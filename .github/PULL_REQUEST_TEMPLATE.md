@@ -4,7 +4,7 @@ Describe the change and why it is needed.
 
 ## Validation
 
-- [ ] `dotnet build .\InstantReplay.sln -c Release`
+- [ ] `dotnet build .\Captail.sln -c Release`
 - [ ] Real Windows UI checked when applicable
 - [ ] Existing replay, hotkey, tray, and recovery behavior preserved
 - [ ] New user-facing text added to both EN and RU resources

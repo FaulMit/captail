@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
-project(EverloopObsBridge LANGUAGES CXX)
+project(CaptailObsBridge LANGUAGES CXX)
 
-add_library(EverloopObsBridge SHARED EverloopObsBridge.cpp)
-target_compile_features(EverloopObsBridge PRIVATE cxx_std_20)
-target_compile_definitions(EverloopObsBridge PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+add_library(CaptailObsBridge SHARED CaptailObsBridge.cpp)
+target_compile_features(CaptailObsBridge PRIVATE cxx_std_20)
+target_compile_definitions(CaptailObsBridge PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)

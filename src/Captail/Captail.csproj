@@ -12,7 +12,8 @@
     <AssemblyName>Captail</AssemblyName>
     <AssemblyTitle>Captail</AssemblyTitle>
     <Product>Captail</Product>
-    <ApplicationIcon>Assets\Everloop.ico</ApplicationIcon>
+    <RootNamespace>Captail</RootNamespace>
+    <ApplicationIcon>Assets\Captail.ico</ApplicationIcon>
     <Version>0.1.0</Version>
   </PropertyGroup>
 
@@ -23,7 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Resource Include="Assets\Everloop.ico" />
+    <Resource Include="Assets\Captail.ico" />
     <Content Include="..\..\LICENSE" Link="LICENSE">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
@@ -51,13 +52,13 @@
   </Target>
 
   <Target Name="BuildObsBridge" BeforeTargets="Build">
-    <Exec Condition="!Exists('$(ObsBridgeBuild)\EverloopObsBridge.sln')"
+    <Exec Condition="!Exists('$(ObsBridgeBuild)\CaptailObsBridge.sln')"
           Command="cmake -S &quot;$(ObsBridgeSource)&quot; -B &quot;$(ObsBridgeBuild)&quot; -G &quot;Visual Studio 17 2022&quot; -A x64" />
-    <Exec Command="cmake --build &quot;$(ObsBridgeBuild)&quot; --config Release --target EverloopObsBridge" />
+    <Exec Command="cmake --build &quot;$(ObsBridgeBuild)&quot; --config Release --target CaptailObsBridge" />
   </Target>
 
   <Target Name="CopyObsBridge" AfterTargets="Build" DependsOnTargets="BuildObsBridge">
-    <Copy SourceFiles="$(ObsBridgeBuild)\Release\EverloopObsBridge.dll"
+    <Copy SourceFiles="$(ObsBridgeBuild)\Release\CaptailObsBridge.dll"
           DestinationFolder="$(OutDir)" />
   </Target>
 
@@ -65,7 +66,7 @@
           AfterTargets="Publish"
           DependsOnTargets="BuildObsBridge"
           Condition="'$(PublishDir)' != ''">
-    <Copy SourceFiles="$(ObsBridgeBuild)\Release\EverloopObsBridge.dll"
+    <Copy SourceFiles="$(ObsBridgeBuild)\Release\CaptailObsBridge.dll"
           DestinationFolder="$(PublishDir)" />
   </Target>
 

@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace InstantReplay;
+namespace Captail;
 
 public static class Log
 {

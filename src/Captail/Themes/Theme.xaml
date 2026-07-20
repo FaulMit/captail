@@ -1,6 +1,6 @@
-<!-- Captail — dark theme ResourceDictionary (.NET 9 WPF)
-     База — хендофф дизайнера (handoff/Theme.xaml), дополнена шаблонами
-     ComboBox, сегментов, чипов и контекстного меню. -->
+<!-- Captail dark theme ResourceDictionary (.NET 9 WPF).
+     Based on the designer handoff, extended with ComboBox, segment,
+     chip, and context-menu templates. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
@@ -155,7 +155,7 @@
     </Setter>
   </Style>
 
-  <!-- Кнопка «Change…» и прочие тихие -->
+  <!-- Quiet actions such as "Change..." -->
   <Style x:Key="SubtleButton" TargetType="Button">
     <Setter Property="Foreground" Value="#FFC4CDD2"/>
     <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
@@ -353,7 +353,7 @@
     </Setter>
   </Style>
 
-  <!-- Квадратная иконочная кнопка в тайтлбаре -->
+  <!-- Square title-bar icon button -->
   <Style x:Key="IconButton" TargetType="Button">
     <Setter Property="Foreground" Value="#FF7D8891"/>
     <Setter Property="Width" Value="28"/>
@@ -432,7 +432,7 @@
   </Style>
 
   <!-- ============ SEGMENT CONTROL ============ -->
-  <!-- Кнопки внутри тёмной полосы BgControl: checked = AccentSubtle фон + mint текст -->
+  <!-- Buttons inside the dark BgControl strip: checked = AccentSubtle background + mint text -->
   <Style x:Key="SegmentButton" TargetType="RadioButton">
     <Setter Property="Foreground" Value="#FF7D8891"/>
     <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
@@ -471,7 +471,7 @@
     <Setter Property="Padding" Value="2"/>
   </Style>
 
-  <!-- ============ SOURCE CHIP (Desktop / Mic на главном экране) ============ -->
+  <!-- ============ SOURCE CHIP (Desktop / Mic on the main screen) ============ -->
   <Style x:Key="SourceChip" TargetType="ToggleButton">
     <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
     <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
@@ -578,7 +578,7 @@
     </Setter>
   </Style>
 
-  <!-- ============ CONTEXT MENU (трей) ============ -->
+  <!-- ============ CONTEXT MENU (tray) ============ -->
   <Style x:Key="TrayMenu" TargetType="ContextMenu">
     <Setter Property="Background" Value="#FF15191C"/>
     <Setter Property="BorderBrush" Value="{StaticResource WindowBorderBrush}"/>

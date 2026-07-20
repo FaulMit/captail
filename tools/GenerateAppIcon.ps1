@@ -1,5 +1,5 @@
 param(
-    [string]$OutputPath = (Join-Path $PSScriptRoot '..\src\InstantReplay\Assets\Everloop.ico')
+    [string]$OutputPath = (Join-Path $PSScriptRoot '..\src\Captail\Assets\Captail.ico')
 )
 
 $ErrorActionPreference = 'Stop'

@@ -31,7 +31,7 @@ $portableArchive = Join-Path $outputRoot "$portableName-Portable-win-x64.zip"
 $setupName = "Captail-$Version-Setup-win-x64.exe"
 $setupPath = Join-Path $outputRoot $setupName
 $checksumPath = Join-Path $outputRoot "SHA256SUMS.txt"
-$project = Join-Path $repoRoot "src\InstantReplay\InstantReplay.csproj"
+$project = Join-Path $repoRoot "src\Captail\Captail.csproj"
 $installerScript = Join-Path $repoRoot "installer\Captail.iss"
 
 foreach ($path in @($stagingRoot, $portableArchive, $setupPath, $checksumPath)) {

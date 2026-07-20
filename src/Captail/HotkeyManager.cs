@@ -2,9 +2,9 @@ using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows.Interop;
 
-namespace InstantReplay;
+namespace Captail;
 
-/// <summary>Два глобальных хоткея: сохранение повтора и включение/выключение буфера.</summary>
+/// <summary>Global hotkeys for saving a replay and toggling the replay buffer.</summary>
 public sealed class HotkeyManager : IDisposable
 {
     [DllImport("user32.dll")]

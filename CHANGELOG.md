@@ -2,6 +2,14 @@
 
 All notable user-facing changes are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Renamed remaining solution, project, namespace, icon, and native bridge identifiers to Captail.
+- Added a real interface screenshot and an OBS Replay Buffer comparison to the README.
+- Standardized repository comments and diagnostic messages in English.
+
 ## [0.1.0] - 2026-07-20
 
 First public preview.

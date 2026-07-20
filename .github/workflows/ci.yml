@@ -29,7 +29,7 @@ jobs:
         with:
           dotnet-version: 9.0.x
           cache: true
-          cache-dependency-path: src/InstantReplay/InstantReplay.csproj
+          cache-dependency-path: src/Captail/Captail.csproj
 
       - name: Cache OBS runtime
         uses: actions/cache@v6
@@ -43,13 +43,13 @@ jobs:
 
       - name: Build Release
         shell: pwsh
-        run: dotnet build ./InstantReplay.sln -c Release -p:ContinuousIntegrationBuild=true
+        run: dotnet build ./Captail.sln -c Release -p:ContinuousIntegrationBuild=true
 
       - name: Validate localization dictionaries
         shell: pwsh
         run: |
-          [xml]$en = Get-Content ./src/InstantReplay/Languages/Strings.en.xaml
-          [xml]$ru = Get-Content ./src/InstantReplay/Languages/Strings.ru.xaml
+          [xml]$en = Get-Content ./src/Captail/Languages/Strings.en.xaml
+          [xml]$ru = Get-Content ./src/Captail/Languages/Strings.ru.xaml
           $enKeys = @($en.ResourceDictionary.String | ForEach-Object { $_.Key })
           $ruKeys = @($ru.ResourceDictionary.String | ForEach-Object { $_.Key })
           $differences = @(Compare-Object $enKeys $ruKeys)

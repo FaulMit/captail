@@ -9,7 +9,7 @@ using System.Windows.Input;
 using System.Windows.Threading;
 using H.NotifyIcon;
 
-namespace InstantReplay;
+namespace Captail;
 
 public partial class App : Application
 {
@@ -355,7 +355,7 @@ public partial class App : Application
                 OutputDirectory = root,
             };
             if (!TryStartPipeline(showError: false))
-                throw new InvalidOperationException("OBS Game Capture не запустился.");
+                throw new InvalidOperationException("OBS Game Capture did not start.");
 
             await Task.Delay(TimeSpan.FromSeconds(8));
             string path = await _obs!.SaveReplayAsync();
@@ -397,11 +397,11 @@ public partial class App : Application
             };
             StartHealthMonitor();
             if (!TryStartPipeline(showError: false))
-                throw new InvalidOperationException("Исходный OBS pipeline не запустился.");
+                throw new InvalidOperationException("The initial OBS pipeline did not start.");
 
             DateTime originalStart = _pipelineStartedUtc;
             await Task.Delay(TimeSpan.FromSeconds(3));
-            RecoverPipeline("QA: искусственный перезапуск OBS.");
+            RecoverPipeline("QA: simulated OBS restart.");
             await Task.Delay(TimeSpan.FromSeconds(6));
             bool restarted = IsReplayRunning && _pipelineStartedUtc > originalStart;
             string path = restarted
@@ -471,8 +471,8 @@ public partial class App : Application
                         Environment.UserName;
         string suffix = userId.Replace('\\', '.') +
                         (isolatedUiTest ? ".UiOnly" : "");
-        string mutexName = $@"Local\Everloop.SingleInstance.{suffix}";
-        _activationPipeName = $"Everloop.Activate.{suffix}";
+        string mutexName = $@"Local\Captail.SingleInstance.{suffix}";
+        _activationPipeName = $"Captail.Activate.{suffix}";
         _singleInstanceMutex = new Mutex(
             initiallyOwned: true,
             mutexName,
@@ -503,11 +503,11 @@ public partial class App : Application
             }
             catch (TimeoutException)
             {
-                // Первый экземпляр ещё запускается.
+                // The first instance may still be starting.
             }
             catch (IOException)
             {
-                // Pipe между попытками пересоздаётся.
+                // The pipe is recreated between attempts.
             }
         }
     }
@@ -550,7 +550,7 @@ public partial class App : Application
     private static void TerminateLegacyInstances()
     {
         int currentId = Environment.ProcessId;
-        foreach (Process process in Process.GetProcessesByName("InstantReplay"))
+        foreach (Process process in Process.GetProcessesByName("Captail"))
         {
             using (process)
             {
@@ -568,7 +568,7 @@ public partial class App : Application
                 catch (Exception exception)
                 {
                     Log.Write(
-                        $"Не удалось закрыть старый экземпляр PID {process.Id}: " +
+                        $"Failed to close the previous instance PID {process.Id}: " +
                         exception.Message);
                 }
             }
@@ -588,7 +588,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            Log.Write($"Глобальный хоткей недоступен: {exception.Message}");
+            Log.Write($"Global hotkey unavailable: {exception.Message}");
             _pendingUiError = exception.Message;
             ShowOverlayNotification(
                 "!",
@@ -639,7 +639,7 @@ public partial class App : Application
             if (engine is not null)
                 _capabilities = engine.Capabilities;
             StopPipeline();
-            Log.Write($"Запуск OBS pipeline не удался: {exception}");
+            Log.Write($"OBS pipeline startup failed: {exception}");
             if (showError)
             {
                 ShowOverlayNotification(
@@ -667,7 +667,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            Log.Write($"Остановка OBS pipeline: {exception}");
+            Log.Write($"OBS pipeline shutdown failed: {exception}");
         }
     }
 
@@ -1119,7 +1119,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
-            Log.Write($"Сохранение повтора упало: {exception}");
+            Log.Write($"Replay save failed: {exception}");
             ShowOverlayNotification(
                 "!",
                 Localization.Text("L.Notify.SaveError"),
@@ -1161,7 +1161,7 @@ public partial class App : Application
     private static Icon CreateIcon()
     {
         using Stream stream = GetResourceStream(
-            new Uri("Assets/Everloop.ico", UriKind.Relative)).Stream;
+            new Uri("Assets/Captail.ico", UriKind.Relative)).Stream;
         using var icon = new Icon(stream);
         return (Icon)icon.Clone();
     }
@@ -1185,7 +1185,7 @@ public partial class App : Application
             }
             catch
             {
-                // Уже освобождён во время аварийного завершения.
+                // Already released during emergency shutdown.
             }
             _singleInstanceMutex.Dispose();
         }

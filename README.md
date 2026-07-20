@@ -13,6 +13,10 @@
 
 Captail is designed around one rule: **Instant Replay should stay on.** A game crash, game-to-desktop switch, temporary capture failure, protected surface, or recoverable graphics-driver interruption should not silently leave you without a replay. A watchdog monitors the recording pipeline and restarts it when recovery is possible.
 
+<p align="center">
+  <img src="docs/captail-main.jpg" alt="Captail main window showing replay status, audio sources, recording format, disk space, and save hotkey" width="420">
+</p>
+
 > [!WARNING]
 > Captail `v0.1.x` is an early public preview. Core recording works, but bugs and hardware-specific problems are expected. Please report anything that does not work.
 
@@ -26,6 +30,16 @@ Captail is designed around one rule: **Instant Replay should stay on.** A game c
 - **Hardware encoding** — AV1, HEVC, and H.264 through supported NVIDIA NVENC, AMD AMF, or Intel Quick Sync encoders.
 - **Flexible audio** — system/game audio and microphone, volume controls, microphone boost, mixed or separate tracks.
 - **Local and private** — no account, cloud upload, analytics, or telemetry. Replays stay on your PC.
+
+## How Captail differs from OBS Replay Buffer
+
+Captail uses libobs for capture and encoding, but it is not an OBS Studio frontend.
+
+- Starts directly in the system tray with Windows.
+- Requires no scenes, sources, or streaming configuration.
+- Monitors capture health and automatically recovers the recording pipeline.
+- Switches between focused game capture and desktop capture.
+- Stays focused on one job: reliable instant replay.
 
 ## Download
 
@@ -147,7 +161,7 @@ Requirements:
 git clone https://github.com/FaulMit/captail.git
 cd captail
 .\tools\AcquireObsRuntime.ps1
-dotnet build .\InstantReplay.sln -c Release
+dotnet build .\Captail.sln -c Release
 ```
 
 Create local release packages:
