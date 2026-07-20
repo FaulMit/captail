@@ -72,7 +72,7 @@ jobs:
         id: inno
         shell: pwsh
         run: |
-          $url = "https://files.jrsoftware.org/is/7/innosetup-7.0.2-x64.exe"
+          $url = "https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe"
           $installer = Join-Path $env:RUNNER_TEMP "innosetup-7.0.2-x64.exe"
           $installDirectory = Join-Path $env:RUNNER_TEMP "innosetup7"
           Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
