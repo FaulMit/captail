@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace InstantReplay;
+namespace Captail;
 
 internal static class ObsNative
 {

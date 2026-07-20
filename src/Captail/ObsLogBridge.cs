@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace InstantReplay;
+namespace Captail;
 
 internal static class ObsLogBridge
 {
@@ -11,18 +11,18 @@ internal static class ObsLogBridge
 
     private static readonly LogCallback Callback = Write;
 
-    [DllImport("EverloopObsBridge.dll", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("CaptailObsBridge.dll", CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]
     private static extern bool everloop_install_obs_log_handler(LogCallback callback);
 
-    [DllImport("EverloopObsBridge.dll", CallingConvention = CallingConvention.Cdecl)]
+    [DllImport("CaptailObsBridge.dll", CallingConvention = CallingConvention.Cdecl)]
     private static extern void everloop_remove_obs_log_handler();
 
     internal static bool Install()
     {
         bool installed = everloop_install_obs_log_handler(Callback);
         if (!installed)
-            Log.Write("OBS log bridge не установился.");
+            Log.Write("OBS log bridge could not be installed.");
         return installed;
     }
 

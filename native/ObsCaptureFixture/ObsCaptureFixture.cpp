@@ -22,7 +22,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
     WNDCLASSW window_class{};
     window_class.hInstance = instance;
     window_class.lpfnWndProc = window_proc;
-    window_class.lpszClassName = L"EverloopObsCaptureFixture";
+    window_class.lpszClassName = L"CaptailObsCaptureFixture";
     window_class.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     if (!RegisterClassW(&window_class))
         return 1;
@@ -30,7 +30,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
     HWND window = CreateWindowExW(
         0,
         window_class.lpszClassName,
-        L"Everloop OBS Capture Fixture",
+        L"Captail OBS Capture Fixture",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,

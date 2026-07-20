@@ -6,9 +6,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using InstantReplay.Interop;
+using Captail.Interop;
 
-namespace InstantReplay;
+namespace Captail;
 
 public partial class SettingsWindow : Window
 {
@@ -169,7 +169,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Write($"Список устройств вывода недоступен: {ex.Message}");
+            Log.Write($"Output-device list unavailable: {ex.Message}");
         }
 
         try
@@ -179,7 +179,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Write($"Список микрофонов недоступен: {ex.Message}");
+            Log.Write($"Microphone list unavailable: {ex.Message}");
         }
 
         try
@@ -199,7 +199,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            Log.Write($"Список мониторов недоступен: {ex.Message}");
+            Log.Write($"Monitor list unavailable: {ex.Message}");
         }
 
         if (MonitorBox.Items.Count == 0)
@@ -256,7 +256,7 @@ public partial class SettingsWindow : Window
             }
             catch
             {
-                // Системные и защищённые процессы недоступны — не показываем.
+                // System and protected processes are inaccessible; omit them.
             }
             finally
             {
@@ -846,7 +846,7 @@ public partial class SettingsWindow : Window
         {
             string? root = Path.GetPathRoot(Path.GetFullPath(_outputDirectory));
             if (string.IsNullOrEmpty(root))
-                throw new IOException("Не удалось определить диск.");
+                throw new IOException("Could not resolve the target drive.");
 
             var drive = new DriveInfo(root);
             long used = drive.TotalSize - drive.AvailableFreeSpace;

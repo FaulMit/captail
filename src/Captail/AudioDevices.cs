@@ -1,6 +1,6 @@
 using NAudio.CoreAudioApi;
 
-namespace InstantReplay;
+namespace Captail;
 
 internal static class AudioDevices
 {

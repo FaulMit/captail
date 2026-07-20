@@ -27,7 +27,7 @@ Requirements:
 
 ```powershell
 .\tools\AcquireObsRuntime.ps1
-dotnet build .\InstantReplay.sln -c Debug
+dotnet build .\Captail.sln -c Debug
 ```
 
 ## Pull requests
@@ -43,6 +43,8 @@ dotnet build .\InstantReplay.sln -c Debug
 ## Code style
 
 - Follow existing C# and XAML conventions.
+- Use English for GitHub issues, pull requests, documentation, code comments, and diagnostic messages.
+- Keep Russian text only in the Russian localization dictionary.
 - Prefer clear behavior over abstraction.
 - Keep user-facing text in EN/RU localization dictionaries.
 - Do not present unavailable hardware functionality as enabled.

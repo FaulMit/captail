@@ -3,7 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace InstantReplay.Interop;
+namespace Captail.Interop;
 
 internal static class CaptureInterop
 {
@@ -153,7 +153,7 @@ internal static class CaptureInterop
             }
             catch
             {
-                // Защищённые системные процессы не являются выбранной игрой.
+                // Protected system processes cannot be the selected game.
             }
 
             process.Dispose();

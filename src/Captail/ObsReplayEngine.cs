@@ -1,8 +1,8 @@
 using System.IO;
 using System.Runtime.InteropServices;
-using InstantReplay.Interop;
+using Captail.Interop;
 
-namespace InstantReplay;
+namespace Captail;
 
 public sealed class ObsReplayEngine : IDisposable
 {
@@ -163,7 +163,7 @@ public sealed class ObsReplayEngine : IDisposable
         }
         catch (Exception exception)
         {
-            Log.Write($"Проверка возможностей GPU не удалась: {exception}");
+            Log.Write($"GPU capability detection failed: {exception}");
             return EncoderCapabilities.Failed(exception.Message);
         }
         finally
@@ -479,8 +479,8 @@ public sealed class ObsReplayEngine : IDisposable
             }
             else
             {
-                // WGC переживает secure/DRM-поверхности и сбросы DXGI стабильнее;
-                // защищённые участки становятся чёрными, сам источник не останавливается.
+                // WGC handles secure/DRM surfaces and DXGI resets more reliably;
+                // protected regions become black without stopping the source.
                 ObsNative.obs_data_set_int(videoSettings, "method", 2);
                 ObsNative.obs_data_set_string(
                     videoSettings,
@@ -628,8 +628,8 @@ public sealed class ObsReplayEngine : IDisposable
                 if (_videoEncoder == 0)
                 {
                     Log.Write(
-                        $"Кодировщик {candidate.EncoderId} отклонил профиль " +
-                        $"{loadProfile}; пробуем следующий.");
+                        $"Encoder {candidate.EncoderId} rejected profile " +
+                        $"{loadProfile}; trying the next candidate.");
                     continue;
                 }
 
@@ -922,7 +922,7 @@ public sealed class ObsReplayEngine : IDisposable
         int enabled = (_config.CaptureSystemAudio ? 1 : 0) +
                       (_config.CaptureMicrophone ? 1 : 0);
         if (enabled == 0)
-            return 1; // Replay Buffer требует аудиокодировщик; дорожка остаётся тихой.
+            return 1; // Replay Buffer requires an audio encoder; this track remains silent.
         return _config.SeparateAudioTracks && enabled > 1 ? 2 : 1;
     }
 

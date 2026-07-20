@@ -1,4 +1,4 @@
-<Window x:Class="InstantReplay.OverlayNotificationWindow"
+<Window x:Class="Captail.OverlayNotificationWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="360" Height="86"

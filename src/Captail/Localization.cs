@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Windows;
 
-namespace InstantReplay;
+namespace Captail;
 
 public static class Localization
 {

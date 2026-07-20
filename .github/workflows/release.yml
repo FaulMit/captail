@@ -56,7 +56,7 @@ jobs:
         with:
           dotnet-version: 9.0.x
           cache: true
-          cache-dependency-path: src/InstantReplay/InstantReplay.csproj
+          cache-dependency-path: src/Captail/Captail.csproj
 
       - name: Cache OBS runtime
         uses: actions/cache@v6

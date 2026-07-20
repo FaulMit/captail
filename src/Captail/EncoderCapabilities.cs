@@ -1,4 +1,4 @@
-namespace InstantReplay;
+namespace Captail;
 
 public sealed record CodecCapability(
     string Codec,
