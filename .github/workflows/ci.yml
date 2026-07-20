@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: src/InstantReplay/InstantReplay.csproj
+
+      - name: Cache OBS runtime
+        uses: actions/cache@v4
+        with:
+          path: runtime/obs
+          key: obs-32.1.2-windows-x64-${{ hashFiles('tools/AcquireObsRuntime.ps1') }}
+
+      - name: Acquire minimal OBS runtime
+        shell: pwsh
+        run: ./tools/AcquireObsRuntime.ps1
+
+      - name: Build Release
+        shell: pwsh
+        run: dotnet build ./InstantReplay.sln -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Validate localization dictionaries
+        shell: pwsh
+        run: |
+          [xml]$en = Get-Content ./src/InstantReplay/Languages/Strings.en.xaml
+          [xml]$ru = Get-Content ./src/InstantReplay/Languages/Strings.ru.xaml
+          $enKeys = @($en.ResourceDictionary.String | ForEach-Object { $_.Key })
+          $ruKeys = @($ru.ResourceDictionary.String | ForEach-Object { $_.Key })
+          $differences = @(Compare-Object $enKeys $ruKeys)
+          if ($differences.Count -ne 0) {
+            $differences | Format-Table | Out-String | Write-Error
+            throw "English and Russian localization keys differ."
+          }
+          if ($enKeys.Count -ne ($enKeys | Sort-Object -Unique).Count) {
+            throw "English localization contains duplicate keys."
+          }
+          if ($ruKeys.Count -ne ($ruKeys | Sort-Object -Unique).Count) {
+            throw "Russian localization contains duplicate keys."
+          }
+          Write-Host "Localization dictionaries match: $($enKeys.Count) keys."

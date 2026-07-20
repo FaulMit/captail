@@ -1,0 +1,236 @@
+name: Build release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version without the v prefix, for example 0.1.1
+        required: true
+        type: string
+      prerelease:
+        description: Mark release as an early preview
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Portable and installer
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      VERSION: ${{ inputs.version }}
+      RELEASE_DIR: artifacts/release/${{ inputs.version }}
+
+    steps:
+      - name: Validate version
+        shell: pwsh
+        run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid semantic version: $env:VERSION"
+          }
+          $existing = gh release view "v$env:VERSION" --repo "$env:GITHUB_REPOSITORY" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release v$env:VERSION already exists."
+          }
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: src/InstantReplay/InstantReplay.csproj
+
+      - name: Cache OBS runtime
+        uses: actions/cache@v4
+        with:
+          path: runtime/obs
+          key: obs-32.1.2-windows-x64-${{ hashFiles('tools/AcquireObsRuntime.ps1') }}
+
+      - name: Acquire minimal OBS runtime
+        shell: pwsh
+        run: ./tools/AcquireObsRuntime.ps1
+
+      - name: Install verified Inno Setup compiler
+        id: inno
+        shell: pwsh
+        run: |
+          $url = "https://files.jrsoftware.org/is/7/innosetup-7.0.2-x64.exe"
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-7.0.2-x64.exe"
+          $installDirectory = Join-Path $env:RUNNER_TEMP "innosetup7"
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
+
+          $signature = Get-AuthenticodeSignature -FilePath $installer
+          if ($signature.Status -ne "Valid" -or
+              $signature.SignerCertificate.Subject -notmatch "Pyrsys B\.V\.") {
+            throw "Inno Setup Authenticode verification failed: $($signature.Status)"
+          }
+
+          $process = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/CURRENTUSER",
+            "/DIR=$installDirectory"
+          )
+          if ($process.ExitCode -ne 0) {
+            throw "Inno Setup installation failed: $($process.ExitCode)"
+          }
+
+          $compiler = Join-Path $installDirectory "ISCC.exe"
+          if (-not (Test-Path -LiteralPath $compiler)) {
+            throw "ISCC.exe not found after installation."
+          }
+          "compiler=$compiler" >> $env:GITHUB_OUTPUT
+
+      - name: Build release packages
+        shell: pwsh
+        run: |
+          ./tools/BuildRelease.ps1 `
+            -Version $env:VERSION `
+            -OutputDirectory $env:RELEASE_DIR `
+            -InnoSetupCompiler '${{ steps.inno.outputs.compiler }}'
+
+      - name: Verify Portable package
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RELEASE_DIR "Captail-$env:VERSION-Portable-win-x64.zip"
+          $extract = Join-Path $env:RUNNER_TEMP "captail-portable-test"
+          Expand-Archive -LiteralPath $archive -DestinationPath $extract
+          $root = Join-Path $extract "Captail-$env:VERSION"
+          $exe = Join-Path $root "Captail.exe"
+          if (-not (Test-Path -LiteralPath $exe)) {
+            throw "Portable package does not contain Captail.exe."
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $root "obs.dll"))) {
+            throw "Portable package does not contain obs.dll."
+          }
+          $product = (Get-Item -LiteralPath $exe).VersionInfo.ProductName
+          if ($product -ne "Captail") {
+            throw "Unexpected Portable product name: $product"
+          }
+          Write-Host "Portable files: $((Get-ChildItem $root -Recurse -File).Count)"
+
+      - name: Verify installer and uninstaller
+        shell: pwsh
+        run: |
+          $setup = Join-Path $env:RELEASE_DIR "Captail-$env:VERSION-Setup-win-x64.exe"
+          $installDirectory = Join-Path $env:RUNNER_TEMP "captail-install-test"
+          $install = Start-Process -FilePath $setup -Wait -PassThru -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/DIR=$installDirectory"
+          )
+          if ($install.ExitCode -ne 0) {
+            throw "Captail installer failed: $($install.ExitCode)"
+          }
+          if (-not (Test-Path -LiteralPath (Join-Path $installDirectory "Captail.exe"))) {
+            throw "Installer did not install Captail.exe."
+          }
+
+          $uninstaller = Join-Path $installDirectory "unins000.exe"
+          if (-not (Test-Path -LiteralPath $uninstaller)) {
+            throw "Installer did not create an uninstaller."
+          }
+          $uninstall = Start-Process -FilePath $uninstaller -Wait -PassThru -ArgumentList @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART"
+          )
+          if ($uninstall.ExitCode -ne 0) {
+            throw "Captail uninstaller failed: $($uninstall.ExitCode)"
+          }
+          if (Test-Path -LiteralPath (Join-Path $installDirectory "Captail.exe")) {
+            throw "Captail.exe remains after uninstall."
+          }
+
+      - name: Verify SHA-256 checksums
+        shell: pwsh
+        run: |
+          $checksumFile = Join-Path $env:RELEASE_DIR "SHA256SUMS.txt"
+          foreach ($line in Get-Content -LiteralPath $checksumFile) {
+            if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
+              throw "Invalid checksum line: $line"
+            }
+            $path = Join-Path $env:RELEASE_DIR $Matches[2]
+            $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actual -ne $Matches[1]) {
+              throw "Checksum mismatch: $($Matches[2])"
+            }
+          }
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Captail-${{ inputs.version }}-win-x64
+          path: |
+            ${{ env.RELEASE_DIR }}/Captail-${{ inputs.version }}-Portable-win-x64.zip
+            ${{ env.RELEASE_DIR }}/Captail-${{ inputs.version }}-Setup-win-x64.exe
+            ${{ env.RELEASE_DIR }}/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            ${{ env.RELEASE_DIR }}/Captail-${{ inputs.version }}-Portable-win-x64.zip
+            ${{ env.RELEASE_DIR }}/Captail-${{ inputs.version }}-Setup-win-x64.exe
+            ${{ env.RELEASE_DIR }}/SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        run: |
+          $intro = @"
+          > [!WARNING]
+          > Captail $env:VERSION is an early public preview. Bugs and hardware-specific issues are expected.
+
+          **Recommended:** download the Setup EXE. It includes Captail, .NET, and required libobs components and creates a Windows uninstaller.
+
+          **Portable:** extract the entire ZIP before launching `Captail.exe`.
+
+          Tested on NVIDIA GeForce RTX 40 and RTX 50 series. Older NVIDIA, AMD, and Intel hardware still needs broader public testing. Please report results and bugs through GitHub Issues.
+
+          Release binaries are not Authenticode-signed. Verify `SHA256SUMS.txt` and GitHub build provenance.
+          "@
+
+          $assets = @(
+            (Join-Path $env:RELEASE_DIR "Captail-$env:VERSION-Portable-win-x64.zip"),
+            (Join-Path $env:RELEASE_DIR "Captail-$env:VERSION-Setup-win-x64.exe"),
+            (Join-Path $env:RELEASE_DIR "SHA256SUMS.txt")
+          )
+          $arguments = @(
+            "release", "create", "v$env:VERSION"
+          ) + $assets + @(
+            "--repo", $env:GITHUB_REPOSITORY,
+            "--target", $env:GITHUB_SHA,
+            "--title", "Captail v$env:VERSION",
+            "--notes", $intro,
+            "--generate-notes"
+          )
+          if ('${{ inputs.prerelease }}' -eq 'true') {
+            $arguments += "--prerelease"
+          }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub Release creation failed."
+          }
+        env:
+          GH_TOKEN: ${{ github.token }}

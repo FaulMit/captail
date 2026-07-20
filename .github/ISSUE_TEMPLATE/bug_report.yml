@@ -1,0 +1,100 @@
+name: Bug report
+description: Report a reproducible Captail problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Captail. Detailed hardware and recording information makes early-preview bugs much easier to reproduce.
+
+  - type: input
+    id: version
+    attributes:
+      label: Captail version
+      description: Find this on the GitHub Release page or in file properties.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - Installer
+        - Portable
+        - Built from source
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 24H2, build 26100"
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU and driver
+      placeholder: "NVIDIA GeForce RTX 5070, driver 576.80"
+    validations:
+      required: true
+
+  - type: textarea
+    id: recording
+    attributes:
+      label: Recording configuration
+      description: Include source, codec, resolution, FPS, bitrate, buffer length, and audio setup.
+      placeholder: "Game Capture, AV1, 2560×1440, 240 FPS, Auto bitrate, 10 min, game audio + microphone"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Start Captail
+        2. Select ...
+        3. Launch ...
+        4. Press ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Logs are in %APPDATA%\Captail\log.txt. Remove personal paths and sensitive information first.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed personal or sensitive information from attached logs.
+          required: true
+        - label: I understand that Captail is currently an early preview.
+          required: true

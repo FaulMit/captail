@@ -1,0 +1,24 @@
+<svg width="1200" height="320" viewBox="0 0 1200 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="90" y1="0" x2="1110" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#101619"/>
+      <stop offset="1" stop-color="#171E21"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="388" y1="84" x2="812" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#76E4C9"/>
+      <stop offset="1" stop-color="#42BCA3"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="320" rx="28" fill="url(#bg)"/>
+  <circle cx="176" cy="160" r="80" stroke="#263337" stroke-width="2"/>
+  <circle cx="176" cy="160" r="55" stroke="url(#accent)" stroke-width="11" stroke-linecap="round" stroke-dasharray="280 70"/>
+  <circle cx="176" cy="160" r="11" fill="#65D9BD"/>
+  <circle cx="176" cy="160" r="92" stroke="#65D9BD" stroke-opacity=".09" stroke-width="16" filter="url(#glow)"/>
+  <text x="300" y="145" fill="#F1F5F4" font-family="Segoe UI, Inter, sans-serif" font-size="76" font-weight="700" letter-spacing="-2">Captail</text>
+  <text x="304" y="204" fill="#98A6A8" font-family="Segoe UI, Inter, sans-serif" font-size="28" font-weight="500">Instant replay that stays on.</text>
+  <rect x="304" y="233" width="244" height="5" rx="2.5" fill="url(#accent)"/>
+  <text x="1030" y="282" fill="#5D6A6D" font-family="Segoe UI, Inter, sans-serif" font-size="18" text-anchor="end">Windows · Open source · libobs</text>
+</svg>

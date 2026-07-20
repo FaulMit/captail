@@ -1,0 +1,27 @@
+# Build output
+artifacts/
+runtime/
+src/**/bin/
+src/**/obj/
+native/**/build/
+
+# IDE and user state
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Test and diagnostic output
+.qa/
+TestResults/
+*.pdb
+*.log
+*.dmp
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

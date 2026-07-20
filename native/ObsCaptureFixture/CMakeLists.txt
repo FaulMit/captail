@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.20)
+project(ObsCaptureFixture LANGUAGES CXX)
+
+add_executable(ObsCaptureFixture WIN32 ObsCaptureFixture.cpp)
+target_compile_features(ObsCaptureFixture PRIVATE cxx_std_20)
+target_compile_definitions(ObsCaptureFixture PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_libraries(ObsCaptureFixture PRIVATE d3d11 dxgi)
