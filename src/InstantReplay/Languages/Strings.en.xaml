@@ -1,0 +1,217 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+  <sys:String x:Key="L.Brand">Captail</sys:String>
+  <sys:String x:Key="L.LanguageCode">EN</sys:String>
+  <sys:String x:Key="L.LanguageTip">Switch language</sys:String>
+  <sys:String x:Key="L.Settings">Settings</sys:String>
+  <sys:String x:Key="L.Done">Done</sys:String>
+  <sys:String x:Key="L.Minimize">Minimize</sys:String>
+  <sys:String x:Key="L.Close">Close</sys:String>
+
+  <sys:String x:Key="L.Status.Enabled">Instant Replay is on</sys:String>
+  <sys:String x:Key="L.Status.Disabled">Instant Replay is off</sys:String>
+  <sys:String x:Key="L.Status.Idle">Buffer is not recording</sys:String>
+  <sys:String x:Key="L.Status.Recovering">Recovering Instant Replay</sys:String>
+  <sys:String x:Key="L.Status.Detail">Last {0} · {1} · {2}</sys:String>
+  <sys:String x:Key="L.Status.BufferLast">Buffer: last {0}</sys:String>
+
+  <sys:String x:Key="L.Audio.System">System</sys:String>
+  <sys:String x:Key="L.Audio.Game">Game</sys:String>
+  <sys:String x:Key="L.Audio.Microphone">Microphone</sys:String>
+  <sys:String x:Key="L.Audio.SystemSound">system audio</sys:String>
+  <sys:String x:Key="L.Audio.GameSound">game audio</sys:String>
+  <sys:String x:Key="L.Audio.MicrophoneLower">microphone</sys:String>
+  <sys:String x:Key="L.Audio.VideoOnly">video only</sys:String>
+  <sys:String x:Key="L.Audio.SeparateSuffix">{0} + microphone · separate</sys:String>
+  <sys:String x:Key="L.Audio.MixedWithMic">{0} + microphone</sys:String>
+  <sys:String x:Key="L.Audio.ToggleTip">Left-click: toggle recording · Right-click: choose device</sys:String>
+  <sys:String x:Key="L.Audio.GameToggleTip">Left-click: toggle game audio · device follows game</sys:String>
+  <sys:String x:Key="L.Audio.GameCaptured">Audio is captured from selected game</sys:String>
+  <sys:String x:Key="L.Audio.SystemDeviceHeader">SYSTEM AUDIO DEVICE</sys:String>
+  <sys:String x:Key="L.Audio.MicDeviceHeader">MICROPHONE DEVICE</sys:String>
+  <sys:String x:Key="L.Audio.UnknownDevice">Unknown device</sys:String>
+  <sys:String x:Key="L.Audio.DefaultWindows">Default · Windows</sys:String>
+
+  <sys:String x:Key="L.OpenCodec">Open codec settings</sys:String>
+  <sys:String x:Key="L.OpenFps">Open frame-rate settings</sys:String>
+  <sys:String x:Key="L.OpenFolderSettings">Open replay-folder settings</sys:String>
+  <sys:String x:Key="L.Save.Duration">Save {0}</sys:String>
+
+  <sys:String x:Key="L.Section.Replay">REPLAY</sys:String>
+  <sys:String x:Key="L.Section.Video">VIDEO</sys:String>
+  <sys:String x:Key="L.Section.Audio">AUDIO</sys:String>
+  <sys:String x:Key="L.Section.Storage">STORAGE</sys:String>
+  <sys:String x:Key="L.Section.Hotkeys">HOTKEYS</sys:String>
+
+  <sys:String x:Key="L.Replay.Instant">Instant Replay</sys:String>
+  <sys:String x:Key="L.Replay.BufferLength">Buffer length</sys:String>
+  <sys:String x:Key="L.Duration.15s">15s</sys:String>
+  <sys:String x:Key="L.Duration.30s">30s</sys:String>
+  <sys:String x:Key="L.Duration.1m">1m</sys:String>
+  <sys:String x:Key="L.Duration.2m">2m</sys:String>
+  <sys:String x:Key="L.Duration.5m">5m</sys:String>
+  <sys:String x:Key="L.Duration.10m">10m</sys:String>
+  <sys:String x:Key="L.Duration.15m">15m</sys:String>
+  <sys:String x:Key="L.Replay.BufferLimit">Buffer limit</sys:String>
+  <sys:String x:Key="L.Replay.BufferLimitTip">Maximum compressed video and audio packet memory</sys:String>
+  <sys:String x:Key="L.Replay.BufferLimitHint">Limits RAM use and duration</sys:String>
+  <sys:String x:Key="L.Replay.DurationOnly">Duration only</sys:String>
+  <sys:String x:Key="L.Size.250MB">250 MB</sys:String>
+  <sys:String x:Key="L.Size.500MB">500 MB</sys:String>
+  <sys:String x:Key="L.Size.1GB">1 GB</sys:String>
+  <sys:String x:Key="L.Size.2GB">2 GB</sys:String>
+  <sys:String x:Key="L.Size.5GB">5 GB</sys:String>
+  <sys:String x:Key="L.Size.10GB">10 GB</sys:String>
+  <sys:String x:Key="L.Replay.StartWindows">Start with Windows</sys:String>
+
+  <sys:String x:Key="L.Video.Source">Source</sys:String>
+  <sys:String x:Key="L.Video.Desktop">Desktop</sys:String>
+  <sys:String x:Key="L.Video.GameSource">Game · OBS Game Capture</sys:String>
+  <sys:String x:Key="L.Video.Game">Game</sys:String>
+  <sys:String x:Key="L.Video.GameCompatibility">Game Capture · anti-cheat compatible</sys:String>
+  <sys:String x:Key="L.Video.Codec">Codec</sys:String>
+  <sys:String x:Key="L.Video.Bitrate">Bitrate</sys:String>
+  <sys:String x:Key="L.Video.AutoLoad">Auto · adaptive load</sys:String>
+  <sys:String x:Key="L.Video.Mbps10">10 Mbps</sys:String>
+  <sys:String x:Key="L.Video.Mbps20">20 Mbps</sys:String>
+  <sys:String x:Key="L.Video.Mbps50">50 Mbps</sys:String>
+  <sys:String x:Key="L.Video.Mbps80">80 Mbps</sys:String>
+  <sys:String x:Key="L.Video.Monitor">Monitor</sys:String>
+  <sys:String x:Key="L.Video.Resolution">Recording resolution</sys:String>
+  <sys:String x:Key="L.Video.SourceResolution">Same as source</sys:String>
+  <sys:String x:Key="L.Video.FrameRate">Frame rate</sys:String>
+  <sys:String x:Key="L.Video.MonitorFormat">Monitor {0} · {1}×{2}</sys:String>
+  <sys:String x:Key="L.Video.PrimaryMonitor">Primary monitor</sys:String>
+  <sys:String x:Key="L.Video.DesktopLower">desktop</sys:String>
+  <sys:String x:Key="L.Video.GameLower">game</sys:String>
+  <sys:String x:Key="L.Video.SourceShort">source</sys:String>
+  <sys:String x:Key="L.Video.GameNotRunning">{0} · not running</sys:String>
+  <sys:String x:Key="L.Video.ChooseGame">Choose a running game…</sys:String>
+
+  <sys:String x:Key="L.Audio.SystemAudio">System audio</sys:String>
+  <sys:String x:Key="L.Audio.GameAudio">Game audio</sys:String>
+  <sys:String x:Key="L.Audio.Volume">Volume</sys:String>
+  <sys:String x:Key="L.Audio.Boost">Boost</sys:String>
+  <sys:String x:Key="L.Audio.BoostTip">Excessive boost may clip microphone audio</sys:String>
+  <sys:String x:Key="L.Audio.Tracks">Audio tracks</sys:String>
+  <sys:String x:Key="L.Audio.SystemAndMic">System and microphone</sys:String>
+  <sys:String x:Key="L.Audio.GameAndMic">Game and microphone</sys:String>
+  <sys:String x:Key="L.Audio.OneMixed">One mixed track</sys:String>
+  <sys:String x:Key="L.Audio.Separate">Separate tracks</sys:String>
+  <sys:String x:Key="L.Audio.Codec">Audio codec</sys:String>
+
+  <sys:String x:Key="L.Storage.ReplayFolder">Replay folder</sys:String>
+  <sys:String x:Key="L.Storage.Change">Change…</sys:String>
+  <sys:String x:Key="L.Storage.FreeOn">{0} free on {1}</sys:String>
+  <sys:String x:Key="L.Storage.Used">{0} used</sys:String>
+  <sys:String x:Key="L.Storage.Free">{0} free</sys:String>
+  <sys:String x:Key="L.Storage.Unavailable">Drive unavailable</sys:String>
+  <sys:String x:Key="L.Storage.NoData">No data</sys:String>
+
+  <sys:String x:Key="L.Hotkey.SaveReplay">Save replay</sys:String>
+  <sys:String x:Key="L.Hotkey.SaveHint">Saves current buffer</sys:String>
+  <sys:String x:Key="L.Hotkey.Toggle">Enable / disable</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleHint">Toggles Instant Replay</sys:String>
+  <sys:String x:Key="L.Hotkey.ApplyHint">Press “Done” to apply changes.</sys:String>
+  <sys:String x:Key="L.Hotkey.Press">Press keys…</sys:String>
+  <sys:String x:Key="L.Hotkey.AddModifier">Add Ctrl / Alt / Shift</sys:String>
+  <sys:String x:Key="L.Hotkey.InUse">Hotkey already in use</sys:String>
+
+  <sys:String x:Key="L.Error">Error</sys:String>
+  <sys:String x:Key="L.Codec.UnavailableSuffix">{0} · unavailable</sys:String>
+  <sys:String x:Key="L.Codec.Unsupported">Current GPU or driver does not support hardware encoding</sys:String>
+  <sys:String x:Key="L.Codec.HardwareUnavailable">Hardware encoder unavailable</sys:String>
+
+  <sys:String x:Key="L.Error.HotkeysTitle">Check hotkeys</sys:String>
+  <sys:String x:Key="L.Error.HotkeysMessage">Hotkeys must be valid and different.</sys:String>
+  <sys:String x:Key="L.Error.FolderTitle">No folder selected</sys:String>
+  <sys:String x:Key="L.Error.FolderMessage">Choose a folder for saved replays.</sys:String>
+  <sys:String x:Key="L.Error.PathTitle">Invalid path</sys:String>
+  <sys:String x:Key="L.Error.PathMessage">Check replay folder path.</sys:String>
+  <sys:String x:Key="L.Error.GameTitle">No game selected</sys:String>
+  <sys:String x:Key="L.Error.GameMessage">Start a game and select its process.</sys:String>
+  <sys:String x:Key="L.Error.CodecTitle">Codec unavailable</sys:String>
+  <sys:String x:Key="L.Error.CodecMessage">Choose a codec supported by current GPU and driver.</sys:String>
+  <sys:String x:Key="L.Error.AutostartTitle">Could not update startup</sys:String>
+  <sys:String x:Key="L.Error.AudioSourceTitle">Audio source unavailable</sys:String>
+  <sys:String x:Key="L.Error.AudioSourceMessage">Change cancelled. Previous audio configuration restored.</sys:String>
+  <sys:String x:Key="L.Error.SourceTitle">Could not change source</sys:String>
+  <sys:String x:Key="L.Error.DeviceTitle">Device unavailable</sys:String>
+  <sys:String x:Key="L.Error.Attention">Attention required</sys:String>
+  <sys:String x:Key="L.Error.BindTitle">Could not assign hotkey</sys:String>
+
+  <sys:String x:Key="L.Tray.Save">Save replay</sys:String>
+  <sys:String x:Key="L.Tray.Toggle">Enable / disable replay</sys:String>
+  <sys:String x:Key="L.Tray.OpenFolder">Open replay folder</sys:String>
+  <sys:String x:Key="L.Tray.OpenApp">Open Captail</sys:String>
+  <sys:String x:Key="L.Tray.Exit">Exit</sys:String>
+  <sys:String x:Key="L.Tray.Active">Captail — {0} buffer</sys:String>
+  <sys:String x:Key="L.Tray.Disabled">Captail — replay off</sys:String>
+
+  <sys:String x:Key="L.Notify.ReadyTitle">Instant Replay ready</sys:String>
+  <sys:String x:Key="L.Notify.EnabledTitle">Instant Replay enabled</sys:String>
+  <sys:String x:Key="L.Notify.DisabledTitle">Instant Replay disabled</sys:String>
+  <sys:String x:Key="L.Notify.DisabledDetail">Buffer stopped.</sys:String>
+  <sys:String x:Key="L.Notify.RecoveredTitle">Instant Replay recovered</sys:String>
+  <sys:String x:Key="L.Notify.RecoveredDetail">Buffer is recording again.</sys:String>
+  <sys:String x:Key="L.Notify.RecoveryTitle">Recovering Instant Replay</sys:String>
+  <sys:String x:Key="L.Notify.RecoveryFailedTitle">Could not recover Instant Replay</sys:String>
+  <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Replay temporarily unavailable</sys:String>
+  <sys:String x:Key="L.Notify.RetryIn">Retry in {0} sec.</sys:String>
+  <sys:String x:Key="L.Notify.ReasonRetry">{0} Retrying in {1} sec.</sys:String>
+  <sys:String x:Key="L.Notify.CaptureFailed">Capture did not start</sys:String>
+  <sys:String x:Key="L.Notify.SettingsApplied">Settings applied</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOff">Instant Replay off</sys:String>
+  <sys:String x:Key="L.Notify.EnableBeforeSave">Enable Instant Replay before saving.</sys:String>
+  <sys:String x:Key="L.Notify.Saved">Replay saved</sys:String>
+  <sys:String x:Key="L.Notify.SaveError">Save failed</sys:String>
+  <sys:String x:Key="L.Notify.HotkeyUnavailableTitle">Global hotkey unavailable</sys:String>
+  <sys:String x:Key="L.Notify.DriverUnavailable">Video driver is temporarily unavailable. Retrying in {0} sec.</sys:String>
+  <sys:String x:Key="L.Recovery.ModuleStopped">Recording module stopped.</sys:String>
+  <sys:String x:Key="L.Recovery.NoFrames">No new frames received.</sys:String>
+  <sys:String x:Key="L.App.StartError">Captail could not start:&#x0A;{0}</sys:String>
+  <sys:String x:Key="L.App.ExecutablePathError">Could not determine Captail executable path.</sys:String>
+
+  <sys:String x:Key="L.Hotkey.MustDiffer">Replay save and toggle hotkeys must differ.</sys:String>
+  <sys:String x:Key="L.Hotkey.Occupied">{0} is already used by another application.</sys:String>
+  <sys:String x:Key="L.Hotkey.ParseError">Could not parse hotkey: {0}</sys:String>
+  <sys:String x:Key="L.Gpu.Generic">Graphics adapter</sys:String>
+  <sys:String x:Key="L.Gpu.Unknown">GPU not detected</sys:String>
+  <sys:String x:Key="L.Gpu.Preview">Preview graphics adapter</sys:String>
+  <sys:String x:Key="L.Gpu.HardwareEncoder">Hardware encoder</sys:String>
+
+  <sys:String x:Key="L.Engine.CapabilitiesPending">GPU capabilities have not been checked yet.</sys:String>
+  <sys:String x:Key="L.Engine.GameCaptured">Game · Game Capture</sys:String>
+  <sys:String x:Key="L.Engine.GameWaiting">Game · waiting for capture</sys:String>
+  <sys:String x:Key="L.Engine.InUse">Recording module is already in use.</sys:String>
+  <sys:String x:Key="L.Engine.BufferStopped">Replay buffer is not running.</sys:String>
+  <sys:String x:Key="L.Engine.SavePending">Previous replay is still being saved.</sys:String>
+  <sys:String x:Key="L.Engine.SaveRejected">Replay buffer rejected save command.</sys:String>
+  <sys:String x:Key="L.Engine.SaveTimeout">Replay save did not finish within 45 seconds.</sys:String>
+  <sys:String x:Key="L.Engine.ModuleMissing">Capture module not found. Reinstall Captail.</sys:String>
+  <sys:String x:Key="L.Engine.InitFailed">Could not initialize capture module.</sys:String>
+  <sys:String x:Key="L.Engine.VersionMismatch">Capture module version is incompatible with this application.</sys:String>
+  <sys:String x:Key="L.Engine.MonitorMissing">Capture monitor not found.</sys:String>
+  <sys:String x:Key="L.Engine.VideoFailed">Video subsystem failed to start: code {0}.</sys:String>
+  <sys:String x:Key="L.Engine.AudioFailed">Audio subsystem failed to start.</sys:String>
+  <sys:String x:Key="L.Engine.NoEncoder">No compatible hardware video encoder found. Update graphics driver.</sys:String>
+  <sys:String x:Key="L.Engine.CodecFallback">{0} is unavailable on {1}; selected {2}.</sys:String>
+  <sys:String x:Key="L.Engine.VideoSourceFailed">Could not create video source.</sys:String>
+  <sys:String x:Key="L.Engine.SceneFailed">Could not create capture scene.</sys:String>
+  <sys:String x:Key="L.Engine.SourceAttachFailed">Could not attach video source.</sys:String>
+  <sys:String x:Key="L.Engine.AudioSourceFailed">Could not create {0} source.</sys:String>
+  <sys:String x:Key="L.Engine.EncoderFailed">No working {0} encoder found.</sys:String>
+  <sys:String x:Key="L.Engine.AudioEncoderFailed">Could not create {0} encoder.</sys:String>
+  <sys:String x:Key="L.Engine.BufferUnavailable">Replay buffer is unavailable.</sys:String>
+  <sys:String x:Key="L.Engine.BufferStartFailed">Replay buffer did not start.</sys:String>
+  <sys:String x:Key="L.Engine.SavedPathMissing">Replay was saved, but file path was not returned.</sys:String>
+  <sys:String x:Key="L.Engine.BufferUnexpectedStop">Replay buffer stopped unexpectedly.</sys:String>
+  <sys:String x:Key="L.Engine.BufferError">Replay buffer: {0}</sys:String>
+
+  <sys:String x:Key="L.Unit.Seconds">{0} sec</sys:String>
+  <sys:String x:Key="L.Unit.Minutes">{0} min</sys:String>
+  <sys:String x:Key="L.Unit.GB">{0} GB</sys:String>
+</ResourceDictionary>

@@ -1,0 +1,92 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows10.0.22621.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Captail</AssemblyName>
+    <AssemblyTitle>Captail</AssemblyTitle>
+    <Product>Captail</Product>
+    <ApplicationIcon>Assets\Everloop.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.1.4" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\Everloop.ico" />
+    <Content Include="..\..\LICENSE" Link="LICENSE">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\README.md" Link="README.md">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <ObsRuntimeRoot>$(MSBuildProjectDirectory)\..\..\runtime\obs</ObsRuntimeRoot>
+    <AcquireObsRuntimeOnBuild Condition="'$(AcquireObsRuntimeOnBuild)' == ''">true</AcquireObsRuntimeOnBuild>
+    <ObsBridgeSource>$(MSBuildProjectDirectory)\..\..\native\ObsBridge</ObsBridgeSource>
+    <ObsBridgeBuild>$(ObsBridgeSource)\build</ObsBridgeBuild>
+  </PropertyGroup>
+
+  <Target Name="AcquireObsRuntime"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(AcquireObsRuntimeOnBuild)' == 'true' and !Exists('$(ObsRuntimeRoot)\bin\obs.dll')">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\AcquireObsRuntime.ps1&quot;" />
+  </Target>
+
+  <Target Name="BuildObsBridge" BeforeTargets="Build">
+    <Exec Condition="!Exists('$(ObsBridgeBuild)\EverloopObsBridge.sln')"
+          Command="cmake -S &quot;$(ObsBridgeSource)&quot; -B &quot;$(ObsBridgeBuild)&quot; -G &quot;Visual Studio 17 2022&quot; -A x64" />
+    <Exec Command="cmake --build &quot;$(ObsBridgeBuild)&quot; --config Release --target EverloopObsBridge" />
+  </Target>
+
+  <Target Name="CopyObsBridge" AfterTargets="Build" DependsOnTargets="BuildObsBridge">
+    <Copy SourceFiles="$(ObsBridgeBuild)\Release\EverloopObsBridge.dll"
+          DestinationFolder="$(OutDir)" />
+  </Target>
+
+  <Target Name="CopyObsBridgeToPublish"
+          AfterTargets="Publish"
+          DependsOnTargets="BuildObsBridge"
+          Condition="'$(PublishDir)' != ''">
+    <Copy SourceFiles="$(ObsBridgeBuild)\Release\EverloopObsBridge.dll"
+          DestinationFolder="$(PublishDir)" />
+  </Target>
+
+  <ItemGroup>
+    <Content Include="$(ObsRuntimeRoot)\bin\**\*">
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(ObsRuntimeRoot)\obs-plugins\**\*">
+      <Link>obs-plugins\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(ObsRuntimeRoot)\data\**\*">
+      <Link>data\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

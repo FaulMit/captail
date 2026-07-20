@@ -1,0 +1,217 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+  <sys:String x:Key="L.Brand">Captail</sys:String>
+  <sys:String x:Key="L.LanguageCode">RU</sys:String>
+  <sys:String x:Key="L.LanguageTip">Сменить язык</sys:String>
+  <sys:String x:Key="L.Settings">Настройки</sys:String>
+  <sys:String x:Key="L.Done">Готово</sys:String>
+  <sys:String x:Key="L.Minimize">Свернуть</sys:String>
+  <sys:String x:Key="L.Close">Закрыть</sys:String>
+
+  <sys:String x:Key="L.Status.Enabled">Мгновенный повтор включён</sys:String>
+  <sys:String x:Key="L.Status.Disabled">Мгновенный повтор выключен</sys:String>
+  <sys:String x:Key="L.Status.Idle">Буфер не записывается</sys:String>
+  <sys:String x:Key="L.Status.Recovering">Восстановление повтора</sys:String>
+  <sys:String x:Key="L.Status.Detail">Последние {0} · {1} · {2}</sys:String>
+  <sys:String x:Key="L.Status.BufferLast">Буфер: последние {0}</sys:String>
+
+  <sys:String x:Key="L.Audio.System">Система</sys:String>
+  <sys:String x:Key="L.Audio.Game">Игра</sys:String>
+  <sys:String x:Key="L.Audio.Microphone">Микрофон</sys:String>
+  <sys:String x:Key="L.Audio.SystemSound">звук системы</sys:String>
+  <sys:String x:Key="L.Audio.GameSound">звук игры</sys:String>
+  <sys:String x:Key="L.Audio.MicrophoneLower">микрофон</sys:String>
+  <sys:String x:Key="L.Audio.VideoOnly">только видео</sys:String>
+  <sys:String x:Key="L.Audio.SeparateSuffix">{0} + микрофон · раздельно</sys:String>
+  <sys:String x:Key="L.Audio.MixedWithMic">{0} + микрофон</sys:String>
+  <sys:String x:Key="L.Audio.ToggleTip">ЛКМ: включить запись · ПКМ: выбрать устройство</sys:String>
+  <sys:String x:Key="L.Audio.GameToggleTip">ЛКМ: включить звук игры · устройство выбирает игра</sys:String>
+  <sys:String x:Key="L.Audio.GameCaptured">Звук захватывается из выбранной игры</sys:String>
+  <sys:String x:Key="L.Audio.SystemDeviceHeader">УСТРОЙСТВО СИСТЕМНОГО ЗВУКА</sys:String>
+  <sys:String x:Key="L.Audio.MicDeviceHeader">УСТРОЙСТВО МИКРОФОНА</sys:String>
+  <sys:String x:Key="L.Audio.UnknownDevice">Неизвестное устройство</sys:String>
+  <sys:String x:Key="L.Audio.DefaultWindows">По умолчанию · Windows</sys:String>
+
+  <sys:String x:Key="L.OpenCodec">Открыть выбор кодека</sys:String>
+  <sys:String x:Key="L.OpenFps">Открыть выбор частоты кадров</sys:String>
+  <sys:String x:Key="L.OpenFolderSettings">Открыть настройки папки повторов</sys:String>
+  <sys:String x:Key="L.Save.Duration">Сохранить {0}</sys:String>
+
+  <sys:String x:Key="L.Section.Replay">ПОВТОР</sys:String>
+  <sys:String x:Key="L.Section.Video">ВИДЕО</sys:String>
+  <sys:String x:Key="L.Section.Audio">ЗВУК</sys:String>
+  <sys:String x:Key="L.Section.Storage">ХРАНИЛИЩЕ</sys:String>
+  <sys:String x:Key="L.Section.Hotkeys">БИНДЫ</sys:String>
+
+  <sys:String x:Key="L.Replay.Instant">Мгновенный повтор</sys:String>
+  <sys:String x:Key="L.Replay.BufferLength">Длина буфера</sys:String>
+  <sys:String x:Key="L.Duration.15s">15с</sys:String>
+  <sys:String x:Key="L.Duration.30s">30с</sys:String>
+  <sys:String x:Key="L.Duration.1m">1м</sys:String>
+  <sys:String x:Key="L.Duration.2m">2м</sys:String>
+  <sys:String x:Key="L.Duration.5m">5м</sys:String>
+  <sys:String x:Key="L.Duration.10m">10м</sys:String>
+  <sys:String x:Key="L.Duration.15m">15м</sys:String>
+  <sys:String x:Key="L.Replay.BufferLimit">Лимит буфера</sys:String>
+  <sys:String x:Key="L.Replay.BufferLimitTip">Максимальный объём сжатых видео- и аудиопакетов в оперативной памяти</sys:String>
+  <sys:String x:Key="L.Replay.BufferLimitHint">Ограничивает ОЗУ и длительность</sys:String>
+  <sys:String x:Key="L.Replay.DurationOnly">Только длительность</sys:String>
+  <sys:String x:Key="L.Size.250MB">250 МБ</sys:String>
+  <sys:String x:Key="L.Size.500MB">500 МБ</sys:String>
+  <sys:String x:Key="L.Size.1GB">1 ГБ</sys:String>
+  <sys:String x:Key="L.Size.2GB">2 ГБ</sys:String>
+  <sys:String x:Key="L.Size.5GB">5 ГБ</sys:String>
+  <sys:String x:Key="L.Size.10GB">10 ГБ</sys:String>
+  <sys:String x:Key="L.Replay.StartWindows">Запускать вместе с Windows</sys:String>
+
+  <sys:String x:Key="L.Video.Source">Источник</sys:String>
+  <sys:String x:Key="L.Video.Desktop">Рабочий стол</sys:String>
+  <sys:String x:Key="L.Video.GameSource">Игра · OBS Game Capture</sys:String>
+  <sys:String x:Key="L.Video.Game">Игра</sys:String>
+  <sys:String x:Key="L.Video.GameCompatibility">Game Capture · совместимость с античитами</sys:String>
+  <sys:String x:Key="L.Video.Codec">Кодек</sys:String>
+  <sys:String x:Key="L.Video.Bitrate">Битрейт</sys:String>
+  <sys:String x:Key="L.Video.AutoLoad">Авто · по нагрузке</sys:String>
+  <sys:String x:Key="L.Video.Mbps10">10 Мбит/с</sys:String>
+  <sys:String x:Key="L.Video.Mbps20">20 Мбит/с</sys:String>
+  <sys:String x:Key="L.Video.Mbps50">50 Мбит/с</sys:String>
+  <sys:String x:Key="L.Video.Mbps80">80 Мбит/с</sys:String>
+  <sys:String x:Key="L.Video.Monitor">Монитор</sys:String>
+  <sys:String x:Key="L.Video.Resolution">Разрешение записи</sys:String>
+  <sys:String x:Key="L.Video.SourceResolution">Как у источника</sys:String>
+  <sys:String x:Key="L.Video.FrameRate">Частота кадров</sys:String>
+  <sys:String x:Key="L.Video.MonitorFormat">Монитор {0} · {1}×{2}</sys:String>
+  <sys:String x:Key="L.Video.PrimaryMonitor">Основной монитор</sys:String>
+  <sys:String x:Key="L.Video.DesktopLower">рабочий стол</sys:String>
+  <sys:String x:Key="L.Video.GameLower">игра</sys:String>
+  <sys:String x:Key="L.Video.SourceShort">исходное</sys:String>
+  <sys:String x:Key="L.Video.GameNotRunning">{0} · не запущена</sys:String>
+  <sys:String x:Key="L.Video.ChooseGame">Выберите запущенную игру…</sys:String>
+
+  <sys:String x:Key="L.Audio.SystemAudio">Звук рабочего стола</sys:String>
+  <sys:String x:Key="L.Audio.GameAudio">Звук игры</sys:String>
+  <sys:String x:Key="L.Audio.Volume">Громкость</sys:String>
+  <sys:String x:Key="L.Audio.Boost">Усиление</sys:String>
+  <sys:String x:Key="L.Audio.BoostTip">Слишком высокое усиление может вызвать перегрузку звука</sys:String>
+  <sys:String x:Key="L.Audio.Tracks">Аудиодорожки</sys:String>
+  <sys:String x:Key="L.Audio.SystemAndMic">Система и микрофон</sys:String>
+  <sys:String x:Key="L.Audio.GameAndMic">Игра и микрофон</sys:String>
+  <sys:String x:Key="L.Audio.OneMixed">Одна общая</sys:String>
+  <sys:String x:Key="L.Audio.Separate">Раздельные</sys:String>
+  <sys:String x:Key="L.Audio.Codec">Аудиокодек</sys:String>
+
+  <sys:String x:Key="L.Storage.ReplayFolder">Папка повторов</sys:String>
+  <sys:String x:Key="L.Storage.Change">Изменить…</sys:String>
+  <sys:String x:Key="L.Storage.FreeOn">{0} свободно на {1}</sys:String>
+  <sys:String x:Key="L.Storage.Used">{0} занято</sys:String>
+  <sys:String x:Key="L.Storage.Free">{0} свободно</sys:String>
+  <sys:String x:Key="L.Storage.Unavailable">Диск недоступен</sys:String>
+  <sys:String x:Key="L.Storage.NoData">Нет данных</sys:String>
+
+  <sys:String x:Key="L.Hotkey.SaveReplay">Сохранить повтор</sys:String>
+  <sys:String x:Key="L.Hotkey.SaveHint">Сохраняет текущий буфер</sys:String>
+  <sys:String x:Key="L.Hotkey.Toggle">Включить / выключить</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleHint">Переключает мгновенный повтор</sys:String>
+  <sys:String x:Key="L.Hotkey.ApplyHint">Нажмите «Готово», чтобы применить изменения.</sys:String>
+  <sys:String x:Key="L.Hotkey.Press">Нажмите клавиши…</sys:String>
+  <sys:String x:Key="L.Hotkey.AddModifier">Добавьте Ctrl / Alt / Shift</sys:String>
+  <sys:String x:Key="L.Hotkey.InUse">Бинд уже используется</sys:String>
+
+  <sys:String x:Key="L.Error">Ошибка</sys:String>
+  <sys:String x:Key="L.Codec.UnavailableSuffix">{0} · недоступно</sys:String>
+  <sys:String x:Key="L.Codec.Unsupported">Текущий GPU или драйвер не поддерживает аппаратное кодирование</sys:String>
+  <sys:String x:Key="L.Codec.HardwareUnavailable">Аппаратный кодировщик недоступен</sys:String>
+
+  <sys:String x:Key="L.Error.HotkeysTitle">Проверьте бинды</sys:String>
+  <sys:String x:Key="L.Error.HotkeysMessage">Комбинации должны быть корректными и разными.</sys:String>
+  <sys:String x:Key="L.Error.FolderTitle">Папка не выбрана</sys:String>
+  <sys:String x:Key="L.Error.FolderMessage">Выберите папку для сохранения повторов.</sys:String>
+  <sys:String x:Key="L.Error.PathTitle">Некорректный путь</sys:String>
+  <sys:String x:Key="L.Error.PathMessage">Проверьте папку для сохранения повторов.</sys:String>
+  <sys:String x:Key="L.Error.GameTitle">Игра не выбрана</sys:String>
+  <sys:String x:Key="L.Error.GameMessage">Запустите игру и выберите её процесс.</sys:String>
+  <sys:String x:Key="L.Error.CodecTitle">Кодек недоступен</sys:String>
+  <sys:String x:Key="L.Error.CodecMessage">Выберите кодек, который поддерживается текущим GPU и драйвером.</sys:String>
+  <sys:String x:Key="L.Error.AutostartTitle">Не удалось изменить автозапуск</sys:String>
+  <sys:String x:Key="L.Error.AudioSourceTitle">Источник звука недоступен</sys:String>
+  <sys:String x:Key="L.Error.AudioSourceMessage">Настройка отменена. Предыдущая конфигурация восстановлена.</sys:String>
+  <sys:String x:Key="L.Error.SourceTitle">Не удалось изменить источник</sys:String>
+  <sys:String x:Key="L.Error.DeviceTitle">Устройство недоступно</sys:String>
+  <sys:String x:Key="L.Error.Attention">Требуется внимание</sys:String>
+  <sys:String x:Key="L.Error.BindTitle">Не удалось назначить бинд</sys:String>
+
+  <sys:String x:Key="L.Tray.Save">Сохранить повтор</sys:String>
+  <sys:String x:Key="L.Tray.Toggle">Включить / выключить повтор</sys:String>
+  <sys:String x:Key="L.Tray.OpenFolder">Открыть папку повторов</sys:String>
+  <sys:String x:Key="L.Tray.OpenApp">Открыть Captail</sys:String>
+  <sys:String x:Key="L.Tray.Exit">Выход</sys:String>
+  <sys:String x:Key="L.Tray.Active">Captail — буфер {0}</sys:String>
+  <sys:String x:Key="L.Tray.Disabled">Captail — повтор выключен</sys:String>
+
+  <sys:String x:Key="L.Notify.ReadyTitle">Мгновенный повтор готов</sys:String>
+  <sys:String x:Key="L.Notify.EnabledTitle">Мгновенный повтор включён</sys:String>
+  <sys:String x:Key="L.Notify.DisabledTitle">Мгновенный повтор выключен</sys:String>
+  <sys:String x:Key="L.Notify.DisabledDetail">Буфер остановлен.</sys:String>
+  <sys:String x:Key="L.Notify.RecoveredTitle">Мгновенный повтор восстановлен</sys:String>
+  <sys:String x:Key="L.Notify.RecoveredDetail">Буфер снова записывается.</sys:String>
+  <sys:String x:Key="L.Notify.RecoveryTitle">Восстановление повтора</sys:String>
+  <sys:String x:Key="L.Notify.RecoveryFailedTitle">Не удалось восстановить повтор</sys:String>
+  <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Повтор временно недоступен</sys:String>
+  <sys:String x:Key="L.Notify.RetryIn">Повторная попытка через {0} сек.</sys:String>
+  <sys:String x:Key="L.Notify.ReasonRetry">{0} Повторная попытка через {1} сек.</sys:String>
+  <sys:String x:Key="L.Notify.CaptureFailed">Захват не запущен</sys:String>
+  <sys:String x:Key="L.Notify.SettingsApplied">Настройки применены</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOff">Повтор выключен</sys:String>
+  <sys:String x:Key="L.Notify.EnableBeforeSave">Включите мгновенный повтор перед сохранением.</sys:String>
+  <sys:String x:Key="L.Notify.Saved">Повтор сохранён</sys:String>
+  <sys:String x:Key="L.Notify.SaveError">Ошибка сохранения</sys:String>
+  <sys:String x:Key="L.Notify.HotkeyUnavailableTitle">Горячая клавиша недоступна</sys:String>
+  <sys:String x:Key="L.Notify.DriverUnavailable">Видеодрайвер временно недоступен. Повторная попытка через {0} сек.</sys:String>
+  <sys:String x:Key="L.Recovery.ModuleStopped">Модуль записи остановлен.</sys:String>
+  <sys:String x:Key="L.Recovery.NoFrames">Новые кадры не поступают.</sys:String>
+  <sys:String x:Key="L.App.StartError">Не удалось запустить Captail:&#x0A;{0}</sys:String>
+  <sys:String x:Key="L.App.ExecutablePathError">Не удалось определить путь Captail.</sys:String>
+
+  <sys:String x:Key="L.Hotkey.MustDiffer">Бинды сохранения и включения повтора должны отличаться.</sys:String>
+  <sys:String x:Key="L.Hotkey.Occupied">Бинд {0} занят другим приложением.</sys:String>
+  <sys:String x:Key="L.Hotkey.ParseError">Не удалось разобрать бинд: {0}</sys:String>
+  <sys:String x:Key="L.Gpu.Generic">Графический адаптер</sys:String>
+  <sys:String x:Key="L.Gpu.Unknown">GPU не определён</sys:String>
+  <sys:String x:Key="L.Gpu.Preview">Тестовый графический адаптер</sys:String>
+  <sys:String x:Key="L.Gpu.HardwareEncoder">Аппаратный кодировщик</sys:String>
+
+  <sys:String x:Key="L.Engine.CapabilitiesPending">Возможности GPU ещё не проверены.</sys:String>
+  <sys:String x:Key="L.Engine.GameCaptured">Игра · Game Capture</sys:String>
+  <sys:String x:Key="L.Engine.GameWaiting">Игра · ожидание захвата</sys:String>
+  <sys:String x:Key="L.Engine.InUse">Модуль записи уже используется.</sys:String>
+  <sys:String x:Key="L.Engine.BufferStopped">Буфер не запущен.</sys:String>
+  <sys:String x:Key="L.Engine.SavePending">Предыдущий повтор ещё сохраняется.</sys:String>
+  <sys:String x:Key="L.Engine.SaveRejected">Буфер не принял команду сохранения.</sys:String>
+  <sys:String x:Key="L.Engine.SaveTimeout">Сохранение повтора не завершилось за 45 секунд.</sys:String>
+  <sys:String x:Key="L.Engine.ModuleMissing">Модуль захвата не найден. Переустановите Captail.</sys:String>
+  <sys:String x:Key="L.Engine.InitFailed">Не удалось инициализировать модуль захвата.</sys:String>
+  <sys:String x:Key="L.Engine.VersionMismatch">Версия модуля захвата несовместима с приложением.</sys:String>
+  <sys:String x:Key="L.Engine.MonitorMissing">Монитор для захвата не найден.</sys:String>
+  <sys:String x:Key="L.Engine.VideoFailed">Видеоподсистема не запустилась: код {0}.</sys:String>
+  <sys:String x:Key="L.Engine.AudioFailed">Аудиоподсистема не запустилась.</sys:String>
+  <sys:String x:Key="L.Engine.NoEncoder">Совместимый аппаратный видеокодировщик не найден. Обновите драйвер видеокарты.</sys:String>
+  <sys:String x:Key="L.Engine.CodecFallback">Кодек {0} недоступен на {1}; выбран {2}.</sys:String>
+  <sys:String x:Key="L.Engine.VideoSourceFailed">Не удалось создать источник видео.</sys:String>
+  <sys:String x:Key="L.Engine.SceneFailed">Не удалось создать сцену захвата.</sys:String>
+  <sys:String x:Key="L.Engine.SourceAttachFailed">Не удалось подключить источник видео.</sys:String>
+  <sys:String x:Key="L.Engine.AudioSourceFailed">Не удалось создать источник {0}.</sys:String>
+  <sys:String x:Key="L.Engine.EncoderFailed">Не найден работающий {0}-кодировщик.</sys:String>
+  <sys:String x:Key="L.Engine.AudioEncoderFailed">Не удалось создать {0}-кодировщик.</sys:String>
+  <sys:String x:Key="L.Engine.BufferUnavailable">Буфер повтора недоступен.</sys:String>
+  <sys:String x:Key="L.Engine.BufferStartFailed">Буфер повтора не запустился.</sys:String>
+  <sys:String x:Key="L.Engine.SavedPathMissing">Повтор сохранён, но путь к файлу не получен.</sys:String>
+  <sys:String x:Key="L.Engine.BufferUnexpectedStop">Буфер повтора неожиданно остановился.</sys:String>
+  <sys:String x:Key="L.Engine.BufferError">Буфер повтора: {0}</sys:String>
+
+  <sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
+  <sys:String x:Key="L.Unit.Minutes">{0} мин</sys:String>
+  <sys:String x:Key="L.Unit.GB">{0} ГБ</sys:String>
+</ResourceDictionary>
