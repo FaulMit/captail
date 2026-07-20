@@ -22,17 +22,17 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 9.0.x
           cache: true
           cache-dependency-path: src/InstantReplay/InstantReplay.csproj
 
       - name: Cache OBS runtime
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: runtime/obs
           key: obs-32.1.2-windows-x64-${{ hashFiles('tools/AcquireObsRuntime.ps1') }}
