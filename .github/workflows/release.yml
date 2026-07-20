@@ -38,8 +38,9 @@ jobs:
           if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') {
             throw "Invalid semantic version: $env:VERSION"
           }
-          $existing = gh release view "v$env:VERSION" --repo "$env:GITHUB_REPOSITORY" 2>$null
-          if ($LASTEXITCODE -eq 0) {
+          $releases = gh release list --repo "$env:GITHUB_REPOSITORY" --limit 100 --json tagName |
+            ConvertFrom-Json
+          if ($releases.tagName -contains "v$env:VERSION") {
             throw "Release v$env:VERSION already exists."
           }
         env:
