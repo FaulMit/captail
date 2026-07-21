@@ -166,6 +166,8 @@
   <sys:String x:Key="L.Notify.SettingsApplied">Settings applied</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Instant Replay off</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Enable Instant Replay before saving.</sys:String>
+  <sys:String x:Key="L.Notify.Saving">Saving replay…</sys:String>
+  <sys:String x:Key="L.Notify.SavingDetail">Writing the last {0} to disk.</sys:String>
   <sys:String x:Key="L.Notify.Saved">Replay saved</sys:String>
   <sys:String x:Key="L.Notify.SaveError">Save failed</sys:String>
   <sys:String x:Key="L.Notify.HotkeyUnavailableTitle">Global hotkey unavailable</sys:String>

@@ -166,6 +166,8 @@
   <sys:String x:Key="L.Notify.SettingsApplied">Настройки применены</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Повтор выключен</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Включите мгновенный повтор перед сохранением.</sys:String>
+  <sys:String x:Key="L.Notify.Saving">Сохраняю повтор…</sys:String>
+  <sys:String x:Key="L.Notify.SavingDetail">Записываю последние {0} на диск.</sys:String>
   <sys:String x:Key="L.Notify.Saved">Повтор сохранён</sys:String>
   <sys:String x:Key="L.Notify.SaveError">Ошибка сохранения</sys:String>
   <sys:String x:Key="L.Notify.HotkeyUnavailableTitle">Горячая клавиша недоступна</sys:String>

@@ -1110,6 +1110,17 @@ public partial class App : Application
     {
         try
         {
+            // Shown immediately so the user sees progress; replaced by the result
+            // notification once the file is on disk. The long duration is a safety
+            // net — the "saved"/"failed" notification supersedes it well before then.
+            ShowOverlayNotification(
+                "⟳",
+                Localization.Text("L.Notify.Saving"),
+                Localization.Format(
+                    "L.Notify.SavingDetail",
+                    FormatDuration(_config!.BufferSeconds)),
+                OverlayTone.Neutral,
+                30_000);
             string path = await engine.SaveReplayAsync();
             ShowOverlayNotification(
                 "✓",

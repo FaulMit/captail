@@ -25,6 +25,9 @@ public partial class OverlayNotificationWindow : Window
     private readonly DispatcherTimer _hideTimer;
     private readonly TranslateTransform _translate = new();
     private bool _allowClose;
+    // Bumped on every ShowNotification so a stale hide/fade from a previous
+    // notification cannot dismiss the one currently on screen.
+    private long _sequence;
 
     public OverlayNotificationWindow()
     {
@@ -57,6 +60,8 @@ public partial class OverlayNotificationWindow : Window
             OverlayTone.Neutral => Color.FromRgb(148, 163, 171),
             _ => Color.FromRgb(99, 224, 189),
         });
+
+        _sequence++;
 
         IconText.Text = glyph;
         IconText.Foreground = accent;
@@ -98,8 +103,14 @@ public partial class OverlayNotificationWindow : Window
     private void HideAnimated()
     {
         _hideTimer.Stop();
+        long token = _sequence;
         var fade = new DoubleAnimation(Opacity, 0, TimeSpan.FromMilliseconds(160));
-        fade.Completed += (_, _) => Hide();
+        fade.Completed += (_, _) =>
+        {
+            // A newer notification may have appeared during the fade — don't hide it.
+            if (token == _sequence)
+                Hide();
+        };
         BeginAnimation(OpacityProperty, fade);
         _translate.BeginAnimation(TranslateTransform.XProperty,
             new DoubleAnimation(0, 18, TimeSpan.FromMilliseconds(180))
