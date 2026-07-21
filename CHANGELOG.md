@@ -4,6 +4,13 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-21
+
+### Fixed
+
+- Saving a replay now shows a "Saving replay…" notification immediately; the "Replay saved" confirmation replaces it once the file is on disk, instead of appearing only after the write finished.
+- Overlay notifications no longer let a previous notification's fade-out dismiss a newer notification that appeared during it.
+
 ### Changed
 
 - Renamed remaining solution, project, namespace, icon, and native bridge identifiers to Captail.
