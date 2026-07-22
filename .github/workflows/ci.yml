@@ -22,20 +22,14 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           dotnet-version: 9.0.x
           cache: true
-          cache-dependency-path: src/Captail/Captail.csproj
-
-      - name: Cache OBS runtime
-        uses: actions/cache@v6
-        with:
-          path: runtime/obs
-          key: obs-32.1.2-windows-x64-${{ hashFiles('tools/AcquireObsRuntime.ps1') }}
+          cache-dependency-path: src/Captail/packages.lock.json
 
       - name: Acquire minimal OBS runtime
         shell: pwsh
@@ -43,7 +37,29 @@ jobs:
 
       - name: Build Release
         shell: pwsh
-        run: dotnet build ./Captail.sln -c Release -p:ContinuousIntegrationBuild=true
+        run: |
+          dotnet restore ./src/Captail/Captail.csproj --locked-mode
+          dotnet build ./Captail.sln -c Release --no-restore `
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Run full .NET analyzers
+        shell: pwsh
+        run: |
+          dotnet build ./src/Captail/Captail.csproj -c Debug --no-restore `
+            -p:EnableNETAnalyzers=true `
+            -p:AnalysisLevel=latest-all `
+            -p:AnalysisMode=All `
+            -p:WarningsAsErrors=CA1806%3BCA2000%3BCA2216%3BCA5392%3BCA5393
+
+      - name: Validate GPU capability model
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path './src/Captail/bin/Debug/net9.0-windows10.0.22621.0/win-x64/Captail.exe'
+          $process = Start-Process -FilePath $exe -ArgumentList '--qa-capability-model' `
+            -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Capability model QA failed: $($process.ExitCode)"
+          }
 
       - name: Validate localization dictionaries
         shell: pwsh

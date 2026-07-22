@@ -1,0 +1,53 @@
+name: CodeQL
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: C# and C++
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: src/Captail/packages.lock.json
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        with:
+          languages: csharp,c-cpp
+
+      - name: Acquire verified OBS runtime
+        shell: pwsh
+        run: ./tools/AcquireObsRuntime.ps1
+
+      - name: Build
+        shell: pwsh
+        run: |
+          dotnet restore ./src/Captail/Captail.csproj --locked-mode
+          dotnet build ./Captail.sln -c Release --no-restore `
+            -p:ContinuousIntegrationBuild=true
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
