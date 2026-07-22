@@ -69,3 +69,28 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Captail"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+  InstalledExe: String;
+begin
+  Result := '';
+  InstalledExe := ExpandConstant('{app}\{#MyAppExeName}');
+  if FileExists(InstalledExe) then
+  begin
+    if not Exec(InstalledExe, '--shutdown-existing', '', SW_HIDE,
+      ewWaitUntilTerminated, ResultCode) then
+      Result := 'Could not ask Captail to stop before updating.'
+    else if ResultCode <> 0 then
+      Result := 'Captail is still busy. Wait for replay saving to finish, then retry.';
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep = usUninstall then
+    RegDeleteValue(HKCU,
+      'Software\Microsoft\Windows\CurrentVersion\Run', 'Captail');
+end;

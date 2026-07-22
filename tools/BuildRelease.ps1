@@ -25,6 +25,7 @@ if (-not $outputRoot.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCa
 }
 
 $stagingRoot = Join-Path $outputRoot "staging"
+$dotnetArtifacts = Join-Path $stagingRoot "dotnet"
 $portableName = "Captail-$Version"
 $publishDirectory = Join-Path $stagingRoot $portableName
 $portableArchive = Join-Path $outputRoot "$portableName-Portable-win-x64.zip"
@@ -46,9 +47,15 @@ foreach ($path in @($stagingRoot, $portableArchive, $setupPath, $checksumPath)) 
 New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null
 
 Write-Host "Publishing Captail $Version..."
+dotnet restore $project --locked-mode --artifacts-path $dotnetArtifacts
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet restore failed with exit code $LASTEXITCODE."
+}
 dotnet publish $project `
     -c Release `
     -r win-x64 `
+    --no-restore `
+    --artifacts-path $dotnetArtifacts `
     --self-contained true `
     -o $publishDirectory `
     -p:Version=$Version `

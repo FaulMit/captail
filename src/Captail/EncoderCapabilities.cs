@@ -59,9 +59,9 @@ public sealed class EncoderCapabilities
         new(
             Localization.Text("L.Gpu.Preview"),
             [
-                new("h264", "obs_nvenc_h264_tex", "nvenc", Localization.Text("L.Gpu.HardwareEncoder")),
-                new("hevc", "obs_nvenc_hevc_tex", "nvenc", Localization.Text("L.Gpu.HardwareEncoder")),
-                new("av1", "obs_nvenc_av1_tex", "nvenc", Localization.Text("L.Gpu.HardwareEncoder")),
+                new("h264", "preview_h264", "hw", Localization.Text("L.Gpu.HardwareEncoder")),
+                new("hevc", "preview_hevc", "hw", Localization.Text("L.Gpu.HardwareEncoder")),
+                new("av1", "preview_av1", "hw", Localization.Text("L.Gpu.HardwareEncoder")),
             ]);
 }
 

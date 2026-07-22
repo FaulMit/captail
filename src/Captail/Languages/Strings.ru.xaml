@@ -182,7 +182,7 @@
   <sys:String x:Key="L.Hotkey.ParseError">Не удалось разобрать бинд: {0}</sys:String>
   <sys:String x:Key="L.Gpu.Generic">Графический адаптер</sys:String>
   <sys:String x:Key="L.Gpu.Unknown">GPU не определён</sys:String>
-  <sys:String x:Key="L.Gpu.Preview">Тестовый графический адаптер</sys:String>
+  <sys:String x:Key="L.Gpu.Preview">Определение видеокарты…</sys:String>
   <sys:String x:Key="L.Gpu.HardwareEncoder">Аппаратный кодировщик</sys:String>
 
   <sys:String x:Key="L.Engine.CapabilitiesPending">Возможности GPU ещё не проверены.</sys:String>

@@ -182,7 +182,7 @@
   <sys:String x:Key="L.Hotkey.ParseError">Could not parse hotkey: {0}</sys:String>
   <sys:String x:Key="L.Gpu.Generic">Graphics adapter</sys:String>
   <sys:String x:Key="L.Gpu.Unknown">GPU not detected</sys:String>
-  <sys:String x:Key="L.Gpu.Preview">Preview graphics adapter</sys:String>
+  <sys:String x:Key="L.Gpu.Preview">Detecting graphics adapter…</sys:String>
   <sys:String x:Key="L.Gpu.HardwareEncoder">Hardware encoder</sys:String>
 
   <sys:String x:Key="L.Engine.CapabilitiesPending">GPU capabilities have not been checked yet.</sys:String>

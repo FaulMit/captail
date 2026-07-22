@@ -4,6 +4,24 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-22
+
+### Fixed
+
+- Settings, audio-source changes, replay toggles, and replay saves no longer block the UI while libobs starts, stops, or writes a replay.
+- Failed settings changes now roll back configuration, hotkeys, autostart state, and the recording pipeline instead of leaving Captail partially configured.
+- Rapid pipeline operations are serialized to prevent save, restart, watchdog recovery, and shutdown races.
+- Configuration writes are atomic and automatically recover from the last valid backup after a damaged file.
+- Game Capture now uses the selected game's client size for source resolution and avoids an unnecessary scene-composition pass.
+- Installer upgrades request a graceful Captail shutdown and uninstall removes its startup entry.
+
+### Changed
+
+- Moved libobs lifetime operations to a dedicated thread and reduced synchronous disk, device, process, and log work on the UI thread.
+- Hardened native library loading, OBS runtime acquisition, dependency locking, installer downloads, and GitHub Actions against dependency substitution.
+- Added automated capability, codec, recovery, and high-frame-rate Game Capture diagnostics.
+- Validated AV1 Game Capture at 2560x1440 and 240 unique frames per second on an NVIDIA GeForce RTX 5070, including concurrent synthetic GPU load.
+
 ## [0.1.1] - 2026-07-21
 
 ### Fixed

@@ -16,11 +16,12 @@ public partial class SettingsWindow : Window
 
     private readonly Config _config;
     private readonly Action _saveReplay;
-    private readonly Func<bool, bool> _setReplayEnabled;
-    private readonly Func<bool, bool, string, string, bool> _setAudioSources;
-    private readonly Func<bool> _applySettings;
+    private readonly Func<bool, Task<bool>> _setReplayEnabled;
+    private readonly Func<bool, bool, string, string, Task<bool>> _setAudioSources;
+    private readonly Func<Config, bool, Task<bool>> _applySettings;
     private EncoderCapabilities _capabilities;
     private readonly DispatcherTimer _diskTimer;
+    private readonly CancellationTokenSource _lifetimeCts = new();
     private string _outputDirectory;
     private string _pendingSaveHotkey;
     private string _pendingToggleHotkey;
@@ -28,6 +29,10 @@ public partial class SettingsWindow : Window
     private bool _updatingUi;
     private bool _runtimeActive;
     private bool? _animatedRecordingState;
+    private int _deviceRefreshVersion;
+    private int _processRefreshVersion;
+    private int _diskRefreshInProgress;
+    private int _actionInProgress;
 
     public bool Applied { get; private set; }
 
@@ -35,9 +40,9 @@ public partial class SettingsWindow : Window
         Config config,
         bool runtimeActive,
         Action saveReplay,
-        Func<bool, bool> setReplayEnabled,
-        Func<bool, bool, string, string, bool> setAudioSources,
-        Func<bool> applySettings,
+        Func<bool, Task<bool>> setReplayEnabled,
+        Func<bool, bool, string, string, Task<bool>> setAudioSources,
+        Func<Config, bool, Task<bool>> applySettings,
         EncoderCapabilities capabilities)
     {
         _config = config;
@@ -53,19 +58,27 @@ public partial class SettingsWindow : Window
 
         InitializeComponent();
         ApplyHardwareCapabilities();
-        _diskTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
-        _diskTimer.Tick += (_, _) => RefreshDisk();
+        _diskTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+        _diskTimer.Tick += async (_, _) => await RefreshDiskAsync();
         Localization.Changed += OnLanguageChanged;
         Closed += (_, _) =>
         {
             Localization.Changed -= OnLanguageChanged;
             _diskTimer.Stop();
+            _lifetimeCts.Cancel();
+            _lifetimeCts.Dispose();
         };
 
-        LoadDeviceLists();
+        ResetDeviceLists();
         LoadSettingsControls();
         UpdateRuntimeState(runtimeActive);
-        RefreshDisk();
+        Loaded += async (_, _) => await RunUiActionAsync(async () =>
+        {
+            await Task.WhenAll(
+                LoadDeviceListsAsync(),
+                PopulateGameProcessesAsync(),
+                RefreshDiskAsync());
+        });
         _diskTimer.Start();
     }
 
@@ -146,7 +159,7 @@ public partial class SettingsWindow : Window
             _ => "HW",
         };
 
-    private void LoadDeviceLists()
+    private void ResetDeviceLists()
     {
         AudioDeviceBox.Items.Clear();
         MicDeviceBox.Items.Clear();
@@ -161,30 +174,50 @@ public partial class SettingsWindow : Window
             Tag = "",
             Content = Localization.Text("L.Audio.DefaultWindows"),
         });
+        MonitorBox.Items.Add(new ComboBoxItem
+        {
+            Tag = "0",
+            Content = Localization.Text("L.Video.PrimaryMonitor"),
+        });
+    }
 
+    private async Task LoadDeviceListsAsync()
+    {
+        int version = Interlocked.Increment(ref _deviceRefreshVersion);
+        string systemDevice = GetSelectedTag(
+            AudioDeviceBox,
+            _config.SystemAudioDeviceId);
+        string microphoneDevice = GetSelectedTag(
+            MicDeviceBox,
+            _config.MicrophoneDeviceId);
+        string monitorId = GetSelectedTag(
+            MonitorBox,
+            _config.MonitorIndex.ToString());
+
+        DeviceListsSnapshot snapshot;
         try
         {
-            foreach (var (id, name) in AudioDevices.ListRenderDevices())
-                AudioDeviceBox.Items.Add(new ComboBoxItem { Tag = id, Content = name });
+            snapshot = await Task.Run(
+                CollectDeviceLists,
+                _lifetimeCts.Token);
         }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
-            Log.Write($"Output-device list unavailable: {ex.Message}");
-        }
-
-        try
-        {
-            foreach (var (id, name) in AudioDevices.ListCaptureDevices())
-                MicDeviceBox.Items.Add(new ComboBoxItem { Tag = id, Content = name });
-        }
-        catch (Exception ex)
-        {
-            Log.Write($"Microphone list unavailable: {ex.Message}");
+            return;
         }
 
-        try
+        if (version != _deviceRefreshVersion || _lifetimeCts.IsCancellationRequested)
+            return;
+
+        ResetDeviceLists();
+        foreach (var (id, name) in snapshot.RenderDevices)
+            AudioDeviceBox.Items.Add(new ComboBoxItem { Tag = id, Content = name });
+        foreach (var (id, name) in snapshot.CaptureDevices)
+            MicDeviceBox.Items.Add(new ComboBoxItem { Tag = id, Content = name });
+        if (snapshot.Monitors.Count > 0)
         {
-            foreach (var monitor in CaptureInterop.EnumerateMonitors())
+            MonitorBox.Items.Clear();
+            foreach (var monitor in snapshot.Monitors)
             {
                 MonitorBox.Items.Add(new ComboBoxItem
                 {
@@ -197,26 +230,93 @@ public partial class SettingsWindow : Window
                 });
             }
         }
+
+        SelectByTag(AudioDeviceBox, systemDevice);
+        SelectByTag(MicDeviceBox, microphoneDevice);
+        SelectByTag(MonitorBox, monitorId);
+        UpdateAudioDeviceState();
+    }
+
+    private static DeviceListsSnapshot CollectDeviceLists()
+    {
+        IReadOnlyList<(string Id, string Name)> renderDevices = [];
+        IReadOnlyList<(string Id, string Name)> captureDevices = [];
+        IReadOnlyList<CaptureInterop.MonitorInfo> monitors = [];
+        try
+        {
+            renderDevices = AudioDevices.ListRenderDevices();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Output-device list unavailable: {ex.Message}");
+        }
+        try
+        {
+            captureDevices = AudioDevices.ListCaptureDevices();
+        }
+        catch (Exception ex)
+        {
+            Log.Write($"Microphone list unavailable: {ex.Message}");
+        }
+        try
+        {
+            monitors = CaptureInterop.EnumerateMonitors();
+        }
         catch (Exception ex)
         {
             Log.Write($"Monitor list unavailable: {ex.Message}");
         }
-
-        if (MonitorBox.Items.Count == 0)
-            MonitorBox.Items.Add(new ComboBoxItem
-            {
-                Tag = "0",
-                Content = Localization.Text("L.Video.PrimaryMonitor"),
-            });
-
-        PopulateGameProcesses();
+        return new DeviceListsSnapshot(renderDevices, captureDevices, monitors);
     }
 
-    private void PopulateGameProcesses()
+    private async Task PopulateGameProcessesAsync()
     {
-        string selectedPath = GetSelectedTag(
-            GameProcessBox,
-            _config.GameExecutablePath);
+        int version = Interlocked.Increment(ref _processRefreshVersion);
+        string selectedPath = GetSelectedTag(GameProcessBox, _config.GameExecutablePath);
+        IReadOnlyList<(string Path, string Label)> choices;
+        try
+        {
+            choices = await Task.Run(CollectGameProcesses, _lifetimeCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Game-process list unavailable: {exception.Message}");
+            return;
+        }
+
+        if (version != _processRefreshVersion || _lifetimeCts.IsCancellationRequested)
+            return;
+
+        var visibleChoices = choices.ToDictionary(
+            choice => choice.Path,
+            choice => choice.Label,
+            StringComparer.OrdinalIgnoreCase);
+        if (!string.IsNullOrWhiteSpace(selectedPath) &&
+            !visibleChoices.ContainsKey(selectedPath))
+        {
+            visibleChoices[selectedPath] = Localization.Format(
+                "L.Video.GameNotRunning",
+                Path.GetFileName(selectedPath));
+        }
+
+        GameProcessBox.Items.Clear();
+        GameProcessBox.Items.Add(new ComboBoxItem
+        {
+            Tag = "",
+            Content = Localization.Text("L.Video.ChooseGame"),
+            IsEnabled = false,
+        });
+        foreach ((string path, string label) in visibleChoices.OrderBy(pair => pair.Value))
+            GameProcessBox.Items.Add(new ComboBoxItem { Tag = path, Content = label });
+        SelectByTag(GameProcessBox, selectedPath);
+    }
+
+    private static IReadOnlyList<(string Path, string Label)> CollectGameProcesses()
+    {
         var choices = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         HashSet<string> shellProcesses = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -264,31 +364,10 @@ public partial class SettingsWindow : Window
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(selectedPath) &&
-            !choices.ContainsKey(selectedPath))
-        {
-            choices[selectedPath] =
-                Localization.Format(
-                    "L.Video.GameNotRunning",
-                    Path.GetFileName(selectedPath));
-        }
-
-        GameProcessBox.Items.Clear();
-        GameProcessBox.Items.Add(new ComboBoxItem
-        {
-            Tag = "",
-            Content = Localization.Text("L.Video.ChooseGame"),
-            IsEnabled = false,
-        });
-        foreach ((string path, string label) in choices.OrderBy(pair => pair.Value))
-        {
-            GameProcessBox.Items.Add(new ComboBoxItem
-            {
-                Tag = path,
-                Content = label,
-            });
-        }
-        SelectByTag(GameProcessBox, selectedPath);
+        return choices
+            .OrderBy(pair => pair.Value)
+            .Select(pair => (pair.Key, pair.Value))
+            .ToArray();
     }
 
     private void CaptureSourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -297,8 +376,8 @@ public partial class SettingsWindow : Window
             UpdateCaptureSourceState();
     }
 
-    private void GameProcessBox_DropDownOpened(object sender, EventArgs e) =>
-        PopulateGameProcesses();
+    private async void GameProcessBox_DropDownOpened(object sender, EventArgs e) =>
+        await RunUiActionAsync(PopulateGameProcessesAsync);
 
     private void UpdateCaptureSourceState()
     {
@@ -442,10 +521,28 @@ public partial class SettingsWindow : Window
 
     private void Language_Click(object sender, RoutedEventArgs e)
     {
-        _config.Language = Localization.IsRussian ? "en" : "ru";
-        _config.Save();
-        Localization.SetLanguage(_config.Language);
-        AnimatePress(LanguageButton);
+        string previousLanguage = _config.Language;
+        try
+        {
+            _config.Language = Localization.IsRussian ? "en" : "ru";
+            _config.Save();
+            Localization.SetLanguage(_config.Language);
+            AnimatePress(LanguageButton);
+        }
+        catch (Exception exception)
+        {
+            _config.Language = previousLanguage;
+            try
+            {
+                _config.Save();
+                Localization.SetLanguage(previousLanguage);
+            }
+            catch (Exception rollbackException)
+            {
+                Log.Write($"Language rollback failed: {rollbackException}");
+            }
+            HandleUiActionError("Language change", exception);
+        }
     }
 
     private void OnLanguageChanged()
@@ -456,24 +553,13 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        string systemDevice = GetSelectedTag(
-            AudioDeviceBox,
-            _config.SystemAudioDeviceId);
-        string microphoneDevice = GetSelectedTag(
-            MicDeviceBox,
-            _config.MicrophoneDeviceId);
-        string monitor = GetSelectedTag(
-            MonitorBox,
-            _config.MonitorIndex.ToString());
-
-        LoadDeviceLists();
-        SelectByTag(AudioDeviceBox, systemDevice);
-        SelectByTag(MicDeviceBox, microphoneDevice);
-        SelectByTag(MonitorBox, monitor);
+        _ = RunUiActionAsync(async () => await Task.WhenAll(
+            LoadDeviceListsAsync(),
+            PopulateGameProcessesAsync()));
         ApplyHardwareCapabilities();
         UpdateCaptureSourceState();
         UpdateRuntimeState(_runtimeActive);
-        RefreshDisk();
+        _ = RefreshDiskAsync();
     }
 
     private void ShowSettings()
@@ -535,14 +621,31 @@ public partial class SettingsWindow : Window
             SystemParameters.WorkArea.Bottom - height - 16);
     }
 
-    private void ReplayToggle_Click(object sender, RoutedEventArgs e)
+    private async void ReplayToggle_Click(object sender, RoutedEventArgs e)
     {
         if (_updatingUi)
             return;
+        if (!TryBeginAction())
+        {
+            UpdateRuntimeState(_runtimeActive);
+            return;
+        }
 
-        bool active = _setReplayEnabled(ReplayToggle.IsChecked == true);
-        UpdateRuntimeState(active);
-        AnimatePress(ReplayToggle);
+        try
+        {
+            bool active = await _setReplayEnabled(ReplayToggle.IsChecked == true);
+            UpdateRuntimeState(active);
+            AnimatePress(ReplayToggle);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Replay toggle", exception);
+            UpdateRuntimeState(_runtimeActive);
+        }
+        finally
+        {
+            EndAction();
+        }
     }
 
     private void SaveReplay_Click(object sender, RoutedEventArgs e)
@@ -551,22 +654,39 @@ public partial class SettingsWindow : Window
         _saveReplay();
     }
 
-    private void SourceChip_Click(object sender, RoutedEventArgs e)
+    private async void SourceChip_Click(object sender, RoutedEventArgs e)
     {
         if (_updatingUi)
             return;
+        if (!TryBeginAction())
+        {
+            UpdateRuntimeState(_runtimeActive);
+            return;
+        }
 
-        bool applied = _setAudioSources(
-            SystemSourceChip.IsChecked == true,
-            MicSourceChip.IsChecked == true,
-            _config.SystemAudioDeviceId,
-            _config.MicrophoneDeviceId);
-        UpdateRuntimeState(_runtimeActive);
-        AnimatePress((FrameworkElement)sender);
-        if (!applied)
-            ShowError(
-                Localization.Text("L.Error.SourceTitle"),
-                Localization.Text("L.Error.AudioSourceMessage"));
+        try
+        {
+            bool applied = await _setAudioSources(
+                SystemSourceChip.IsChecked == true,
+                MicSourceChip.IsChecked == true,
+                _config.SystemAudioDeviceId,
+                _config.MicrophoneDeviceId);
+            UpdateRuntimeState(_runtimeActive);
+            AnimatePress((FrameworkElement)sender);
+            if (!applied)
+                ShowError(
+                    Localization.Text("L.Error.SourceTitle"),
+                    Localization.Text("L.Error.AudioSourceMessage"));
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Audio source toggle", exception);
+            UpdateRuntimeState(_runtimeActive);
+        }
+        finally
+        {
+            EndAction();
+        }
     }
 
     private void AudioDeviceMenu_Opened(object sender, RoutedEventArgs e)
@@ -627,27 +747,47 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void AudioDeviceMenuItem_Click(object sender, RoutedEventArgs e)
+    private async void AudioDeviceMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (((MenuItem)sender).Tag is not AudioDeviceSelection selection)
             return;
+        if (!TryBeginAction())
+            return;
 
-        string systemDeviceId = selection.IsSystem ? selection.Id : _config.SystemAudioDeviceId;
-        string microphoneDeviceId = selection.IsSystem ? _config.MicrophoneDeviceId : selection.Id;
-        bool applied = _setAudioSources(
-            SystemSourceChip.IsChecked == true,
-            MicSourceChip.IsChecked == true,
-            systemDeviceId,
-            microphoneDeviceId);
+        try
+        {
+            string systemDeviceId = selection.IsSystem
+                ? selection.Id
+                : _config.SystemAudioDeviceId;
+            string microphoneDeviceId = selection.IsSystem
+                ? _config.MicrophoneDeviceId
+                : selection.Id;
+            bool applied = await _setAudioSources(
+                SystemSourceChip.IsChecked == true,
+                MicSourceChip.IsChecked == true,
+                systemDeviceId,
+                microphoneDeviceId);
 
-        SelectByTag(
-            selection.IsSystem ? AudioDeviceBox : MicDeviceBox,
-            selection.IsSystem ? _config.SystemAudioDeviceId : _config.MicrophoneDeviceId);
-        UpdateRuntimeState(_runtimeActive);
-        if (!applied)
-            ShowError(
-                Localization.Text("L.Error.DeviceTitle"),
-                Localization.Text("L.Error.AudioSourceMessage"));
+            SelectByTag(
+                selection.IsSystem ? AudioDeviceBox : MicDeviceBox,
+                selection.IsSystem
+                    ? _config.SystemAudioDeviceId
+                    : _config.MicrophoneDeviceId);
+            UpdateRuntimeState(_runtimeActive);
+            if (!applied)
+                ShowError(
+                    Localization.Text("L.Error.DeviceTitle"),
+                    Localization.Text("L.Error.AudioSourceMessage"));
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Audio device selection", exception);
+            UpdateRuntimeState(_runtimeActive);
+        }
+        finally
+        {
+            EndAction();
+        }
     }
 
     private void AudioToggle_Click(object sender, RoutedEventArgs e)
@@ -674,7 +814,7 @@ public partial class SettingsWindow : Window
 
         _outputDirectory = dialog.FolderName;
         OutputDirText.Text = _outputDirectory;
-        RefreshDisk();
+        _ = RefreshDiskAsync();
     }
 
     private void HotkeyCapture_Click(object sender, RoutedEventArgs e)
@@ -744,7 +884,7 @@ public partial class SettingsWindow : Window
         _capturingHotkeyButton = null;
     }
 
-    private void Apply_Click(object sender, RoutedEventArgs e)
+    private async void Apply_Click(object sender, RoutedEventArgs e)
     {
         CancelHotkeyCapture();
         if (!HotkeyManager.IsValid(_pendingSaveHotkey) ||
@@ -779,13 +919,14 @@ public partial class SettingsWindow : Window
 
         bool separateAudioTracks =
             GetSelectedTag(AudioTrackModeBox, "mixed") == "separate";
-        _config.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
-        _config.BufferSeconds = GetSelectedRadioInt(BufferOptions, _config.BufferSeconds);
-        _config.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
-        _config.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
-        _config.GameExecutablePath = GetSelectedTag(GameProcessBox, "");
-        if (_config.CaptureSource == "game" &&
-            string.IsNullOrWhiteSpace(_config.GameExecutablePath))
+        Config candidate = _config.Clone();
+        candidate.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
+        candidate.BufferSeconds = GetSelectedRadioInt(BufferOptions, _config.BufferSeconds);
+        candidate.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
+        candidate.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
+        candidate.GameExecutablePath = GetSelectedTag(GameProcessBox, "");
+        if (candidate.CaptureSource == "game" &&
+            string.IsNullOrWhiteSpace(candidate.GameExecutablePath))
         {
             ShowError(
                 Localization.Text("L.Error.GameTitle"),
@@ -800,79 +941,167 @@ public partial class SettingsWindow : Window
                 Localization.Text("L.Error.CodecMessage"));
             return;
         }
-        _config.Codec = selectedCodec;
-        _config.BitrateMbps = GetSelectedInt(BitrateBox, _config.BitrateMbps);
-        _config.FrameRate = GetSelectedRadioInt(FpsOptions, _config.FrameRate);
-        _config.MonitorIndex = GetSelectedInt(MonitorBox, _config.MonitorIndex);
-        _config.RecordingResolution = GetSelectedTag(ResolutionBox, "source");
-        _config.CaptureSystemAudio = SystemAudioBox.IsChecked == true;
-        _config.SystemAudioVolume = (int)Math.Round(SystemVolumeSlider.Value);
-        _config.SystemAudioDeviceId = GetSelectedTag(AudioDeviceBox, "");
-        _config.CaptureMicrophone = MicBox.IsChecked == true;
-        _config.MicrophoneVolume = (int)Math.Round(MicVolumeSlider.Value);
-        _config.MicrophoneBoostDb = (int)Math.Round(MicBoostSlider.Value);
-        _config.MicrophoneDeviceId = GetSelectedTag(MicDeviceBox, "");
-        _config.AudioCodec = GetSelectedTag(AudioCodecBox, "aac");
-        _config.SeparateAudioTracks = separateAudioTracks;
-        _config.OutputDirectory = _outputDirectory;
-        _config.Hotkey = _pendingSaveHotkey;
-        _config.ToggleReplayHotkey = _pendingToggleHotkey;
-        _config.Save();
+        if (!TryBeginAction())
+            return;
 
         try
         {
-            Autostart.SetEnabled(AutostartBox.IsChecked == true);
-        }
-        catch (Exception ex)
-        {
-            ShowError(Localization.Text("L.Error.AutostartTitle"), ex.Message);
-            return;
-        }
+            candidate.Codec = selectedCodec;
+            candidate.BitrateMbps = GetSelectedInt(BitrateBox, _config.BitrateMbps);
+            candidate.FrameRate = GetSelectedRadioInt(FpsOptions, _config.FrameRate);
+            candidate.MonitorIndex = GetSelectedInt(MonitorBox, _config.MonitorIndex);
+            candidate.RecordingResolution = GetSelectedTag(ResolutionBox, "source");
+            candidate.CaptureSystemAudio = SystemAudioBox.IsChecked == true;
+            candidate.SystemAudioVolume = (int)Math.Round(SystemVolumeSlider.Value);
+            candidate.SystemAudioDeviceId = GetSelectedTag(AudioDeviceBox, "");
+            candidate.CaptureMicrophone = MicBox.IsChecked == true;
+            candidate.MicrophoneVolume = (int)Math.Round(MicVolumeSlider.Value);
+            candidate.MicrophoneBoostDb = (int)Math.Round(MicBoostSlider.Value);
+            candidate.MicrophoneDeviceId = GetSelectedTag(MicDeviceBox, "");
+            candidate.AudioCodec = GetSelectedTag(AudioCodecBox, "aac");
+            candidate.SeparateAudioTracks = separateAudioTracks;
+            candidate.OutputDirectory = _outputDirectory;
+            candidate.Hotkey = _pendingSaveHotkey;
+            candidate.ToggleReplayHotkey = _pendingToggleHotkey;
+            candidate.Normalize();
 
-        if (!_applySettings())
+            if (!await _applySettings(
+                    candidate,
+                    AutostartBox.IsChecked == true))
+            {
+                LoadSettingsControls();
+                return;
+            }
+
+            Applied = true;
+            _ = RefreshDiskAsync();
+            ShowDashboard();
+        }
+        catch (Exception exception)
         {
+            Log.Write($"Apply settings UI failed: {exception}");
+            ShowError(
+                Localization.Text("L.Error.Attention"),
+                exception.Message);
             LoadSettingsControls();
-            return;
         }
-
-        Applied = true;
-        RefreshDisk();
-        ShowDashboard();
+        finally
+        {
+            EndAction();
+        }
     }
 
-    private void RefreshDisk()
+    private bool TryBeginAction()
+    {
+        if (Interlocked.Exchange(ref _actionInProgress, 1) != 0)
+            return false;
+
+        ReplayToggle.IsEnabled = false;
+        SystemSourceChip.IsEnabled = false;
+        MicSourceChip.IsEnabled = false;
+        SettingsReplayToggle.IsEnabled = false;
+        DoneButton.IsEnabled = false;
+        return true;
+    }
+
+    private void EndAction()
+    {
+        Interlocked.Exchange(ref _actionInProgress, 0);
+        ReplayToggle.IsEnabled = true;
+        SystemSourceChip.IsEnabled = true;
+        MicSourceChip.IsEnabled = true;
+        SettingsReplayToggle.IsEnabled = true;
+        DoneButton.IsEnabled = true;
+    }
+
+    private async Task RunUiActionAsync(Func<Task> action)
     {
         try
         {
-            string? root = Path.GetPathRoot(Path.GetFullPath(_outputDirectory));
-            if (string.IsNullOrEmpty(root))
-                throw new IOException("Could not resolve the target drive.");
+            await action();
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Background UI action", exception);
+        }
+    }
 
-            var drive = new DriveInfo(root);
-            long used = drive.TotalSize - drive.AvailableFreeSpace;
-            double percent = drive.TotalSize == 0 ? 0 : used * 100d / drive.TotalSize;
+    private void HandleUiActionError(string operation, Exception exception)
+    {
+        Log.Write($"{operation} failed: {exception}");
+        ShowError(
+            Localization.Text("L.Error.Attention"),
+            exception.Message);
+    }
+
+    private async Task RefreshDiskAsync()
+    {
+        if (Interlocked.Exchange(ref _diskRefreshInProgress, 1) != 0)
+            return;
+
+        string outputDirectory = _outputDirectory;
+        try
+        {
+            DiskSnapshot snapshot = await Task.Run(
+                () => ReadDiskSnapshot(outputDirectory),
+                _lifetimeCts.Token);
+            if (_lifetimeCts.IsCancellationRequested ||
+                !string.Equals(outputDirectory, _outputDirectory, StringComparison.Ordinal))
+            {
+                return;
+            }
 
             DiskSummaryText.Text = Localization.Format(
                 "L.Storage.FreeOn",
-                FormatBytes(drive.AvailableFreeSpace),
-                drive.Name.TrimEnd('\\'));
-            DiskSummaryProgress.Value = percent;
+                FormatBytes(snapshot.FreeBytes),
+                snapshot.DriveName);
+            DiskSummaryProgress.Value = snapshot.UsedPercent;
             DiskUsedText.Text = Localization.Format(
                 "L.Storage.Used",
-                FormatBytes(used));
+                FormatBytes(snapshot.UsedBytes));
             DiskFreeText.Text = Localization.Format(
                 "L.Storage.Free",
-                FormatBytes(drive.AvailableFreeSpace));
-            DiskProgress.Value = percent;
+                FormatBytes(snapshot.FreeBytes));
+            DiskProgress.Value = snapshot.UsedPercent;
         }
-        catch
+        catch (OperationCanceledException)
         {
+            return;
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Disk-space query unavailable: {exception.Message}");
             DiskSummaryText.Text = Localization.Text("L.Storage.Unavailable");
             DiskSummaryProgress.Value = 0;
             DiskUsedText.Text = Localization.Text("L.Storage.NoData");
             DiskFreeText.Text = "";
             DiskProgress.Value = 0;
         }
+        finally
+        {
+            Interlocked.Exchange(ref _diskRefreshInProgress, 0);
+        }
+    }
+
+    private static DiskSnapshot ReadDiskSnapshot(string outputDirectory)
+    {
+        string? root = Path.GetPathRoot(Path.GetFullPath(outputDirectory));
+        if (string.IsNullOrEmpty(root))
+            throw new IOException("Could not resolve the target drive.");
+
+        var drive = new DriveInfo(root);
+        long total = drive.TotalSize;
+        long free = drive.AvailableFreeSpace;
+        long used = total - free;
+        return new DiskSnapshot(
+            drive.Name.TrimEnd('\\'),
+            used,
+            free,
+            total == 0 ? 0 : used * 100d / total);
     }
 
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1033,6 +1262,17 @@ public partial class SettingsWindow : Window
                 : "L.Video.DesktopLower");
 
     private sealed record AudioDeviceSelection(bool IsSystem, string Id);
+
+    private sealed record DeviceListsSnapshot(
+        IReadOnlyList<(string Id, string Name)> RenderDevices,
+        IReadOnlyList<(string Id, string Name)> CaptureDevices,
+        IReadOnlyList<CaptureInterop.MonitorInfo> Monitors);
+
+    private sealed record DiskSnapshot(
+        string DriveName,
+        long UsedBytes,
+        long FreeBytes,
+        double UsedPercent);
 
     private static void SelectRadioByTag(Panel panel, string tag)
     {
