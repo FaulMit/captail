@@ -47,7 +47,10 @@ foreach ($path in @($stagingRoot, $portableArchive, $setupPath, $checksumPath)) 
 New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null
 
 Write-Host "Publishing Captail $Version..."
-dotnet restore $project --locked-mode --artifacts-path $dotnetArtifacts
+dotnet restore $project `
+    --locked-mode `
+    --runtime win-x64 `
+    --artifacts-path $dotnetArtifacts
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet restore failed with exit code $LASTEXITCODE."
 }
