@@ -14,13 +14,16 @@
     <Product>Captail</Product>
     <RootNamespace>Captail</RootNamespace>
     <ApplicationIcon>Assets\Captail.ico</ApplicationIcon>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="NAudio" Version="2.3.0" />
+    <!-- 2.4.x currently publishes .NET Framework-only assets; keep last
+         compatible modern-WPF build until upstream restores net targets. -->
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.1.4" />
-    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.10" />
   </ItemGroup>
 
   <ItemGroup>
@@ -71,6 +74,16 @@
   </Target>
 
   <ItemGroup>
+    <Content Include="$(ObsRuntimeRoot)\VERSION">
+      <Link>OBS_RUNTIME_VERSION</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(ObsRuntimeRoot)\SOURCE_SHA256">
+      <Link>OBS_RUNTIME_SHA256</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="$(ObsRuntimeRoot)\bin\**\*">
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
@@ -85,6 +98,7 @@
     </Content>
     <Content Include="$(ObsRuntimeRoot)\data\**\*">
       <Link>data\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

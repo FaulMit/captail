@@ -1,12 +1,23 @@
 using System.IO;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using Captail.Interop;
 
 namespace Captail;
 
+[SuppressMessage(
+    "Usage",
+    "CA2216:Disposable types should declare finalizer",
+    Justification = "libobs is thread-affine; finalizer-thread native shutdown is unsafe.")]
 public sealed class ObsReplayEngine : IDisposable
 {
     private const string RequiredObsVersion = "32.1.2";
+    private static readonly string[] CapabilityCodecNames = ["h264", "hevc", "av1"];
+    private static readonly string[] DiagnosticEffectNames =
+    [
+        "default.effect", "opaque.effect", "solid.effect",
+        "format_conversion.effect", "premultiplied_alpha.effect",
+    ];
     private static readonly object ContextGate = new();
     private static nint _obsLibrary;
     private static bool _contextOwned;
@@ -19,7 +30,6 @@ public sealed class ObsReplayEngine : IDisposable
     private readonly List<nint> _audioEncoders = [];
 
     private nint _videoSource;
-    private nint _scene;
     private nint _videoEncoder;
     private nint _output;
     private nint _outputSignals;
@@ -32,6 +42,8 @@ public sealed class ObsReplayEngine : IDisposable
     private DateTime _previousFrameCheckUtc;
     private uint _outputWidth;
     private uint _outputHeight;
+    private uint _baseWidth;
+    private uint _baseHeight;
 
     public event Action<string>? Faulted;
 
@@ -96,6 +108,8 @@ public sealed class ObsReplayEngine : IDisposable
 
     public ulong BufferedBytes =>
         _output == 0 ? 0 : ObsNative.obs_output_get_total_bytes(_output);
+    public uint TotalRenderedFrames => ObsNative.obs_get_total_frames();
+    public uint LaggedRenderedFrames => ObsNative.obs_get_lagged_frames();
 
     public ObsReplayEngine(Config config)
     {
@@ -147,7 +161,6 @@ public sealed class ObsReplayEngine : IDisposable
 
     public static EncoderCapabilities ProbeCapabilities(Config config)
     {
-        var probe = new ObsReplayEngine(config);
         lock (ContextGate)
         {
             if (_contextOwned)
@@ -156,6 +169,19 @@ public sealed class ObsReplayEngine : IDisposable
             _contextOwned = true;
         }
 
+        ObsReplayEngine probe;
+        try
+        {
+            probe = new ObsReplayEngine(config);
+        }
+        catch
+        {
+            lock (ContextGate)
+                _contextOwned = false;
+            throw;
+        }
+
+        using (probe)
         try
         {
             probe.InitializeObs();
@@ -165,10 +191,6 @@ public sealed class ObsReplayEngine : IDisposable
         {
             Log.Write($"GPU capability detection failed: {exception}");
             return EncoderCapabilities.Failed(exception.Message);
-        }
-        finally
-        {
-            probe.Dispose();
         }
     }
 
@@ -241,7 +263,7 @@ public sealed class ObsReplayEngine : IDisposable
                 Localization.Text("L.Engine.InitFailed"));
 
         string version = ObsVersion();
-        if (!version.StartsWith(RequiredObsVersion, StringComparison.Ordinal))
+        if (!string.Equals(version, RequiredObsVersion, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.VersionMismatch"));
@@ -258,8 +280,15 @@ public sealed class ObsReplayEngine : IDisposable
                 : monitors.FirstOrDefault()
                   ?? throw new InvalidOperationException(
                       Localization.Text("L.Engine.MonitorMissing"));
+        (int captureWidth, int captureHeight) = IsGameCapture
+            ? CaptureInterop.GetGameClientSize(_config.GameExecutablePath) ??
+              (monitor.Width, monitor.Height)
+            : (monitor.Width, monitor.Height);
+        _baseWidth = (uint)captureWidth;
+        _baseHeight = (uint)captureHeight;
         (uint outputWidth, uint outputHeight) = ResolveOutputSize(
-            monitor,
+            _baseWidth,
+            _baseHeight,
             _config.RecordingResolution);
         _outputWidth = outputWidth;
         _outputHeight = outputHeight;
@@ -273,8 +302,8 @@ public sealed class ObsReplayEngine : IDisposable
                 GraphicsModule = graphicsModule,
                 FpsNum = (uint)_config.FrameRate,
                 FpsDen = 1,
-                BaseWidth = (uint)monitor.Width,
-                BaseHeight = (uint)monitor.Height,
+                BaseWidth = _baseWidth,
+                BaseHeight = _baseHeight,
                 OutputWidth = outputWidth,
                 OutputHeight = outputHeight,
                 OutputFormat = ObsNative.VideoFormat.Nv12,
@@ -282,7 +311,9 @@ public sealed class ObsReplayEngine : IDisposable
                 GpuConversion = true,
                 ColorSpace = ObsNative.VideoColorSpace.Cs709,
                 Range = ObsNative.VideoRange.Partial,
-                ScaleType = ObsNative.ScaleType.Bicubic,
+                ScaleType = _config.FrameRate >= 120
+                    ? ObsNative.ScaleType.Bilinear
+                    : ObsNative.ScaleType.Bicubic,
             };
             int result = ObsNative.obs_reset_video(ref video);
             if (result != 0)
@@ -348,7 +379,7 @@ public sealed class ObsReplayEngine : IDisposable
             EncoderCatalog.Available(registered, adapterName));
         string available = string.Join(
             ", ",
-            new[] { "h264", "hevc", "av1" }
+            CapabilityCodecNames
                 .Where(capabilities.Supports)
                 .Select(codec =>
                     $"{codec}:{capabilities.Preferred(codec)!.FamilyDisplayName}"));
@@ -381,7 +412,8 @@ public sealed class ObsReplayEngine : IDisposable
     private static string ToObsPath(string path) => path.Replace('\\', '/');
 
     private static (uint Width, uint Height) ResolveOutputSize(
-        CaptureInterop.MonitorInfo monitor,
+        uint sourceWidth,
+        uint sourceHeight,
         string setting) =>
         setting.ToLowerInvariant() switch
         {
@@ -389,7 +421,7 @@ public sealed class ObsReplayEngine : IDisposable
             "1080p" => (1920, 1080),
             "1440p" => (2560, 1440),
             "2160p" => (3840, 2160),
-            _ => ((uint)monitor.Width, (uint)monitor.Height),
+            _ => (sourceWidth, sourceHeight),
         };
 
     private static void DiagnoseEffects(string baseDirectory, string dataRoot)
@@ -410,11 +442,7 @@ public sealed class ObsReplayEngine : IDisposable
 
             ObsNative.gs_enter_context(graphics);
             entered = true;
-            foreach (string name in new[]
-                     {
-                         "default.effect", "opaque.effect", "solid.effect",
-                         "format_conversion.effect", "premultiplied_alpha.effect"
-                     })
+            foreach (string name in DiagnosticEffectNames)
             {
                 nint error = 0;
                 nint effect = ObsNative.gs_effect_create_from_file(
@@ -504,7 +532,7 @@ public sealed class ObsReplayEngine : IDisposable
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.VideoSourceFailed"));
 
-        uint systemMix = _config.SeparateAudioTracks ? 1u : 1u;
+        const uint systemMix = 1u;
         if (IsGameCapture && _config.CaptureSystemAudio)
         {
             ObsNative.obs_source_set_audio_mixers(_videoSource, systemMix);
@@ -513,32 +541,9 @@ public sealed class ObsReplayEngine : IDisposable
                 NormalizeVolume(_config.SystemAudioVolume));
         }
 
-        _scene = ObsNative.obs_scene_create("Captail Scene");
-        if (_scene == 0)
-            throw new InvalidOperationException(
-                Localization.Text("L.Engine.SceneFailed"));
-        nint item = ObsNative.obs_scene_add(_scene, _videoSource);
-        if (item == 0)
-            throw new InvalidOperationException(
-                Localization.Text("L.Engine.SourceAttachFailed"));
-
-        var bounds = new ObsNative.Vec2
-        {
-            X = monitor.Width,
-            Y = monitor.Height,
-        };
-        var position = new ObsNative.Vec2
-        {
-            X = monitor.Width / 2f,
-            Y = monitor.Height / 2f,
-        };
-        ObsNative.obs_sceneitem_set_alignment(item, 0);
-        ObsNative.obs_sceneitem_set_bounds_alignment(item, 0);
-        ObsNative.obs_sceneitem_set_bounds_type(item, ObsNative.BoundsType.ScaleInner);
-        ObsNative.obs_sceneitem_set_bounds(item, ref bounds);
-        ObsNative.obs_sceneitem_set_pos(item, ref position);
-        ObsNative.obs_sceneitem_set_scale_filter(item, ObsNative.ScaleType.Bicubic);
-        ObsNative.obs_set_output_source(0, ObsNative.obs_scene_get_source(_scene));
+        // Captail always has one video source. Connecting it directly avoids an
+        // extra scene-composition pass, which matters at 144/240 FPS.
+        ObsNative.obs_set_output_source(0, _videoSource);
 
         if (!IsGameCapture && _config.CaptureSystemAudio)
         {
@@ -1095,14 +1100,14 @@ public sealed class ObsReplayEngine : IDisposable
             ObsNative.obs_encoder_release(encoder);
         _audioEncoders.Clear();
 
-        for (uint channel = 0; channel <= 6; channel++)
+        for (uint channel = 0; channel < 6; channel++)
             ObsNative.obs_set_output_source(channel, 0);
 
-        if (_scene != 0)
-        {
-            ObsNative.obs_scene_release(_scene);
-            _scene = 0;
-        }
+        if (_videoSource != 0)
+            ObsNative.obs_source_remove(_videoSource);
+        foreach (nint source in _audioSources)
+            ObsNative.obs_source_remove(source);
+
         if (_videoSource != 0)
         {
             ObsNative.obs_source_release(_videoSource);
@@ -1112,6 +1117,7 @@ public sealed class ObsReplayEngine : IDisposable
             ObsNative.obs_source_release(source);
         _audioSources.Clear();
 
+        ObsNative.obs_wait_for_destroy_queue();
         ObsNative.obs_shutdown();
         _obsStarted = false;
         if (_logBridgeInstalled)

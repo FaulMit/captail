@@ -29,6 +29,9 @@ internal static class CaptureInterop
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(nint window, StringBuilder className, int maxCount);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(nint window, out Rect rect);
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
     {
@@ -134,6 +137,20 @@ internal static class CaptureInterop
     {
         using Process? process = FindProcess(executablePath, requireWindow: false);
         return process is not null;
+    }
+
+    public static (int Width, int Height)? GetGameClientSize(string executablePath)
+    {
+        using Process? process = FindProcess(executablePath, requireWindow: true);
+        if (process is null ||
+            !GetClientRect(process.MainWindowHandle, out Rect rect))
+        {
+            return null;
+        }
+
+        int width = rect.Right - rect.Left;
+        int height = rect.Bottom - rect.Top;
+        return width > 0 && height > 0 ? (width, height) : null;
     }
 
     private static Process? FindProcess(string executablePath, bool requireWindow)

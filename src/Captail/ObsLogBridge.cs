@@ -13,20 +13,20 @@ internal static class ObsLogBridge
 
     [DllImport("CaptailObsBridge.dll", CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]
-    private static extern bool everloop_install_obs_log_handler(LogCallback callback);
+    private static extern bool captail_install_obs_log_handler(LogCallback callback);
 
     [DllImport("CaptailObsBridge.dll", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void everloop_remove_obs_log_handler();
+    private static extern void captail_remove_obs_log_handler();
 
     internal static bool Install()
     {
-        bool installed = everloop_install_obs_log_handler(Callback);
+        bool installed = captail_install_obs_log_handler(Callback);
         if (!installed)
             Log.Write("OBS log bridge could not be installed.");
         return installed;
     }
 
-    internal static void Remove() => everloop_remove_obs_log_handler();
+    internal static void Remove() => captail_remove_obs_log_handler();
 
     private static void Write(int level, string message) =>
         Log.Write($"libobs[{level}]: {message}");

@@ -1,8 +1,8 @@
 #include <Windows.h>
+#include <chrono>
 #include <d3d11.h>
 #include <dxgi.h>
 #include <wrl/client.h>
-#include <thread>
 
 using Microsoft::WRL::ComPtr;
 
@@ -17,8 +17,16 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
 }
 }
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
+int WINAPI wWinMain(
+    _In_ HINSTANCE instance,
+    _In_opt_ HINSTANCE,
+    _In_ PWSTR,
+    _In_ int show)
 {
+    constexpr int client_width = 2560;
+    constexpr int client_height = 1440;
+    constexpr DWORD window_style = WS_POPUP;
+
     WNDCLASSW window_class{};
     window_class.hInstance = instance;
     window_class.lpfnWndProc = window_proc;
@@ -27,15 +35,19 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
     if (!RegisterClassW(&window_class))
         return 1;
 
+    RECT window_rect{0, 0, client_width, client_height};
+    if (!AdjustWindowRect(&window_rect, window_style, FALSE))
+        return 2;
+
     HWND window = CreateWindowExW(
-        0,
+        WS_EX_TOPMOST,
         window_class.lpszClassName,
         L"Captail OBS Capture Fixture",
-        WS_OVERLAPPEDWINDOW,
-        CW_USEDEFAULT,
-        CW_USEDEFAULT,
-        1280,
-        720,
+        window_style,
+        0,
+        0,
+        window_rect.right - window_rect.left,
+        window_rect.bottom - window_rect.top,
         nullptr,
         nullptr,
         instance,
@@ -80,8 +92,20 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
                               back_buffer.Get(), nullptr, &render_target)))
         return 4;
 
+    D3D11_TEXTURE2D_DESC stress_desc{};
+    back_buffer->GetDesc(&stress_desc);
+    stress_desc.BindFlags = 0;
+    stress_desc.MiscFlags = 0;
+    ComPtr<ID3D11Texture2D> stress_texture;
+    if (FAILED(device->CreateTexture2D(&stress_desc, nullptr, &stress_texture)))
+        return 5;
+
     ShowWindow(window, show);
     uint32_t frame = 0;
+    constexpr auto frame_interval = std::chrono::nanoseconds(1'000'000'000 / 240);
+    auto next_frame = std::chrono::steady_clock::now();
+    auto measurement_start = next_frame;
+    uint32_t measurement_frames = 0;
     MSG message{};
     while (message.message != WM_QUIT) {
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
@@ -98,8 +122,29 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show)
             1.0f,
         };
         context->ClearRenderTargetView(render_target.Get(), color);
+        for (int pass = 0; pass < 32; pass++) {
+            context->CopyResource(stress_texture.Get(), back_buffer.Get());
+            context->CopyResource(back_buffer.Get(), stress_texture.Get());
+        }
         swap_chain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
-        std::this_thread::yield();
+        measurement_frames++;
+        const auto measurement_now = std::chrono::steady_clock::now();
+        const auto measurement_elapsed = measurement_now - measurement_start;
+        if (measurement_elapsed >= std::chrono::seconds(1)) {
+            const double measured_fps = measurement_frames /
+                std::chrono::duration<double>(measurement_elapsed).count();
+            wchar_t title[96]{};
+            swprintf_s(title, L"Captail Capture Fixture - %.1f FPS", measured_fps);
+            SetWindowTextW(window, title);
+            measurement_start = measurement_now;
+            measurement_frames = 0;
+        }
+        next_frame += frame_interval;
+        while (std::chrono::steady_clock::now() < next_frame)
+            YieldProcessor();
+        auto now = std::chrono::steady_clock::now();
+        if (now - next_frame > frame_interval)
+            next_frame = now;
     }
     return 0;
 }

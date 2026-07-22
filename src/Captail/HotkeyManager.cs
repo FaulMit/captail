@@ -135,21 +135,26 @@ public sealed class HotkeyManager : IDisposable
     {
         uint modifiers = 0;
         uint vk = 0;
+        int keyCount = 0;
         foreach (string rawPart in hotkey.Split('+'))
         {
             string part = rawPart.Trim();
+            if (part.Length == 0)
+                throw new FormatException(
+                    Localization.Format("L.Hotkey.ParseError", hotkey));
             switch (part.ToUpperInvariant())
             {
                 case "CTRL": modifiers |= MOD_CONTROL; break;
                 case "SHIFT": modifiers |= MOD_SHIFT; break;
                 case "ALT": modifiers |= MOD_ALT; break;
                 default:
-                    var key = (Key)Enum.Parse(typeof(Key), NormalizeKeyName(part), ignoreCase: true);
+                    keyCount++;
+                    var key = Enum.Parse<Key>(NormalizeKeyName(part), ignoreCase: true);
                     vk = (uint)KeyInterop.VirtualKeyFromKey(key);
                     break;
             }
         }
-        if (vk == 0)
+        if (vk == 0 || keyCount != 1)
             throw new FormatException(
                 Localization.Format("L.Hotkey.ParseError", hotkey));
         return (modifiers, vk);

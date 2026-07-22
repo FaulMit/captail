@@ -122,9 +122,21 @@ public partial class OverlayNotificationWindow : Window
     private void MakeClickThrough()
     {
         nint hwnd = new WindowInteropHelper(this).Handle;
+        Marshal.SetLastPInvokeError(0);
         int styles = GetWindowLong(hwnd, GwlExStyle);
-        SetWindowLong(hwnd, GwlExStyle,
+        int error = Marshal.GetLastPInvokeError();
+        if (styles == 0 && error != 0)
+        {
+            Log.Write($"Could not read overlay window style: Win32 error {error}.");
+            return;
+        }
+
+        Marshal.SetLastPInvokeError(0);
+        int previousStyles = SetWindowLong(hwnd, GwlExStyle,
             styles | WsExTransparent | WsExToolWindow | WsExNoActivate);
+        error = Marshal.GetLastPInvokeError();
+        if (previousStyles == 0 && error != 0)
+            Log.Write($"Could not make overlay click-through: Win32 error {error}.");
     }
 
     [DllImport("user32.dll", SetLastError = true)]

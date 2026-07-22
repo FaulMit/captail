@@ -2,6 +2,10 @@ using System.Runtime.InteropServices;
 
 namespace Captail;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Security",
+    "CA2101:Specify marshaling for P/Invoke string arguments",
+    Justification = "libobs APIs require explicit UTF-8 strings via LPUTF8Str.")]
 internal static class ObsNative
 {
     internal const string Library = "obs.dll";
@@ -11,7 +15,6 @@ internal static class ObsNative
     internal enum VideoRange { Default, Partial, Full }
     internal enum ScaleType { Disable, Point, Bicubic, Bilinear, Lanczos, Area }
     internal enum SpeakerLayout { Unknown, Mono, Stereo }
-    internal enum BoundsType { None, Stretch, ScaleInner }
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct VideoInfo
@@ -36,13 +39,6 @@ internal static class ObsNative
     {
         internal uint SamplesPerSecond;
         internal SpeakerLayout Speakers;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    internal struct Vec2
-    {
-        internal float X;
-        internal float Y;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -73,6 +69,9 @@ internal static class ObsNative
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_shutdown();
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_wait_for_destroy_queue();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]
@@ -152,6 +151,9 @@ internal static class ObsNative
     internal static extern uint obs_get_total_frames();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern uint obs_get_lagged_frames();
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern nint obs_data_create();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
@@ -186,6 +188,9 @@ internal static class ObsNative
     internal static extern void obs_source_release(nint source);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_source_remove(nint source);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_source_set_audio_mixers(nint source, uint mixers);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
@@ -202,37 +207,6 @@ internal static class ObsNative
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern nint obs_source_get_proc_handler(nint source);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern nint obs_scene_create(
-        [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_scene_release(nint scene);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern nint obs_scene_get_source(nint scene);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern nint obs_scene_add(nint scene, nint source);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_sceneitem_set_alignment(nint item, uint alignment);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_sceneitem_set_bounds_alignment(nint item, uint alignment);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_sceneitem_set_bounds_type(nint item, BoundsType type);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_sceneitem_set_bounds(nint item, ref Vec2 bounds);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_sceneitem_set_pos(nint item, ref Vec2 position);
-
-    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern void obs_sceneitem_set_scale_filter(nint item, ScaleType filter);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_set_output_source(uint channel, nint source);

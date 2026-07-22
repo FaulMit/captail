@@ -11,7 +11,16 @@ public static class Autostart
     public static bool IsEnabled()
     {
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
-        return HasCommand(key, ValueName);
+        return string.Equals(
+            ReadCommand(key),
+            ExpectedCommand(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool HasEntry()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(RunKey);
+        return !string.IsNullOrWhiteSpace(ReadCommand(key));
     }
 
     public static void SetEnabled(bool enabled)
@@ -19,12 +28,9 @@ public static class Autostart
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
         if (enabled)
         {
-            string executablePath = Environment.ProcessPath ??
-                throw new InvalidOperationException(
-                    Localization.Text("L.App.ExecutablePathError"));
             key.SetValue(
                 ValueName,
-                $"\"{executablePath}\" --background",
+                ExpectedCommand(),
                 RegistryValueKind.String);
         }
         else
@@ -33,10 +39,17 @@ public static class Autostart
         }
     }
 
-    private static bool HasCommand(RegistryKey? key, string valueName) =>
+    private static string? ReadCommand(RegistryKey? key) =>
         key?.GetValue(
-            valueName,
+            ValueName,
             defaultValue: null,
-            RegistryValueOptions.DoNotExpandEnvironmentNames) is string command &&
-        !string.IsNullOrWhiteSpace(command);
+            RegistryValueOptions.DoNotExpandEnvironmentNames) as string;
+
+    private static string ExpectedCommand()
+    {
+        string executablePath = Environment.ProcessPath ??
+            throw new InvalidOperationException(
+                Localization.Text("L.App.ExecutablePathError"));
+        return $"\"{executablePath}\" --background";
+    }
 }
