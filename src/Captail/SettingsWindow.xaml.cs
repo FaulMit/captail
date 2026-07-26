@@ -19,6 +19,13 @@ public partial class SettingsWindow : Window
     private readonly Func<bool, Task<bool>> _setReplayEnabled;
     private readonly Func<bool, bool, string, string, Task<bool>> _setAudioSources;
     private readonly Func<Config, bool, Task<bool>> _applySettings;
+    private readonly Func<bool, CancellationToken, Task<UpdateRelease?>>
+        _checkForUpdates;
+    private readonly Func<
+        UpdateRelease,
+        IProgress<int>,
+        CancellationToken,
+        Task> _installUpdate;
     private EncoderCapabilities _capabilities;
     private readonly DispatcherTimer _diskTimer;
     private readonly CancellationTokenSource _lifetimeCts = new();
@@ -28,22 +35,34 @@ public partial class SettingsWindow : Window
     private Button? _capturingHotkeyButton;
     private bool _updatingUi;
     private bool _runtimeActive;
+    private int _availableReplaySeconds;
     private bool? _animatedRecordingState;
     private int _deviceRefreshVersion;
     private int _processRefreshVersion;
     private int _diskRefreshInProgress;
     private int _actionInProgress;
+    private UpdateRelease? _availableUpdate;
+    private UpdateDisplayState _updateDisplayState = UpdateDisplayState.Current;
+    private int _updateProgress;
+    private bool _updateCheckInProgress;
+    private bool _updateInstallInProgress;
 
     public bool Applied { get; private set; }
 
-    public SettingsWindow(
+    internal SettingsWindow(
         Config config,
         bool runtimeActive,
         Action saveReplay,
         Func<bool, Task<bool>> setReplayEnabled,
         Func<bool, bool, string, string, Task<bool>> setAudioSources,
         Func<Config, bool, Task<bool>> applySettings,
-        EncoderCapabilities capabilities)
+        EncoderCapabilities capabilities,
+        Func<bool, CancellationToken, Task<UpdateRelease?>> checkForUpdates,
+        Func<
+            UpdateRelease,
+            IProgress<int>,
+            CancellationToken,
+            Task> installUpdate)
     {
         _config = config;
         _saveReplay = saveReplay;
@@ -51,6 +70,8 @@ public partial class SettingsWindow : Window
         _setAudioSources = setAudioSources;
         _applySettings = applySettings;
         _capabilities = capabilities;
+        _checkForUpdates = checkForUpdates;
+        _installUpdate = installUpdate;
         _outputDirectory = config.OutputDirectory;
         _pendingSaveHotkey = config.Hotkey;
         _pendingToggleHotkey = config.ToggleReplayHotkey;
@@ -72,13 +93,18 @@ public partial class SettingsWindow : Window
         ResetDeviceLists();
         LoadSettingsControls();
         UpdateRuntimeState(runtimeActive);
-        Loaded += async (_, _) => await RunUiActionAsync(async () =>
+        RenderUpdateStatus();
+        Loaded += async (_, _) =>
         {
-            await Task.WhenAll(
-                LoadDeviceListsAsync(),
-                PopulateGameProcessesAsync(),
-                RefreshDiskAsync());
-        });
+            await RunUiActionAsync(async () =>
+            {
+                await Task.WhenAll(
+                    LoadDeviceListsAsync(),
+                    PopulateGameProcessesAsync(),
+                    RefreshDiskAsync());
+            });
+            _ = CheckForUpdatesAsync(force: false);
+        };
         _diskTimer.Start();
     }
 
@@ -438,9 +464,14 @@ public partial class SettingsWindow : Window
     public void UpdateRuntimeState(
         bool active,
         string? activeCodec = null,
-        string? activeCaptureSource = null)
+        string? activeCaptureSource = null,
+        int? availableReplaySeconds = null)
     {
         _runtimeActive = active;
+        if (availableReplaySeconds is not null)
+            _availableReplaySeconds = availableReplaySeconds.Value;
+        else if (!active)
+            _availableReplaySeconds = 0;
         _updatingUi = true;
         ReplayToggle.IsChecked = active;
         SettingsReplayToggle.IsChecked = active;
@@ -492,7 +523,10 @@ public partial class SettingsWindow : Window
         FpsSummaryText.Text = $"{_config.FrameRate} FPS";
         SaveButtonText.Text = Localization.Format(
             "L.Save.Duration",
-            FormatDuration(_config.BufferSeconds));
+            FormatDuration(
+                active
+                    ? Math.Max(1, _availableReplaySeconds)
+                    : _config.BufferSeconds));
         HotkeySummaryText.Text = _config.Hotkey;
         OutputFolderSummaryText.Text = _config.OutputDirectory;
     }
@@ -559,7 +593,202 @@ public partial class SettingsWindow : Window
         ApplyHardwareCapabilities();
         UpdateCaptureSourceState();
         UpdateRuntimeState(_runtimeActive);
+        RenderUpdateStatus();
         _ = RefreshDiskAsync();
+    }
+
+    private void GitHub_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = UpdateService.RepositoryUrl,
+                UseShellExecute = true,
+            });
+            AnimatePress(GitHubButton);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Open GitHub repository", exception);
+        }
+    }
+
+    private async void UpdateVersion_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_updateCheckInProgress || _updateInstallInProgress)
+            return;
+
+        AnimatePress(UpdateVersionButton);
+        if (_availableUpdate is null)
+        {
+            await CheckForUpdatesAsync(force: true);
+            return;
+        }
+
+        _updateInstallInProgress = true;
+        _updateDisplayState = UpdateDisplayState.Downloading;
+        _updateProgress = 0;
+        RenderUpdateStatus();
+
+        try
+        {
+            var progress = new Progress<int>(value =>
+            {
+                _updateProgress = Math.Clamp(value, 0, 100);
+                RenderUpdateStatus();
+            });
+            await _installUpdate(
+                _availableUpdate,
+                progress,
+                _lifetimeCts.Token);
+            _updateDisplayState = UpdateDisplayState.Installing;
+            RenderUpdateStatus();
+        }
+        catch (OperationCanceledException)
+            when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Update installation failed: {exception}");
+            _updateInstallInProgress = false;
+            _updateDisplayState = UpdateDisplayState.Available;
+            RenderUpdateStatus();
+            ShowError(
+                Localization.Text("L.Update.InstallFailedTitle"),
+                exception.Message);
+        }
+    }
+
+    private async Task CheckForUpdatesAsync(bool force)
+    {
+        if (_updateCheckInProgress || _updateInstallInProgress)
+            return;
+
+        _updateCheckInProgress = true;
+        _updateDisplayState = UpdateDisplayState.Checking;
+        RenderUpdateStatus();
+        try
+        {
+            _availableUpdate = await _checkForUpdates(
+                force,
+                _lifetimeCts.Token);
+            _updateDisplayState = _availableUpdate is null
+                ? UpdateDisplayState.Current
+                : UpdateDisplayState.Available;
+            RenderUpdateStatus();
+            if (_availableUpdate is not null)
+            {
+                AnimatePress(UpdateVersionButton);
+                var pulse = new DoubleAnimation(
+                    0.28,
+                    1,
+                    TimeSpan.FromMilliseconds(420))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = new RepeatBehavior(2),
+                };
+                UpdateStatusDot.BeginAnimation(
+                    OpacityProperty,
+                    pulse);
+            }
+        }
+        catch (OperationCanceledException)
+            when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Update check failed: {exception}");
+            _availableUpdate = null;
+            _updateDisplayState = UpdateDisplayState.CheckFailed;
+            RenderUpdateStatus();
+            if (force)
+            {
+                ShowError(
+                    Localization.Text("L.Update.CheckFailedTitle"),
+                    exception.Message);
+            }
+        }
+        finally
+        {
+            _updateCheckInProgress = false;
+            if (!_lifetimeCts.IsCancellationRequested)
+                RenderUpdateStatus();
+        }
+    }
+
+    private void RenderUpdateStatus()
+    {
+        string current = UpdateService.CurrentVersionText;
+        string? available = _availableUpdate is null
+            ? null
+            : UpdateService.FormatVersion(_availableUpdate.Version);
+
+        UpdateVersionButton.Tag = _updateDisplayState switch
+        {
+            UpdateDisplayState.Available => "available",
+            UpdateDisplayState.Checking or
+            UpdateDisplayState.Downloading or
+            UpdateDisplayState.Installing => "busy",
+            _ => "current",
+        };
+        UpdateStatusDot.Visibility = _updateDisplayState is
+            UpdateDisplayState.Available or
+            UpdateDisplayState.Downloading or
+            UpdateDisplayState.Installing
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+
+        switch (_updateDisplayState)
+        {
+            case UpdateDisplayState.Checking:
+                UpdateStatusText.Text =
+                    $"v{current} · {Localization.Text("L.Update.Checking")}";
+                UpdateVersionButton.ToolTip =
+                    Localization.Text("L.Update.CheckingTip");
+                break;
+            case UpdateDisplayState.Available:
+                UpdateStatusText.Text = Localization.Format(
+                    "L.Update.Available",
+                    available ?? current);
+                UpdateVersionButton.ToolTip = Localization.Format(
+                    "L.Update.AvailableTip",
+                    available ?? current);
+                break;
+            case UpdateDisplayState.Downloading:
+                UpdateStatusText.Text = Localization.Format(
+                    "L.Update.Downloading",
+                    _updateProgress);
+                UpdateVersionButton.ToolTip = Localization.Format(
+                    "L.Update.DownloadingTip",
+                    available ?? current);
+                break;
+            case UpdateDisplayState.Installing:
+                UpdateStatusText.Text =
+                    Localization.Text("L.Update.Installing");
+                UpdateVersionButton.ToolTip =
+                    Localization.Text("L.Update.InstallingTip");
+                break;
+            case UpdateDisplayState.CheckFailed:
+                UpdateStatusText.Text = $"v{current}";
+                UpdateVersionButton.ToolTip =
+                    Localization.Text("L.Update.CheckFailedTip");
+                break;
+            default:
+                UpdateStatusText.Text = $"v{current}";
+                UpdateVersionButton.ToolTip = _updateCheckInProgress
+                    ? Localization.Text("L.Update.CheckingTip")
+                    : Localization.Format(
+                        "L.Update.UpToDateTip",
+                        current);
+                break;
+        }
     }
 
     private void ShowSettings()
@@ -1260,6 +1489,16 @@ public partial class SettingsWindow : Window
             _config.CaptureSource == "game"
                 ? "L.Video.GameLower"
                 : "L.Video.DesktopLower");
+
+    private enum UpdateDisplayState
+    {
+        Current,
+        Checking,
+        Available,
+        Downloading,
+        Installing,
+        CheckFailed,
+    }
 
     private sealed record AudioDeviceSelection(bool IsSystem, string Id);
 

@@ -38,8 +38,10 @@ public sealed class ObsReplayEngine : IDisposable
     private bool _obsStarted;
     private bool _logBridgeInstalled;
     private bool _disposing;
+    private bool _resettingReplayWindow;
     private uint _previousFrameCount;
     private DateTime _previousFrameCheckUtc;
+    private DateTime _replayWindowStartedUtc;
     private uint _outputWidth;
     private uint _outputHeight;
     private uint _baseWidth;
@@ -108,6 +110,18 @@ public sealed class ObsReplayEngine : IDisposable
 
     public ulong BufferedBytes =>
         _output == 0 ? 0 : ObsNative.obs_output_get_total_bytes(_output);
+    public int AvailableReplaySeconds
+    {
+        get
+        {
+            if (!IsActive || _replayWindowStartedUtc == default)
+                return 0;
+
+            int elapsed = (int)Math.Floor(
+                (DateTime.UtcNow - _replayWindowStartedUtc).TotalSeconds);
+            return Math.Clamp(elapsed, 0, _config.BufferSeconds);
+        }
+    }
     public uint TotalRenderedFrames => ObsNative.obs_get_total_frames();
     public uint LaggedRenderedFrames => ObsNative.obs_get_lagged_frames();
 
@@ -182,21 +196,23 @@ public sealed class ObsReplayEngine : IDisposable
         }
 
         using (probe)
-        try
-        {
-            probe.InitializeObs();
-            return probe.DetectCapabilities();
-        }
-        catch (Exception exception)
-        {
-            Log.Write($"GPU capability detection failed: {exception}");
-            return EncoderCapabilities.Failed(exception.Message);
-        }
+            try
+            {
+                probe.InitializeObs();
+                return probe.DetectCapabilities();
+            }
+            catch (Exception exception)
+            {
+                Log.Write($"GPU capability detection failed: {exception}");
+                return EncoderCapabilities.Failed(exception.Message);
+            }
     }
 
-    public async Task<string> SaveReplayAsync(CancellationToken cancellationToken = default)
+    public ReplaySaveOperation BeginSaveReplay(
+        CancellationToken cancellationToken = default)
     {
         Task<string> completion;
+        ulong initialMuxBytes;
         lock (_saveGate)
         {
             if (!IsActive)
@@ -209,6 +225,7 @@ public sealed class ObsReplayEngine : IDisposable
             _pendingSave = new TaskCompletionSource<string>(
                 TaskCreationOptions.RunContinuationsAsynchronously);
             completion = _pendingSave.Task;
+            initialMuxBytes = BufferedBytes;
             nint procedures = ObsNative.obs_output_get_proc_handler(_output);
             if (procedures == 0 ||
                 !ObsNative.proc_handler_call(procedures, "save", 0))
@@ -219,6 +236,68 @@ public sealed class ObsReplayEngine : IDisposable
             }
         }
 
+        return new ReplaySaveOperation(
+            WaitForSaveCompletionAsync(completion, cancellationToken),
+            initialMuxBytes);
+    }
+
+    public Task<string> SaveReplayAsync(
+        CancellationToken cancellationToken = default) =>
+        BeginSaveReplay(cancellationToken).Completion;
+
+    public bool HasSaveSnapshotStarted(ReplaySaveOperation operation) =>
+        BufferedBytes != operation.InitialMuxBytes;
+
+    public void ResetReplayWindow()
+    {
+        if (!IsActive)
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.BufferStopped"));
+
+        _resettingReplayWindow = true;
+        try
+        {
+            ObsNative.obs_output_stop(_output);
+            for (int attempt = 0;
+                 attempt < 80 && ObsNative.obs_output_active(_output);
+                 attempt++)
+            {
+                Thread.Sleep(25);
+            }
+            if (ObsNative.obs_output_active(_output))
+            {
+                ObsNative.obs_output_force_stop(_output);
+                for (int attempt = 0;
+                     attempt < 40 && ObsNative.obs_output_active(_output);
+                     attempt++)
+                {
+                    Thread.Sleep(25);
+                }
+            }
+            if (ObsNative.obs_output_active(_output) ||
+                !ObsNative.obs_output_start(_output))
+            {
+                string error = PtrToString(
+                    ObsNative.obs_output_get_last_error(_output));
+                throw new InvalidOperationException(
+                    string.IsNullOrWhiteSpace(error)
+                        ? Localization.Text("L.Engine.BufferStartFailed")
+                        : error);
+            }
+
+            _replayWindowStartedUtc = DateTime.UtcNow;
+            Log.Write("Replay window advanced after save.");
+        }
+        finally
+        {
+            _resettingReplayWindow = false;
+        }
+    }
+
+    private async Task<string> WaitForSaveCompletionAsync(
+        Task<string> completion,
+        CancellationToken cancellationToken)
+    {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(45));
         try
@@ -920,6 +999,7 @@ public sealed class ObsReplayEngine : IDisposable
                     ? Localization.Text("L.Engine.BufferStartFailed")
                     : error);
         }
+        _replayWindowStartedUtc = DateTime.UtcNow;
     }
 
     private int AudioTrackCount()
@@ -952,7 +1032,7 @@ public sealed class ObsReplayEngine : IDisposable
 
     private void OnOutputStopped(nint _, nint __)
     {
-        if (_disposing)
+        if (_disposing || _resettingReplayWindow)
             return;
         string error = PtrToString(ObsNative.obs_output_get_last_error(_output));
         Faulted?.Invoke(
@@ -1131,3 +1211,7 @@ public sealed class ObsReplayEngine : IDisposable
             _contextOwned = false;
     }
 }
+
+public sealed record ReplaySaveOperation(
+    Task<string> Completion,
+    ulong InitialMuxBytes);

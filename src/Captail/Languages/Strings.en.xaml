@@ -10,6 +10,20 @@
   <sys:String x:Key="L.Done">Done</sys:String>
   <sys:String x:Key="L.Minimize">Minimize</sys:String>
   <sys:String x:Key="L.Close">Close</sys:String>
+  <sys:String x:Key="L.Footer.GitHubTip">Open Captail on GitHub</sys:String>
+  <sys:String x:Key="L.Update.CurrentTip">Version {0} · click to check for updates</sys:String>
+  <sys:String x:Key="L.Update.Checking">Checking…</sys:String>
+  <sys:String x:Key="L.Update.CheckingTip">Checking GitHub Releases</sys:String>
+  <sys:String x:Key="L.Update.UpToDateTip">Captail {0} is up to date · click to check again</sys:String>
+  <sys:String x:Key="L.Update.Available">Update v{0}</sys:String>
+  <sys:String x:Key="L.Update.AvailableTip">Version {0} is ready · click to download and update</sys:String>
+  <sys:String x:Key="L.Update.Downloading">Downloading {0}%</sys:String>
+  <sys:String x:Key="L.Update.DownloadingTip">Downloading and verifying Captail {0}</sys:String>
+  <sys:String x:Key="L.Update.Installing">Installing…</sys:String>
+  <sys:String x:Key="L.Update.InstallingTip">Captail will restart after the update</sys:String>
+  <sys:String x:Key="L.Update.CheckFailedTip">Could not check for updates · click to retry</sys:String>
+  <sys:String x:Key="L.Update.CheckFailedTitle">Update check failed</sys:String>
+  <sys:String x:Key="L.Update.InstallFailedTitle">Update failed</sys:String>
 
   <sys:String x:Key="L.Status.Enabled">Instant Replay is on</sys:String>
   <sys:String x:Key="L.Status.Disabled">Instant Replay is off</sys:String>
@@ -59,6 +73,8 @@
   <sys:String x:Key="L.Replay.BufferLimitTip">Maximum compressed video and audio packet memory</sys:String>
   <sys:String x:Key="L.Replay.BufferLimitHint">Limits RAM use and duration</sys:String>
   <sys:String x:Key="L.Replay.DurationOnly">Duration only</sys:String>
+  <sys:String x:Key="L.Help.BufferLength">How much recent footage Captail keeps ready. Longer buffers use more RAM. After a save, the next clip starts with new footage instead of repeating the previous clip.</sys:String>
+  <sys:String x:Key="L.Help.BufferLimit">Hard limit for compressed replay data in RAM. If this limit is reached first, the available replay will be shorter. Leave “Duration only” unless you need predictable memory use.</sys:String>
   <sys:String x:Key="L.Size.250MB">250 MB</sys:String>
   <sys:String x:Key="L.Size.500MB">500 MB</sys:String>
   <sys:String x:Key="L.Size.1GB">1 GB</sys:String>
@@ -90,6 +106,13 @@
   <sys:String x:Key="L.Video.SourceShort">source</sys:String>
   <sys:String x:Key="L.Video.GameNotRunning">{0} · not running</sys:String>
   <sys:String x:Key="L.Video.ChooseGame">Choose a running game…</sys:String>
+  <sys:String x:Key="L.Help.VideoSource">Desktop captures the selected monitor; protected video may appear black without stopping the buffer. Game Capture hooks the selected game directly for cleaner high-FPS recording.</sys:String>
+  <sys:String x:Key="L.Help.VideoCodec.Av1">AV1 — newest and most efficient. Cleaner at the same bitrate, or smaller files at the same quality. Hardware support includes GeForce RTX 40/50, Radeon RX 7000 and Intel Arc.</sys:String>
+  <sys:String x:Key="L.Help.VideoCodec.Hevc">HEVC — nearly as compact and supported by more modern GPUs.</sys:String>
+  <sys:String x:Key="L.Help.VideoCodec.H264">H.264 — uses more space, but opens almost everywhere.</sys:String>
+  <sys:String x:Key="L.Help.Bitrate">How much video data is written each second. Higher values keep fast motion cleaner, but use more RAM and disk space. 50 Mbps is roughly 375 MB per minute. Auto adapts to codec, resolution and FPS.</sys:String>
+  <sys:String x:Key="L.Help.Resolution">Source keeps the original dimensions. Lower resolution reduces GPU load, RAM use and file size, but also removes detail. It does not change monitor resolution.</sys:String>
+  <sys:String x:Key="L.Help.FrameRate">60 FPS is enough for normal playback. 120–240 FPS records real extra frames for smooth slow motion; Captail does not invent frames. The game must render fast enough, and higher FPS increases GPU and memory use.</sys:String>
 
   <sys:String x:Key="L.Audio.SystemAudio">System audio</sys:String>
   <sys:String x:Key="L.Audio.GameAudio">Game audio</sys:String>
@@ -102,6 +125,9 @@
   <sys:String x:Key="L.Audio.OneMixed">One mixed track</sys:String>
   <sys:String x:Key="L.Audio.Separate">Separate tracks</sys:String>
   <sys:String x:Key="L.Audio.Codec">Audio codec</sys:String>
+  <sys:String x:Key="L.Help.MicBoost">Raises microphone gain before encoding. Use it when 100% volume is still quiet. Too much boost also raises noise and can make loud speech distort.</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">Mixed track plays everywhere and is easiest to share. Separate tracks keep game/system audio and microphone independent for editing; some players play only one track at a time.</sys:String>
+  <sys:String x:Key="L.Help.AudioCodec">AAC saves as MP4 and works with almost every player and editor. Opus is efficient and sounds good at lower bitrates, but uses MKV and may need a modern editor.</sys:String>
 
   <sys:String x:Key="L.Storage.ReplayFolder">Replay folder</sys:String>
   <sys:String x:Key="L.Storage.Change">Change…</sys:String>

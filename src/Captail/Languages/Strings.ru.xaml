@@ -10,6 +10,20 @@
   <sys:String x:Key="L.Done">Готово</sys:String>
   <sys:String x:Key="L.Minimize">Свернуть</sys:String>
   <sys:String x:Key="L.Close">Закрыть</sys:String>
+  <sys:String x:Key="L.Footer.GitHubTip">Открыть Captail на GitHub</sys:String>
+  <sys:String x:Key="L.Update.CurrentTip">Версия {0} · нажмите, чтобы проверить обновления</sys:String>
+  <sys:String x:Key="L.Update.Checking">Проверка…</sys:String>
+  <sys:String x:Key="L.Update.CheckingTip">Проверяем GitHub Releases</sys:String>
+  <sys:String x:Key="L.Update.UpToDateTip">Установлена актуальная версия {0} · нажмите для повторной проверки</sys:String>
+  <sys:String x:Key="L.Update.Available">Обновить до v{0}</sys:String>
+  <sys:String x:Key="L.Update.AvailableTip">Доступна версия {0} · нажмите, чтобы скачать и обновить</sys:String>
+  <sys:String x:Key="L.Update.Downloading">Загрузка {0}%</sys:String>
+  <sys:String x:Key="L.Update.DownloadingTip">Скачиваем и проверяем Captail {0}</sys:String>
+  <sys:String x:Key="L.Update.Installing">Установка…</sys:String>
+  <sys:String x:Key="L.Update.InstallingTip">После обновления Captail перезапустится</sys:String>
+  <sys:String x:Key="L.Update.CheckFailedTip">Не удалось проверить обновления · нажмите, чтобы повторить</sys:String>
+  <sys:String x:Key="L.Update.CheckFailedTitle">Ошибка проверки обновлений</sys:String>
+  <sys:String x:Key="L.Update.InstallFailedTitle">Ошибка обновления</sys:String>
 
   <sys:String x:Key="L.Status.Enabled">Мгновенный повтор включён</sys:String>
   <sys:String x:Key="L.Status.Disabled">Мгновенный повтор выключен</sys:String>
@@ -59,6 +73,8 @@
   <sys:String x:Key="L.Replay.BufferLimitTip">Максимальный объём сжатых видео- и аудиопакетов в оперативной памяти</sys:String>
   <sys:String x:Key="L.Replay.BufferLimitHint">Ограничивает ОЗУ и длительность</sys:String>
   <sys:String x:Key="L.Replay.DurationOnly">Только длительность</sys:String>
+  <sys:String x:Key="L.Help.BufferLength">Сколько последних секунд Captail держит наготове. Чем длиннее буфер, тем больше нужно ОЗУ. После сохранения следующий клип начинается с новых кадров и не повторяет предыдущий.</sys:String>
+  <sys:String x:Key="L.Help.BufferLimit">Жёсткий лимит сжатого буфера в ОЗУ. Если память закончится раньше времени, доступный повтор станет короче. Оставьте «Только длительность», если точный расход памяти не важен.</sys:String>
   <sys:String x:Key="L.Size.250MB">250 МБ</sys:String>
   <sys:String x:Key="L.Size.500MB">500 МБ</sys:String>
   <sys:String x:Key="L.Size.1GB">1 ГБ</sys:String>
@@ -90,6 +106,13 @@
   <sys:String x:Key="L.Video.SourceShort">исходное</sys:String>
   <sys:String x:Key="L.Video.GameNotRunning">{0} · не запущена</sys:String>
   <sys:String x:Key="L.Video.ChooseGame">Выберите запущенную игру…</sys:String>
+  <sys:String x:Key="L.Help.VideoSource">«Рабочий стол» записывает выбранный монитор; защищённое видео может быть чёрным, но буфер продолжит работу. Game Capture напрямую захватывает выбранную игру и лучше подходит для высокого FPS.</sys:String>
+  <sys:String x:Key="L.Help.VideoCodec.Av1">AV1 — самый современный и эффективный. Чище при том же битрейте или меньше файл при том же качестве. Поддержка есть на GeForce RTX 40/50, Radeon RX 7000 и Intel Arc.</sys:String>
+  <sys:String x:Key="L.Help.VideoCodec.Hevc">HEVC — почти такой же компактный и поддерживается большим числом современных GPU.</sys:String>
+  <sys:String x:Key="L.Help.VideoCodec.H264">H.264 — занимает больше места, зато открывается почти везде.</sys:String>
+  <sys:String x:Key="L.Help.Bitrate">Сколько видеоданных записывается каждую секунду. Чем выше значение, тем чище быстрое движение, но больше расход ОЗУ и диска. 50 Мбит/с — примерно 375 МБ в минуту. «Авто» учитывает кодек, разрешение и FPS.</sys:String>
+  <sys:String x:Key="L.Help.Resolution">«Как у источника» сохраняет исходный размер кадра. Меньшее разрешение снижает нагрузку, расход ОЗУ и размер файла, но убирает детали. Разрешение монитора не меняется.</sys:String>
+  <sys:String x:Key="L.Help.FrameRate">60 FPS достаточно для обычного просмотра. 120–240 FPS записывают реальные дополнительные кадры для плавного замедления — Captail не дорисовывает фейковые. Игра должна выдавать нужный FPS; нагрузка и расход памяти растут.</sys:String>
 
   <sys:String x:Key="L.Audio.SystemAudio">Звук рабочего стола</sys:String>
   <sys:String x:Key="L.Audio.GameAudio">Звук игры</sys:String>
@@ -102,6 +125,9 @@
   <sys:String x:Key="L.Audio.OneMixed">Одна общая</sys:String>
   <sys:String x:Key="L.Audio.Separate">Раздельные</sys:String>
   <sys:String x:Key="L.Audio.Codec">Аудиокодек</sys:String>
+  <sys:String x:Key="L.Help.MicBoost">Усиливает микрофон до кодирования. Используйте, если даже на 100% голос тихий. Слишком высокое усиление также поднимает шум и может перегружать громкую речь.</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">Общая дорожка работает почти везде и удобна для просмотра. Раздельные сохраняют игру/систему и микрофон отдельно для монтажа; некоторые плееры воспроизводят только одну дорожку за раз.</sys:String>
+  <sys:String x:Key="L.Help.AudioCodec">AAC сохраняется в MP4 и работает почти со всеми плеерами и редакторами. Opus эффективнее на низком битрейте, но использует MKV и может потребовать современный редактор.</sys:String>
 
   <sys:String x:Key="L.Storage.ReplayFolder">Папка повторов</sys:String>
   <sys:String x:Key="L.Storage.Change">Изменить…</sys:String>
