@@ -36,6 +36,8 @@ public partial class App : Application
     private int _recoveryFailures;
     private int _recoveryInProgress;
     private OverlayNotificationWindow? _overlayNotification;
+    private readonly UpdateService _updateService = new();
+    private DispatcherTimer? _updateShutdownTimer;
     private int _saving;
     private EncoderCapabilities? _capabilities;
     private readonly SemaphoreSlim _pipelineGate = new(1, 1);
@@ -45,6 +47,9 @@ public partial class App : Application
     private string? _captureDescription;
     private int _exiting;
     private bool _shutdownExistingSucceeded = true;
+#if DEBUG
+    private bool _qaUpdateAvailable;
+#endif
 
     private bool IsReplayRunning => _replayRunning;
 
@@ -69,11 +74,22 @@ public partial class App : Application
                 argument => argument.StartsWith(
                     "--qa-game-capture=",
                     StringComparison.OrdinalIgnoreCase));
+            bool replaySegmentsTest = e.Args.Contains(
+                "--qa-replay-segments",
+                StringComparer.OrdinalIgnoreCase);
+            bool updateCheckTest = e.Args.Contains(
+                "--qa-update-check",
+                StringComparer.OrdinalIgnoreCase);
+            _qaUpdateAvailable = e.Args.Contains(
+                "--qa-update-available",
+                StringComparer.OrdinalIgnoreCase);
 #else
             const bool faultTest = false;
             const bool codecTest = false;
             const bool capabilityModelTest = false;
             const bool gameCaptureTest = false;
+            const bool replaySegmentsTest = false;
+            const bool updateCheckTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
                 "--background",
@@ -85,7 +101,7 @@ public partial class App : Application
                     backgroundLaunch,
                     shutdownExisting,
                     _uiOnly || faultTest || codecTest || capabilityModelTest ||
-                    gameCaptureTest))
+                    gameCaptureTest || replaySegmentsTest || updateCheckTest))
             {
                 Shutdown();
                 return;
@@ -132,6 +148,19 @@ public partial class App : Application
             if (gameCaptureTest)
             {
                 RunGameCaptureTest(e.Args);
+                return;
+            }
+            if (replaySegmentsTest)
+            {
+                RunReplaySegmentsTest();
+                return;
+            }
+            if (updateCheckTest)
+            {
+                await _updateService.CheckAsync(
+                    force: true,
+                    CancellationToken.None);
+                Shutdown(0);
                 return;
             }
 #endif
@@ -917,34 +946,42 @@ public partial class App : Application
             return;
         }
 
-        if (_obs is null)
-        {
-            await RecoverPipelineAsync(Localization.Text("L.Recovery.ModuleStopped"));
-            return;
-        }
-        if (DateTime.UtcNow - _pipelineStartedUtc < TimeSpan.FromSeconds(8))
-            return;
         if (!await _pipelineGate.WaitAsync(0))
             return;
 
-        bool healthy;
+        string? recoveryReason = null;
         try
         {
             ObsReplayEngine? engine = _obs;
-            (healthy, string? description) = engine is null
-                ? (false, null)
-                : await RunOnObsThreadAsync(() =>
-                    (engine.IsHealthy, engine.Description));
-            if (healthy)
-                _captureDescription = description;
+            if (engine is null)
+            {
+                recoveryReason = Localization.Text(
+                    "L.Recovery.ModuleStopped");
+            }
+            else if (DateTime.UtcNow - _pipelineStartedUtc <
+                TimeSpan.FromSeconds(8))
+            {
+                return;
+            }
+            else
+            {
+                (bool healthy, string? description) =
+                    await RunOnObsThreadAsync(() =>
+                        (engine.IsHealthy, engine.Description));
+                if (healthy)
+                    _captureDescription = description;
+                else
+                    recoveryReason = Localization.Text(
+                        "L.Recovery.NoFrames");
+            }
         }
         finally
         {
             _pipelineGate.Release();
         }
 
-        if (!healthy)
-            await RecoverPipelineAsync(Localization.Text("L.Recovery.NoFrames"));
+        if (recoveryReason is not null)
+            await RecoverPipelineAsync(recoveryReason);
         else
             UpdateUiState();
     }
@@ -1145,7 +1182,9 @@ public partial class App : Application
             SetReplayEnabledAsync,
             SetAudioSourcesAsync,
             ApplySettingsAsync,
-            capabilities);
+            capabilities,
+            CheckForUpdatesAsync,
+            PrepareAndLaunchUpdateAsync);
         _settingsWindow.Closed += (_, _) =>
         {
             _settingsWindow = null;
@@ -1167,6 +1206,58 @@ public partial class App : Application
                 _pendingUiError);
             _pendingUiError = null;
         }
+    }
+
+    private Task<UpdateRelease?> CheckForUpdatesAsync(
+        bool force,
+        CancellationToken cancellationToken)
+    {
+#if DEBUG
+        if (_qaUpdateAvailable)
+        {
+            var asset = new UpdateAsset(
+                "qa",
+                new Uri("https://github.com/FaulMit/captail"),
+                1,
+                $"sha256:{new string('0', 64)}");
+            return Task.FromResult<UpdateRelease?>(
+                new UpdateRelease(
+                    new Version(0, 2, 0),
+                    "v0.2.0",
+                    new Uri(
+                        "https://github.com/FaulMit/captail/releases/tag/v0.2.0"),
+                    true,
+                    asset,
+                    asset,
+                    null));
+        }
+#endif
+        return _updateService.CheckAsync(force, cancellationToken);
+    }
+
+    private async Task PrepareAndLaunchUpdateAsync(
+        UpdateRelease release,
+        IProgress<int> progress,
+        CancellationToken cancellationToken)
+    {
+        PreparedUpdate update = await _updateService.PrepareAsync(
+            release,
+            progress,
+            cancellationToken);
+        UpdateService.Launch(update);
+
+        _updateShutdownTimer?.Stop();
+        _updateShutdownTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(450),
+        };
+        _updateShutdownTimer.Tick += (_, _) =>
+        {
+            _updateShutdownTimer?.Stop();
+            _updateShutdownTimer = null;
+            _ = RequestShutdownAsync();
+        };
+        _updateShutdownTimer.Start();
     }
 
     private async Task EnsureCapabilitiesAsync()
@@ -1494,12 +1585,16 @@ public partial class App : Application
     {
         bool active = IsReplayRunning;
         string codec = _obs?.ActiveCodec ?? _config?.Codec ?? "h264";
+        int availableReplaySeconds = active
+            ? _obs?.AvailableReplaySeconds ?? _config!.BufferSeconds
+            : 0;
         if (_capabilities is not null)
             _settingsWindow?.UpdateCapabilities(_capabilities);
         _settingsWindow?.UpdateRuntimeState(
             active,
             codec,
-            _captureDescription);
+            _captureDescription,
+            availableReplaySeconds);
         if (_tray is not null)
         {
             _tray.ToolTipText = active
@@ -1537,6 +1632,11 @@ public partial class App : Application
     {
         try
         {
+            int availableReplaySeconds = Math.Max(
+                1,
+                Math.Min(
+                    _config!.BufferSeconds,
+                    engine.AvailableReplaySeconds));
             // Shown immediately so the user sees progress; replaced by the result
             // notification once the file is on disk. The long duration is a safety
             // net — the "saved"/"failed" notification supersedes it well before then.
@@ -1545,7 +1645,7 @@ public partial class App : Application
                 Localization.Text("L.Notify.Saving"),
                 Localization.Format(
                     "L.Notify.SavingDetail",
-                    FormatDuration(_config!.BufferSeconds)),
+                    FormatDuration(availableReplaySeconds)),
                 OverlayTone.Neutral,
                 30_000);
             string path = await SaveReplayGuardedAsync(engine);
@@ -1581,15 +1681,119 @@ public partial class App : Application
                 throw new InvalidOperationException(
                     Localization.Text("L.Notify.EnableBeforeSave"));
             }
-            Task<string> saveOperation = await RunOnObsThreadAsync(
-                    () => engine.SaveReplayAsync())
+            ReplaySaveOperation operation = await RunOnObsThreadAsync(
+                    () => engine.BeginSaveReplay())
                 .ConfigureAwait(false);
-            return await saveOperation.ConfigureAwait(false);
+            bool snapshotStarted = await WaitForSaveSnapshotAsync(
+                    engine,
+                    operation)
+                .ConfigureAwait(false);
+            if (snapshotStarted)
+            {
+                await RunOnObsThreadAsync(engine.ResetReplayWindow)
+                    .ConfigureAwait(false);
+            }
+
+            string path = await operation.Completion.ConfigureAwait(false);
+            if (!snapshotStarted)
+            {
+                Log.Write(
+                    "Replay snapshot marker was delayed; advancing window " +
+                    "after mux completion.");
+                await RunOnObsThreadAsync(engine.ResetReplayWindow)
+                    .ConfigureAwait(false);
+            }
+            return path;
         }
         finally
         {
             _pipelineGate.Release();
         }
+    }
+
+#if DEBUG
+    private async void RunReplaySegmentsTest()
+    {
+        try
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "Captail",
+                $"obs_segments_{Environment.ProcessId}");
+            _config = new Config
+            {
+                ReplayEnabled = true,
+                BufferSeconds = 15,
+                FrameRate = 30,
+                BitrateMbps = 8,
+                Codec = "h264",
+                CaptureSource = "desktop",
+                CaptureSystemAudio = false,
+                CaptureMicrophone = false,
+                OutputDirectory = root,
+            };
+            if (!await TryStartPipelineAsync(showError: false))
+            {
+                throw new InvalidOperationException(
+                    "The replay segment pipeline did not start.");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(6));
+            string first = await SaveReplayGuardedAsync(_obs!);
+            int availableAfterFirst = _obs!.AvailableReplaySeconds;
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            string second = await SaveReplayGuardedAsync(_obs);
+            int availableAfterSecond = _obs.AvailableReplaySeconds;
+
+            bool passed =
+                File.Exists(first) &&
+                File.Exists(second) &&
+                new FileInfo(first).Length > 0 &&
+                new FileInfo(second).Length > 0 &&
+                availableAfterFirst <= 1 &&
+                availableAfterSecond <= 1;
+            Log.Write(
+                $"OBS_SEGMENT_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"first={first}, second={second}, " +
+                $"availableAfterFirst={availableAfterFirst}s, " +
+                $"availableAfterSecond={availableAfterSecond}s");
+            await StopPipelineCoreAsync();
+            Shutdown(passed ? 0 : 13);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"OBS_SEGMENT_TEST FAIL: {exception}");
+            Shutdown(13);
+        }
+    }
+#endif
+
+    private async Task<bool> WaitForSaveSnapshotAsync(
+        ObsReplayEngine engine,
+        ReplaySaveOperation operation)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!ReferenceEquals(engine, _obs) ||
+                !IsReplayRunning ||
+                Volatile.Read(ref _exiting) != 0)
+            {
+                throw new InvalidOperationException(
+                    Localization.Text("L.Notify.EnableBeforeSave"));
+            }
+
+            bool started = await RunOnObsThreadAsync(
+                    () => engine.HasSaveSnapshotStarted(operation))
+                .ConfigureAwait(false);
+            if (started)
+                return true;
+            if (operation.Completion.IsCompleted)
+                break;
+            await Task.Delay(15).ConfigureAwait(false);
+        }
+
+        return false;
     }
 
     private void OnLanguageChanged()
@@ -1668,6 +1872,7 @@ public partial class App : Application
             Interlocked.Exchange(ref _exiting, 1) != 0 && _obs is null;
         Localization.Changed -= OnLanguageChanged;
         _healthTimer?.Stop();
+        _updateShutdownTimer?.Stop();
         _activationServerCts?.Cancel();
         _activationServerCts?.Dispose();
         _settingsWindow?.Close();

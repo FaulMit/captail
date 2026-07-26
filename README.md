@@ -13,12 +13,27 @@
 
 Captail is designed around one rule: **Instant Replay should stay on.** A game crash, game-to-desktop switch, temporary capture failure, protected surface, or recoverable graphics-driver interruption should not silently leave you without a replay. A watchdog monitors the recording pipeline and restarts it when recovery is possible.
 
+## Interface
+
 <p align="center">
   <img src="docs/captail-main.jpg" alt="Captail main window showing replay status, audio sources, recording format, disk space, and save hotkey" width="420">
 </p>
 
+<p align="center">
+  <img src="docs/captail-settings-video.jpg" alt="Captail video settings with source, codec, bitrate, resolution, and frame-rate controls" width="390">
+  <img src="docs/captail-settings-audio.jpg" alt="Captail audio, storage, and hotkey settings" width="390">
+</p>
+
 > [!WARNING]
 > Captail `v0.1.x` is an early public preview. Core recording works, but bugs and hardware-specific problems are expected. Please report anything that does not work.
+
+## What's new in v0.1.3
+
+- **Built-in updates** — the footer shows update status and installs the correct Installer or Portable package after verifying its SHA-256 digest.
+- **Clearer settings** — concise help popups explain codecs, bitrate, resolution, frame rate, audio tracks, buffer limits, and other technical options in English and Russian.
+- **Non-overlapping saves** — after saving a replay, the next clip starts at that save boundary instead of repeating footage from the previous file.
+- **More accurate save duration** — the main action shows how much new footage is currently available.
+- **Safer recovery** — the watchdog no longer treats normal recording-pipeline startup as a failure.
 
 ## Why Captail?
 
@@ -52,6 +67,8 @@ Download the latest version from [GitHub Releases](https://github.com/FaulMit/ca
 | `SHA256SUMS.txt` | Verification | Compare downloaded file SHA-256 before running it. |
 
 Both packages are self-contained. **OBS Studio and .NET do not need to be installed separately.**
+
+Captail checks GitHub Releases in the background. When an update is available, the version in the footer becomes a mint update button. Click it to download, verify, install, and restart. Installer builds update through Setup; Portable builds replace their extracted files without changing package type.
 
 > [!NOTE]
 > Current binaries are not Authenticode-signed. Windows SmartScreen may show an “Unknown publisher” warning. Verify the SHA-256 checksum and GitHub build provenance before running a release.
@@ -104,6 +121,8 @@ Both hotkeys can be changed in Settings.
 - Start with Windows.
 - Native overlay notifications for replay state and saved clips.
 - Single-instance protection.
+- Built-in GitHub release indicator and verified one-click updates.
+- Direct repository link in the footer.
 - English interface by default, with live English/Russian switching.
 
 ### Reliability
@@ -111,6 +130,7 @@ Both hotkeys can be changed in Settings.
 - Recording-pipeline watchdog.
 - Automatic replay restart after recoverable capture or encoder failure.
 - Progressive retry delay when the graphics driver is temporarily unavailable.
+- Sequential save boundaries prevent duplicate footage across consecutive clips.
 - Fragmented MP4 output to reduce the risk of losing an entire file after interruption.
 - Protected/DRM surfaces may become black while the rolling buffer continues.
 
@@ -144,7 +164,7 @@ Feedback is especially valuable during this preview.
 1. Check [existing issues](https://github.com/FaulMit/captail/issues).
 2. Open a [bug report](https://github.com/FaulMit/captail/issues/new/choose).
 3. Include Captail version, Windows version, GPU, driver version, source, codec, FPS, resolution, and reproduction steps.
-4. Attach `%APPDATA%\Captail\log.txt` when possible. Review it first and remove personal paths or other sensitive information.
+4. Attach `%LOCALAPPDATA%\Captail\log.txt` when possible. Review it first and remove personal paths or other sensitive information.
 
 Requests for older NVIDIA, AMD, and Intel testing are welcome even when everything works.
 
@@ -180,6 +200,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/RELE
 - `native/ObsCaptureFixture` — D3D11 fixture for Game Capture and high-FPS validation.
 - `App.xaml.cs` — tray, hotkeys, notifications, single-instance behavior, watchdog, and recovery.
 - `SettingsWindow.*` — compact WPF interface.
+- `UpdateService.cs` — GitHub release discovery, package verification, Installer updates, and Portable self-replacement.
 
 ## License and attribution
 

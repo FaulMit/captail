@@ -4,6 +4,19 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-26
+
+### Added
+
+- Concise English and Russian help tooltips for replay, video, and audio settings.
+- Dashboard footer with repository access, current version, and one-click updates for installed and Portable builds.
+
+### Fixed
+
+- Watchdog checks no longer mistake an in-progress pipeline startup for a stopped recording module.
+- Consecutive replay saves now advance the rolling window so later clips contain only footage recorded since the previous save.
+- Save controls and notifications now show the currently available replay duration instead of always showing the configured maximum.
+
 ## [0.1.2] - 2026-07-22
 
 ### Fixed

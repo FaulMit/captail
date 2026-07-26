@@ -24,6 +24,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="54"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="34"/>
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0"
@@ -242,7 +243,19 @@
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <StackPanel Margin="13,11">
-                                    <TextBlock Text="{DynamicResource L.Replay.BufferLength}" Style="{StaticResource RowLabelText}" Margin="0,0,0,8"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="{DynamicResource L.Replay.BufferLength}" Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Replay.BufferLength}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.BufferLength}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <Border Style="{StaticResource SegmentStrip}">
                                         <UniformGrid x:Name="BufferOptions" Rows="1">
                                             <RadioButton GroupName="Buffer" Tag="15" Content="{DynamicResource L.Duration.15s}" Style="{StaticResource SegmentButton}"/>
@@ -262,9 +275,20 @@
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="{DynamicResource L.Replay.BufferLimit}"
-                                                   Style="{StaticResource RowLabelText}"
-                                                   ToolTip="{DynamicResource L.Replay.BufferLimitTip}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{DynamicResource L.Replay.BufferLimit}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <Button Style="{StaticResource HelpIconButton}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Replay.BufferLimit}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.BufferLimit}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </StackPanel>
                                         <TextBlock Text="{DynamicResource L.Replay.BufferLimitHint}"
                                                    Style="{StaticResource SecondaryText}"
                                                    FontSize="10" Margin="0,2,0,0"/>
@@ -297,7 +321,19 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{DynamicResource L.Video.Source}" Style="{StaticResource RowLabelText}"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource L.Video.Source}" Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Video.Source}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.VideoSource}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <ComboBox x:Name="CaptureSourceBox" Grid.Column="1"
                                               Style="{StaticResource DarkCombo}"
                                               SelectionChanged="CaptureSourceBox_SelectionChanged">
@@ -328,7 +364,21 @@
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="{DynamicResource L.Video.Codec}" Style="{StaticResource RowLabelText}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{DynamicResource L.Video.Codec}" Style="{StaticResource RowLabelText}"/>
+                                            <Button Style="{StaticResource HelpIconButton}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Video.Codec}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.VideoCodec.Av1}" Style="{StaticResource HelpTipBody}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.VideoCodec.Hevc}" Style="{StaticResource HelpTipBody}" Margin="0,6,0,0"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.VideoCodec.H264}" Style="{StaticResource HelpTipBody}" Margin="0,6,0,0"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </StackPanel>
                                         <TextBlock x:Name="HardwareEncoderText"
                                                    Style="{StaticResource SecondaryText}"
                                                    FontSize="10" Margin="0,2,0,0"
@@ -351,7 +401,19 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{DynamicResource L.Video.Bitrate}" Style="{StaticResource RowLabelText}"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource L.Video.Bitrate}" Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Video.Bitrate}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.Bitrate}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <ComboBox x:Name="BitrateBox" Grid.Column="1" Style="{StaticResource DarkCombo}">
                                         <ComboBoxItem Tag="0" Content="{DynamicResource L.Video.AutoLoad}"/>
                                         <ComboBoxItem Tag="10" Content="{DynamicResource L.Video.Mbps10}"/>
@@ -375,7 +437,19 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{DynamicResource L.Video.Resolution}" Style="{StaticResource RowLabelText}"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource L.Video.Resolution}" Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Video.Resolution}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.Resolution}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <ComboBox x:Name="ResolutionBox" Grid.Column="1"
                                               Style="{StaticResource DarkCombo}">
                                         <ComboBoxItem Tag="source" Content="{DynamicResource L.Video.SourceResolution}"/>
@@ -387,7 +461,19 @@
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <StackPanel x:Name="FpsSettingsRow" Margin="13,11">
-                                    <TextBlock Text="{DynamicResource L.Video.FrameRate}" Style="{StaticResource RowLabelText}" Margin="0,0,0,8"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="{DynamicResource L.Video.FrameRate}" Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Video.FrameRate}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.FrameRate}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <Border Style="{StaticResource SegmentStrip}">
                                         <UniformGrid x:Name="FpsOptions" Rows="1">
                                             <RadioButton GroupName="Fps" Tag="30" Content="30" Style="{StaticResource SegmentButton}"/>
@@ -450,13 +536,24 @@
                                 </Grid>
                                 <Grid x:Name="MicBoostRow" Margin="13,0,13,11">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="95"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="48"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{DynamicResource L.Audio.Boost}" Style="{StaticResource SecondaryText}"
-                                               VerticalAlignment="Center"
-                                               ToolTip="{DynamicResource L.Audio.BoostTip}"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource L.Audio.Boost}" Style="{StaticResource SecondaryText}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Audio.Boost}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.MicBoost}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <Slider x:Name="MicBoostSlider" Grid.Column="1"
                                             Style="{StaticResource VolumeSlider}"
                                             Maximum="20" TickFrequency="1"
@@ -473,7 +570,19 @@
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <TextBlock Text="{DynamicResource L.Audio.Tracks}" Style="{StaticResource RowLabelText}"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{DynamicResource L.Audio.Tracks}" Style="{StaticResource RowLabelText}"/>
+                                            <Button Style="{StaticResource HelpIconButton}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Audio.Tracks}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.AudioTracks}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </StackPanel>
                                         <TextBlock x:Name="AudioTrackHintText" Text="{DynamicResource L.Audio.SystemAndMic}"
                                                    Style="{StaticResource SecondaryText}" Margin="0,3,0,0"/>
                                     </StackPanel>
@@ -489,7 +598,19 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{DynamicResource L.Audio.Codec}" Style="{StaticResource RowLabelText}"/>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource L.Audio.Codec}" Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Audio.Codec}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.AudioCodec}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
                                     <ComboBox x:Name="AudioCodecBox" Grid.Column="1" Style="{StaticResource DarkCombo}">
                                         <ComboBoxItem Tag="aac" Content="AAC"/>
                                         <ComboBoxItem Tag="opus" Content="Opus · MKV"/>
@@ -565,7 +686,41 @@
                 </ScrollViewer>
             </Grid>
 
-            <Border x:Name="NoticeBanner" Grid.RowSpan="2" Panel.ZIndex="20"
+            <Border Grid.Row="2" BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="0,1,0,0" Margin="16,0">
+                <Grid>
+                    <Button x:Name="GitHubButton"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource FooterLinkButton}"
+                            Click="GitHub_Click"
+                            ToolTip="{DynamicResource L.Footer.GitHubTip}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconGitHub}"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  Width="13" Height="13" Stretch="Uniform"/>
+                            <TextBlock Text="GitHub" Margin="6,0,0,0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="UpdateVersionButton"
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource UpdateVersionButton}"
+                            Tag="current"
+                            Click="UpdateVersion_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse x:Name="UpdateStatusDot"
+                                     Width="5" Height="5" Margin="0,0,6,0"
+                                     Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                     Visibility="Collapsed"/>
+                            <TextBlock x:Name="UpdateStatusText"
+                                       Text="v0.0.0"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <Border x:Name="NoticeBanner" Grid.RowSpan="3" Panel.ZIndex="20"
                     Visibility="Collapsed" Opacity="0"
                     VerticalAlignment="Bottom" Margin="16"
                     Background="#FF171C1F" BorderBrush="#FF5A3B35" BorderThickness="1"
