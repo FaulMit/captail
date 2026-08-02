@@ -10,9 +10,28 @@ All notable user-facing changes are documented here.
 
 - Update downloads now close their file handles before promoting verified packages or replacing an invalid cached package, preventing Windows file-lock errors during one-click updates.
 
-### Upgrade note
+### Upgrade notes
 
 - Captail 0.1.3 and 0.1.4 cannot complete an in-app update because the bug is inside those installed versions. Download and run the 0.1.5 Setup EXE once; later in-app updates will work normally.
+
+## [0.1.4] - 2026-08-02
+
+### Added
+
+- Replay library with every saved clip in a vertically scrollable list.
+- Built-in clip editor with responsive video preview, a single trim range, separate system/game and microphone track controls, save-as-copy, and confirmed overwrite.
+- Clip details showing estimated trimmed size, original size, resolution, frame rate, and codec.
+- Automatic desktop-to-game capture switching, plus a game-only mode that leaves the desktop out of recordings.
+
+### Changed
+
+- Replay cards now reveal compact actions on hover instead of using a large edge glow.
+- FFmpeg and FFplay are included with Captail, so clip preview and trimming need no separate download.
+
+### Fixed
+
+- Clean installations now receive the FFmpeg runtime required by the editor.
+- Preview rendering keeps the complete frame visible instead of showing only its upper-left region.
 
 ## [0.1.3] - 2026-07-26
 

@@ -11,6 +11,24 @@ Each release contains:
 
 ## Create a release
 
+Before running the workflow:
+
+1. Review changes since the previous tag.
+2. Move completed entries from `[Unreleased]` into a dated version section in `CHANGELOG.md`.
+3. Follow [RELEASE_NOTES.md](RELEASE_NOTES.md) for categories, wording, and required upgrade notices.
+4. Preview the generated GitHub Release description locally:
+
+```powershell
+.\tools\New-ReleaseNotes.ps1 `
+  -Version 0.1.6 `
+  -PreviousTag v0.1.5 `
+  -OutputPath "$env:TEMP\captail-release-notes.md"
+```
+
+Commit and merge the changelog before dispatching the release. The workflow stops if it cannot find a non-empty section matching the requested version.
+
+Then start the release from GitHub:
+
 From GitHub:
 
 1. Open **Actions**.
@@ -29,7 +47,14 @@ gh workflow run release.yml `
   -f prerelease=true
 ```
 
-The workflow validates the version, builds and verifies both packages, creates tag `v0.1.1`, and publishes the GitHub Release.
+The workflow validates the version, builds and verifies both packages, creates tag `v0.1.1`, and publishes the GitHub Release using the matching changelog section.
+
+After publishing, verify:
+
+- release title, version, and prerelease status;
+- Installer, Portable ZIP, and `SHA256SUMS.txt` assets;
+- generated release notes and full-changelog link;
+- GitHub build-provenance attestations.
 
 ## Local package build
 
