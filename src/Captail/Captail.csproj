@@ -62,6 +62,28 @@
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\AcquireFfmpegRuntime.ps1&quot;" />
   </Target>
 
+  <Target Name="CopyFfmpegRuntimeToBuild"
+          AfterTargets="Build"
+          DependsOnTargets="AcquireFfmpegRuntime">
+    <ItemGroup>
+      <_FfmpegBuildFile Include="$(FfmpegRuntimeRoot)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_FfmpegBuildFile)"
+          DestinationFiles="@(_FfmpegBuildFile->'$(OutDir)ffmpeg\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyFfmpegRuntimeToPublish"
+          AfterTargets="Publish"
+          DependsOnTargets="AcquireFfmpegRuntime">
+    <ItemGroup>
+      <_FfmpegPublishFile Include="$(FfmpegRuntimeRoot)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_FfmpegPublishFile)"
+          DestinationFiles="@(_FfmpegPublishFile->'$(PublishDir)ffmpeg\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="BuildObsBridge" BeforeTargets="Build">
     <Exec Condition="!Exists('$(ObsBridgeBuild)\CaptailObsBridge.sln')"
           Command="cmake -S &quot;$(ObsBridgeSource)&quot; -B &quot;$(ObsBridgeBuild)&quot; -G &quot;Visual Studio 17 2022&quot; -A x64" />
@@ -106,12 +128,6 @@
     </Content>
     <Content Include="$(ObsRuntimeRoot)\data\**\*">
       <Link>data\%(RecursiveDir)%(Filename)%(Extension)</Link>
-      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
-    <Content Include="$(FfmpegRuntimeRoot)\**\*">
-      <Link>ffmpeg\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
