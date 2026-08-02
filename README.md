@@ -8,7 +8,9 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--2.0--or--later-65d9bd" alt="GPL-2.0-or-later"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-252b2e" alt="Windows 10/11">
 </p>
-
+<p align="center">
+  <a href='https://ko-fi.com/Q4E824D8J4' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://storage.ko-fi.com/cdn/kofi3.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
+</p>
 <p align="center">
   <strong>Save what just happened.</strong><br>
   Lightweight, open-source instant replay for Windows — built to stay recording.
