@@ -51,6 +51,29 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate release notes
+        id: release-notes
+        shell: pwsh
+        run: |
+          $releaseJson = gh release list `
+            --repo "$env:GITHUB_REPOSITORY" `
+            --limit 1 `
+            --json tagName
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not determine the previous release."
+          }
+          $releases = @($releaseJson | ConvertFrom-Json)
+          $previousTag = if ($releases.Count -gt 0) { $releases[0].tagName } else { "" }
+          $notesPath = Join-Path $env:RUNNER_TEMP "captail-$env:VERSION-release-notes.md"
+          ./tools/New-ReleaseNotes.ps1 `
+            -Version $env:VERSION `
+            -PreviousTag $previousTag `
+            -Repository $env:GITHUB_REPOSITORY `
+            -OutputPath $notesPath
+          "path=$notesPath" >> $env:GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Set up .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -200,19 +223,6 @@ jobs:
       - name: Publish GitHub Release
         shell: pwsh
         run: |
-          $intro = @"
-          > [!WARNING]
-          > Captail $env:VERSION is an early public preview. Bugs and hardware-specific issues are expected.
-
-          **Recommended:** download the Setup EXE. It includes Captail, .NET, and required libobs components and creates a Windows uninstaller.
-
-          **Portable:** extract the entire ZIP before launching `Captail.exe`.
-
-          Tested on NVIDIA GeForce RTX 40 and RTX 50 series. Older NVIDIA, AMD, and Intel hardware still needs broader public testing. Please report results and bugs through GitHub Issues.
-
-          Release binaries are not Authenticode-signed. Verify `SHA256SUMS.txt` and GitHub build provenance.
-          "@
-
           $assets = @(
             (Join-Path $env:RELEASE_DIR "Captail-$env:VERSION-Portable-win-x64.zip"),
             (Join-Path $env:RELEASE_DIR "Captail-$env:VERSION-Setup-win-x64.exe"),
@@ -224,8 +234,7 @@ jobs:
             "--repo", $env:GITHUB_REPOSITORY,
             "--target", $env:GITHUB_SHA,
             "--title", "Captail v$env:VERSION",
-            "--notes", $intro,
-            "--generate-notes"
+            "--notes-file", '${{ steps.release-notes.outputs.path }}'
           )
           if ('${{ inputs.prerelease }}' -eq 'true') {
             $arguments += "--prerelease"
