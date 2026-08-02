@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -9,6 +10,10 @@ using System.Windows.Threading;
 
 namespace Captail;
 
+[SuppressMessage(
+    "Usage",
+    "CA2216:Disposable types should declare finalizer",
+    Justification = "WPF HwndHost owns the native window and calls DestroyWindowCore on the UI thread.")]
 public sealed class FfplayHost : HwndHost
 {
     private const int GwlStyle = -16;
@@ -248,12 +253,20 @@ public sealed class FfplayHost : HwndHost
                     "-t", Seconds(duration),
                     path,
                 ]);
-            var process = new Process { StartInfo = startInfo };
-            if (!process.Start())
-                continue;
-            _audioPlayers.Add(process);
-            _drainTasks.Add(process.StandardOutput.ReadToEndAsync(cancellationToken));
-            _drainTasks.Add(process.StandardError.ReadToEndAsync(cancellationToken));
+            Process? process = new() { StartInfo = startInfo };
+            try
+            {
+                if (!process.Start())
+                    continue;
+                _audioPlayers.Add(process);
+                _drainTasks.Add(process.StandardOutput.ReadToEndAsync(cancellationToken));
+                _drainTasks.Add(process.StandardError.ReadToEndAsync(cancellationToken));
+                process = null;
+            }
+            finally
+            {
+                process?.Dispose();
+            }
         }
     }
 
