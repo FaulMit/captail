@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource L.Brand}"
         Icon="Assets/Captail.ico"
-        Width="404" Height="430"
+        Width="404" Height="650"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="NoResize"
@@ -80,7 +80,12 @@
                 </StackPanel>
             </Grid>
 
-            <StackPanel x:Name="DashboardPanel" Grid.Row="1" Margin="16,4,16,16">
+            <Grid x:Name="DashboardPanel" Grid.Row="1" Margin="16,4,10,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Margin="0,0,6,0">
                 <Border Style="{StaticResource SettingsGroup}" Padding="14">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -222,11 +227,158 @@
                             HorizontalAlignment="Left" Style="{StaticResource DashboardLinkButton}"
                             Click="OutputFolderSummary_Click" ToolTip="{DynamicResource L.OpenFolderSettings}">
                         <TextBlock x:Name="OutputFolderSummaryText" Style="{StaticResource MonoText}"
-                                   FontSize="10" MaxWidth="338" TextTrimming="CharacterEllipsis"
+                                   FontSize="12" MaxWidth="338" TextTrimming="CharacterEllipsis"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                     </Button>
                 </Grid>
-            </StackPanel>
+                </StackPanel>
+
+                <Grid Grid.Row="1" Margin="0,16,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="2,0,8,8">
+                        <TextBlock Text="{DynamicResource L.Library.Recent}"
+                                   Style="{StaticResource SectionHeaderText}" Margin="0"
+                                   FontSize="12.5" Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <Button HorizontalAlignment="Right"
+                                Style="{StaticResource DashboardLinkButton}"
+                                Click="RefreshLibrary_Click"
+                                ToolTip="{DynamicResource L.Library.Refresh}">
+                            <TextBlock Text="↻" FontSize="16"/>
+                        </Button>
+                    </Grid>
+                    <TextBlock x:Name="ReplayLibraryEmptyText" Grid.Row="1"
+                               Text="{DynamicResource L.Library.Empty}"
+                               Style="{StaticResource SecondaryText}"
+                               TextAlignment="Center" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Margin="0,0,6,0"
+                               Visibility="Collapsed"/>
+                    <ScrollViewer x:Name="RecentReplaysScrollViewer" Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  PanningMode="VerticalOnly" Padding="0,0,6,0">
+                <ItemsControl x:Name="RecentReplaysList"
+                              VirtualizingPanel.IsVirtualizing="True"
+                              VirtualizingPanel.VirtualizationMode="Recycling">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border x:Name="ClipCard" Height="74" Margin="0,0,0,8"
+                                    Background="{StaticResource BgSurfaceBrush}"
+                                    BorderBrush="{StaticResource DividerBrush}"
+                                    BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="112"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="{StaticResource BgControlBrush}"
+                                            CornerRadius="9,0,0,9">
+                                        <Grid>
+                                            <Border CornerRadius="9,0,0,9">
+                                                <Border.Background>
+                                                    <ImageBrush ImageSource="{Binding Thumbnail}"
+                                                                Stretch="UniformToFill"/>
+                                                </Border.Background>
+                                            </Border>
+                                            <Border HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                    Margin="5" Padding="5,2" CornerRadius="4"
+                                                    Background="#BB0B0F11">
+                                                <TextBlock Text="{Binding Duration}" FontFamily="{StaticResource FontMono}"
+                                                           FontSize="10.5" Foreground="White"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                    <StackPanel x:Name="ClipText" Grid.Column="1" Margin="11,10"
+                                                VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Details}" Style="{StaticResource SecondaryText}"
+                                                   Margin="0,5,0,0" FontSize="11.5" TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <Border x:Name="ClipActionTray" Grid.Column="1"
+                                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                                            Margin="8" Padding="3" CornerRadius="10"
+                                            Background="#F51A2023" BorderBrush="#FF303A3D"
+                                            BorderThickness="1" Opacity="0" IsHitTestVisible="False"
+                                            RenderTransformOrigin="0.5,0.5">
+                                        <Border.RenderTransform>
+                                            <TranslateTransform x:Name="ClipActionTranslate" X="8"/>
+                                        </Border.RenderTransform>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Style="{StaticResource ClipActionButton}"
+                                                    Click="RevealReplay_Click" ToolTip="{DynamicResource L.Library.Open}">
+                                                <Path Data="{StaticResource IconFolder}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="1.8" Stretch="Uniform"/>
+                                            </Button>
+                                            <Button Style="{StaticResource ClipActionButton}"
+                                                    Click="TrimReplay_Click" ToolTip="{DynamicResource L.Library.Trim}"
+                                                    IsEnabled="{Binding CanTrim}">
+                                                <Path Data="{StaticResource IconScissors}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="1.8" Stretch="Uniform"/>
+                                            </Button>
+                                            <Button Style="{StaticResource ClipActionButton}"
+                                                    Click="RequestDeleteReplay_Click" ToolTip="{DynamicResource L.Library.Delete}">
+                                                <Path Data="{StaticResource IconTrash}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      StrokeThickness="1.8" Stretch="Uniform"/>
+                                            </Button>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                            <DataTemplate.Triggers>
+                                <Trigger SourceName="ClipCard" Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="ClipActionTray" Property="IsHitTestVisible" Value="True"/>
+                                    <Setter TargetName="ClipCard" Property="Background" Value="#FF171D20"/>
+                                    <Setter TargetName="ClipCard" Property="BorderBrush" Value="#FF2E3C38"/>
+                                </Trigger>
+                                <EventTrigger SourceName="ClipCard" RoutedEvent="MouseEnter">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ClipActionTray"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.14"/>
+                                            <DoubleAnimation Storyboard.TargetName="ClipActionTranslate"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="0" Duration="0:0:0.14">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="ClipText"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0.24" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                                <EventTrigger SourceName="ClipCard" RoutedEvent="MouseLeave">
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="ClipActionTray"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="0" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="ClipActionTranslate"
+                                                             Storyboard.TargetProperty="X"
+                                                             To="8" Duration="0:0:0.1"/>
+                                            <DoubleAnimation Storyboard.TargetName="ClipText"
+                                                             Storyboard.TargetProperty="Opacity"
+                                                             To="1" Duration="0:0:0.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
 
             <Grid x:Name="SettingsPanel" Grid.Row="1" Visibility="Collapsed">
                 <ScrollViewer x:Name="SettingsScrollViewer"
@@ -340,22 +492,6 @@
                                         <ComboBoxItem Tag="desktop" Content="{DynamicResource L.Video.Desktop}"/>
                                         <ComboBoxItem Tag="game" Content="{DynamicResource L.Video.GameSource}"/>
                                     </ComboBox>
-                                </Grid>
-                                <Border Style="{StaticResource RowDivider}"/>
-                                <Grid x:Name="GameProcessRow" Margin="13,11">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="220"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="{DynamicResource L.Video.Game}" Style="{StaticResource RowLabelText}"/>
-                                        <TextBlock Text="{DynamicResource L.Video.GameCompatibility}"
-                                                   Style="{StaticResource SecondaryText}"
-                                                   FontSize="10" Margin="0,2,0,0"/>
-                                    </StackPanel>
-                                    <ComboBox x:Name="GameProcessBox" Grid.Column="1"
-                                              Style="{StaticResource DarkCombo}"
-                                              DropDownOpened="GameProcessBox_DropDownOpened"/>
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <Grid x:Name="CodecSettingsRow" Margin="13,11">
@@ -636,6 +772,20 @@
                                             Click="BrowseOutput_Click"/>
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Text="{DynamicResource L.Storage.OrganizeByGame}" Style="{StaticResource RowLabelText}"/>
+                                        <TextBlock Text="{DynamicResource L.Storage.OrganizeByGameHint}"
+                                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="285"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="OrganizeByGameBox" Grid.Column="1"
+                                                  Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
                                 <StackPanel Margin="13,11">
                                     <Grid Margin="0,0,0,8">
                                         <TextBlock x:Name="DiskUsedText" Style="{StaticResource SecondaryText}"/>
@@ -754,6 +904,27 @@
                               StrokeThickness="1.8" Width="11" Height="11" Stretch="Uniform"/>
                     </Button>
                 </Grid>
+            </Border>
+
+            <Border x:Name="DeleteConfirmOverlay" Grid.RowSpan="3" Panel.ZIndex="30"
+                    Visibility="Collapsed" Background="#B80A0D0F" CornerRadius="15">
+                <Border Width="320" Padding="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Style="{StaticResource SettingsGroup}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource L.Library.DeleteTitle}"
+                                   FontSize="15" FontWeight="Bold"/>
+                        <TextBlock x:Name="DeleteConfirmFileText" Margin="0,7,0,0"
+                                   Style="{StaticResource MonoText}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{DynamicResource L.Library.DeleteMessage}" Margin="0,9,0,16"
+                                   Style="{StaticResource SecondaryText}"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource L.Library.Cancel}" Style="{StaticResource SubtleButton}"
+                                    Margin="0,0,8,0" Click="CancelDeleteReplay_Click"/>
+                            <Button Content="{DynamicResource L.Library.Delete}" Style="{StaticResource AccentButton}"
+                                    Padding="14,8" Click="ConfirmDeleteReplay_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </Border>
         </Grid>
     </Border>

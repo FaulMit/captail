@@ -28,10 +28,8 @@ public sealed class Config
     public int MonitorIndex { get; set; }
     /// <summary>"source", "720p", "1080p", "1440p", or "2160p".</summary>
     public string RecordingResolution { get; set; } = "source";
-    /// <summary>"desktop" or "game".</summary>
+    /// <summary>"desktop" (with automatic game detection) or "game".</summary>
     public string CaptureSource { get; set; } = "desktop";
-    /// <summary>Full path to the selected game executable; PID is resolved when the pipeline starts.</summary>
-    public string GameExecutablePath { get; set; } = "";
 
     public bool CaptureSystemAudio { get; set; } = true;
     public int SystemAudioVolume { get; set; } = 100;
@@ -53,6 +51,7 @@ public sealed class Config
 
     public string OutputDirectory { get; set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Captail");
+    public bool OrganizeReplaysByGame { get; set; }
     [JsonIgnore]
     public static string ConfigPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Captail", "config.json");
@@ -145,7 +144,6 @@ public sealed class Config
         MonitorIndex = source.MonitorIndex;
         RecordingResolution = source.RecordingResolution;
         CaptureSource = source.CaptureSource;
-        GameExecutablePath = source.GameExecutablePath;
         CaptureSystemAudio = source.CaptureSystemAudio;
         SystemAudioVolume = source.SystemAudioVolume;
         SystemAudioDeviceId = source.SystemAudioDeviceId;
@@ -157,6 +155,7 @@ public sealed class Config
         AudioCodec = source.AudioCodec;
         SeparateAudioTracks = source.SeparateAudioTracks;
         OutputDirectory = source.OutputDirectory;
+        OrganizeReplaysByGame = source.OrganizeReplaysByGame;
         Normalize();
     }
 
@@ -169,7 +168,6 @@ public sealed class Config
         MonitorIndex == other.MonitorIndex &&
         string.Equals(RecordingResolution, other.RecordingResolution, StringComparison.Ordinal) &&
         string.Equals(CaptureSource, other.CaptureSource, StringComparison.Ordinal) &&
-        string.Equals(GameExecutablePath, other.GameExecutablePath, StringComparison.OrdinalIgnoreCase) &&
         CaptureSystemAudio == other.CaptureSystemAudio &&
         SystemAudioVolume == other.SystemAudioVolume &&
         string.Equals(SystemAudioDeviceId, other.SystemAudioDeviceId, StringComparison.Ordinal) &&
@@ -180,7 +178,8 @@ public sealed class Config
         AudioBitrateKbps == other.AudioBitrateKbps &&
         string.Equals(AudioCodec, other.AudioCodec, StringComparison.Ordinal) &&
         SeparateAudioTracks == other.SeparateAudioTracks &&
-        string.Equals(OutputDirectory, other.OutputDirectory, StringComparison.OrdinalIgnoreCase);
+        string.Equals(OutputDirectory, other.OutputDirectory, StringComparison.OrdinalIgnoreCase) &&
+        OrganizeReplaysByGame == other.OrganizeReplaysByGame;
 
     public void Normalize()
     {
@@ -205,7 +204,6 @@ public sealed class Config
             ["source", "720p", "1080p", "1440p", "2160p"],
             "source");
         CaptureSource = AllowedText(CaptureSource, ["desktop", "game"], "desktop");
-        GameExecutablePath = NormalizePath(GameExecutablePath, allowEmpty: true);
         SystemAudioVolume = Math.Clamp(SystemAudioVolume, 0, 100);
         SystemAudioDeviceId = NormalizeIdentifier(SystemAudioDeviceId);
         MicrophoneVolume = Math.Clamp(MicrophoneVolume, 0, 100);

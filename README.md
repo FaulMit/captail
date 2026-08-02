@@ -16,7 +16,7 @@ Captail is designed around one rule: **Instant Replay should stay on.** A game c
 ## Interface
 
 <p align="center">
-  <img src="docs/captail-main.jpg" alt="Captail main window showing replay status, audio sources, recording format, disk space, and save hotkey" width="420">
+  <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and the scrollable replay library" width="420">
 </p>
 
 <p align="center">
@@ -24,16 +24,21 @@ Captail is designed around one rule: **Instant Replay should stay on.** A game c
   <img src="docs/captail-settings-audio.jpg" alt="Captail audio, storage, and hotkey settings" width="390">
 </p>
 
+<p align="center">
+  <img src="docs/captail-editor.png" alt="Captail clip editor with video timeline, separate audio tracks, trim range, and live media details" width="820">
+</p>
+
 > [!WARNING]
 > Captail `v0.1.x` is an early public preview. Core recording works, but bugs and hardware-specific problems are expected. Please report anything that does not work.
 
-## What's new in v0.1.3
+## What's new in v0.1.4
 
-- **Built-in updates** — the footer shows update status and installs the correct Installer or Portable package after verifying its SHA-256 digest.
-- **Clearer settings** — concise help popups explain codecs, bitrate, resolution, frame rate, audio tracks, buffer limits, and other technical options in English and Russian.
-- **Non-overlapping saves** — after saving a replay, the next clip starts at that save boundary instead of repeating footage from the previous file.
-- **More accurate save duration** — the main action shows how much new footage is currently available.
-- **Safer recovery** — the watchdog no longer treats normal recording-pipeline startup as a failure.
+- **Replay library** — every saved replay is available from the main window in a fast, scrollable list with thumbnail previews.
+- **Cleaner replay actions** — hover a clip for compact Open in folder, Trim, and Delete controls. Deletion always requires confirmation.
+- **Built-in clip editor** — scrub through video, select one trim range, preview both audio tracks, keep or remove each track, then save a copy or overwrite the original.
+- **Useful clip details** — the editor shows estimated trimmed size, current file size, resolution, true source FPS, and codec while the range changes.
+- **More reliable preview** — full-frame DPI-aware playback replaces the cropped upper-left preview and includes system/game plus microphone audio.
+- **Automatic game capture** — Desktop mode records the selected monitor and switches to direct Game Capture for a detected fullscreen game. Game Capture mode waits for any game without recording the desktop.
 
 ## Why Captail?
 
@@ -77,7 +82,7 @@ Captail checks GitHub Releases in the background. When an update is available, t
 
 1. Install Captail or extract the Portable ZIP.
 2. Launch `Captail.exe`.
-3. Select **Desktop** or a running game under **Source**.
+3. Select **Desktop** for automatic desktop/game switching, or **Game Capture** to record games only.
 4. Choose buffer length, codec, resolution, FPS, and audio sources.
 5. Keep Instant Replay enabled.
 6. Press `Ctrl+Shift+F10` to save the current buffer.
@@ -124,6 +129,15 @@ Both hotkeys can be changed in Settings.
 - Built-in GitHub release indicator and verified one-click updates.
 - Direct repository link in the footer.
 - English interface by default, with live English/Russian switching.
+
+### Replay library and editor
+
+- Scrollable library containing every supported replay in the selected folder.
+- Cached thumbnail strip and responsive seeking.
+- One visual trim range with draggable start and end handles.
+- Independent system/game and microphone track selection.
+- Save as a new clip or overwrite the original after confirmation.
+- Live estimated output size, source size, resolution, FPS, and codec.
 
 ### Reliability
 
@@ -187,7 +201,7 @@ dotnet build .\Captail.sln -c Release
 Create local release packages:
 
 ```powershell
-.\tools\BuildRelease.ps1 -Version 0.1.0 -InnoSetupCompiler "C:\Program Files\Inno Setup 7\ISCC.exe"
+.\tools\BuildRelease.ps1 -Version 0.1.4 -InnoSetupCompiler "C:\Program Files\Inno Setup 7\ISCC.exe"
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/RELEASING.md](docs/RELEASING.md) for the automated release process.
@@ -200,6 +214,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/RELE
 - `native/ObsCaptureFixture` — D3D11 fixture for Game Capture and high-FPS validation.
 - `App.xaml.cs` — tray, hotkeys, notifications, single-instance behavior, watchdog, and recovery.
 - `SettingsWindow.*` — compact WPF interface.
+- `ReplayLibrary.cs` — replay discovery, metadata, thumbnail cache, delete, and trim orchestration.
+- `ClipEditorWindow.*` — preview, timeline, audio-track selection, and copy/overwrite workflows.
+- `FfmpegAdapter.cs` and `FfplayHost.cs` — bundled media probing, thumbnails, waveforms, trimming, and editor playback.
 - `UpdateService.cs` — GitHub release discovery, package verification, Installer updates, and Portable self-replacement.
 
 ## License and attribution

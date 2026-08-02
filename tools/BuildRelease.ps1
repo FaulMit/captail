@@ -80,6 +80,12 @@ if (-not (Test-Path -LiteralPath $captailExe)) {
 if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "obs.dll"))) {
     throw "Published OBS runtime not found."
 }
+if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "ffmpeg\ffmpeg.exe"))) {
+    throw "Published FFmpeg runtime not found."
+}
+if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "ffmpeg\ffplay.exe"))) {
+    throw "Published FFplay runtime not found."
+}
 
 Write-Host "Creating Portable archive..."
 Compress-Archive -LiteralPath $publishDirectory `
