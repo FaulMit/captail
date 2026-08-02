@@ -9,146 +9,205 @@
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-252b2e" alt="Windows 10/11">
 </p>
 
-**Captail** is a lightweight, open-source alternative to NVIDIA ShadowPlay Instant Replay. It continuously keeps the latest seconds or minutes in a rolling buffer and saves them when you press a hotkey.
-
-Captail is designed around one rule: **Instant Replay should stay on.** A game crash, game-to-desktop switch, temporary capture failure, protected surface, or recoverable graphics-driver interruption should not silently leave you without a replay. A watchdog monitors the recording pipeline and restarts it when recovery is possible.
-
-## Interface
-
 <p align="center">
-  <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and the scrollable replay library" width="420">
+  <strong>Save what just happened.</strong><br>
+  Lightweight, open-source instant replay for Windows — built to stay recording.
 </p>
 
 <p align="center">
-  <img src="docs/captail-settings-video.jpg" alt="Captail video settings with source, codec, bitrate, resolution, and frame-rate controls" width="390">
+  <a href="https://github.com/FaulMit/captail/releases"><strong>Download Captail</strong></a>
+  ·
+  <a href="https://github.com/FaulMit/captail/issues/new/choose">Report a problem</a>
+</p>
+
+Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It keeps the latest seconds or minutes in a rolling buffer, then saves them when you press a hotkey. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
+
+> [!WARNING]
+> Captail `v0.1.x` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+
+## Is Captail for me?
+
+Captail is for Windows players who want instant replay without running a full streaming suite or wondering whether recording silently stopped.
+
+It is a good fit if you want:
+
+- one hotkey to save recent gameplay;
+- desktop capture that automatically switches to a fullscreen game;
+- a game-only mode that never records the desktop;
+- real high-frame-rate capture for slow motion;
+- system/game and microphone audio, mixed or separated;
+- automatic recovery after recoverable capture, game, or driver failures;
+- local files that stay on your PC.
+
+Captail is not a streaming application, scene compositor, DRM bypass, or cloud clip service.
+
+## What does it look like?
+
+<p align="center">
+  <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and recent replays" width="420">
+</p>
+
+<p align="center">
+  <img src="docs/captail-settings-video.jpg" alt="Captail video settings: source, codec, bitrate, monitor, resolution, and frame rate" width="390">
   <img src="docs/captail-settings-audio.jpg" alt="Captail audio, storage, and hotkey settings" width="390">
 </p>
 
 <p align="center">
-  <img src="docs/captail-editor.png" alt="Captail clip editor with video timeline, separate audio tracks, trim range, and live media details" width="820">
+  <img src="docs/captail-editor.png" alt="Captail clip editor with a video timeline, separate audio tracks, trim range, and media details" width="820">
 </p>
 
-> [!WARNING]
-> Captail `v0.1.x` is an early public preview. Core recording works, but bugs and hardware-specific problems are expected. Please report anything that does not work.
+## How do I install it?
 
-## What's new in v0.1.4
+Open [GitHub Releases](https://github.com/FaulMit/captail/releases) and choose one package:
 
-- **Replay library** — every saved replay is available from the main window in a fast, scrollable list with thumbnail previews.
-- **Cleaner replay actions** — hover a clip for compact Open in folder, Trim, and Delete controls. Deletion always requires confirmation.
-- **Built-in clip editor** — scrub through video, select one trim range, preview both audio tracks, keep or remove each track, then save a copy or overwrite the original.
-- **Useful clip details** — the editor shows estimated trimmed size, current file size, resolution, true source FPS, and codec while the range changes.
-- **More reliable preview** — full-frame DPI-aware playback replaces the cropped upper-left preview and includes system/game plus microphone audio.
-- **Automatic game capture** — Desktop mode records the selected monitor and switches to direct Game Capture for a detected fullscreen game. Game Capture mode waits for any game without recording the desktop.
-
-## Why Captail?
-
-- **Small, focused UI** — replay state, active source, audio, hotkey, and disk space at a glance.
-- **Resilient rolling buffer** — health monitoring and automatic pipeline recovery.
-- **DRM-tolerant behavior** — protected sections may appear black, but the buffer is designed to continue instead of disabling itself.
-- **Real high-frame-rate capture** — 30, 60, 120, 144, or 240 FPS without generated duplicate frames.
-- **Game or desktop capture** — per-game Game Capture or Windows desktop capture.
-- **Hardware encoding** — AV1, HEVC, and H.264 through supported NVIDIA NVENC, AMD AMF, or Intel Quick Sync encoders.
-- **Flexible audio** — system/game audio and microphone, volume controls, microphone boost, mixed or separate tracks.
-- **Local and private** — no account, cloud upload, analytics, or telemetry. Replays stay on your PC.
-
-## How Captail differs from OBS Replay Buffer
-
-Captail uses libobs for capture and encoding, but it is not an OBS Studio frontend.
-
-- Starts directly in the system tray with Windows.
-- Requires no scenes, sources, or streaming configuration.
-- Monitors capture health and automatically recovers the recording pipeline.
-- Switches between focused game capture and desktop capture.
-- Stays focused on one job: reliable instant replay.
-
-## Download
-
-Download the latest version from [GitHub Releases](https://github.com/FaulMit/captail/releases).
-
-| Package | Best for | What to do |
+| Package | Choose it when | Installation |
 | --- | --- | --- |
-| `Captail-x.y.z-Setup-win-x64.exe` | Most users | Run installer. Captail and all required runtimes are installed automatically. An uninstaller is added to Windows Settings. |
-| `Captail-x.y.z-Portable-win-x64.zip` | Portable use | Extract the complete folder, then run `Captail.exe`. |
-| `SHA256SUMS.txt` | Verification | Compare downloaded file SHA-256 before running it. |
+| `Captail-x.y.z-Setup-win-x64.exe` | You want the normal Windows experience | Run Setup. It installs Captail for your Windows account and adds an uninstaller to Windows Settings. |
+| `Captail-x.y.z-Portable-win-x64.zip` | You want a movable, self-contained folder | Extract the entire ZIP, then run `Captail.exe` inside it. Do not run it from the archive. |
+| `SHA256SUMS.txt` | You want to verify the download | Compare the package SHA-256 with the published value before running it. |
 
-Both packages are self-contained. **OBS Studio and .NET do not need to be installed separately.**
-
-Captail checks GitHub Releases in the background. When an update is available, the version in the footer becomes a mint update button. Click it to download, verify, install, and restart. Installer builds update through Setup; Portable builds replace their extracted files without changing package type.
+Both packages include .NET, libobs, and FFmpeg. You do not need to install OBS Studio or extra runtimes.
 
 > [!NOTE]
-> Current binaries are not Authenticode-signed. Windows SmartScreen may show an “Unknown publisher” warning. Verify the SHA-256 checksum and GitHub build provenance before running a release.
+> Release binaries are not Authenticode-signed yet. Windows SmartScreen may show “Unknown publisher.” Verify `SHA256SUMS.txt` and GitHub build provenance if you want to confirm the download.
 
-## Quick start
+> [!IMPORTANT]
+> Already using Captail `0.1.3` or `0.1.4`? Their updater contains a Windows file-lock bug. Download and run the `0.1.5` Setup EXE manually once. In-app updates work normally starting with `0.1.5`.
 
-1. Install Captail or extract the Portable ZIP.
-2. Launch `Captail.exe`.
-3. Select **Desktop** for automatic desktop/game switching, or **Game Capture** to record games only.
-4. Choose buffer length, codec, resolution, FPS, and audio sources.
-5. Keep Instant Replay enabled.
-6. Press `Ctrl+Shift+F10` to save the current buffer.
+## How do I save my first replay?
+
+1. Launch Captail. It stays available from the system tray.
+2. Open Settings and choose **Desktop** or **Game Capture**.
+3. Choose buffer length, codec, resolution, FPS, and audio sources.
+4. Leave **Instant Replay** enabled.
+5. Play normally.
+6. Press `Ctrl+Shift+F10`, or click **Save**, when something worth keeping happens.
 
 Default hotkeys:
 
-| Action | Hotkey |
+| Action | Default |
 | --- | --- |
-| Save replay | `Ctrl+Shift+F10` |
+| Save recent footage | `Ctrl+Shift+F10` |
 | Enable or disable Instant Replay | `Ctrl+Shift+F9` |
 
-Both hotkeys can be changed in Settings.
+Both hotkeys are configurable. Double-click the tray icon to reopen Captail.
 
-## Features
+## What does each capture mode record?
 
-### Capture and video
+| Mode | When no game is detected | When a fullscreen game appears | Audio source |
+| --- | --- | --- | --- |
+| **Desktop** | Records the selected monitor | Automatically switches to direct Game Capture | Selected Windows output device |
+| **Game Capture** | Waits without recording the desktop | Captures the detected game directly | Detected game audio |
 
-- Selected-process Game Capture with anti-cheat compatibility mode.
-- Windows Graphics Capture for desktop recording.
-- AV1, HEVC/H.265, and H.264/AVC when supported by GPU and driver.
-- Automatic GPU and encoder capability detection.
-- GPU-aware encoder profiles for NVIDIA, AMD, and Intel hardware.
-- Adaptive automatic bitrate or manual bitrate.
-- Source resolution, 720p, 1080p, 1440p, or 4K.
-- 30, 60, 120, 144, and 240 FPS.
-- Duration limit and optional maximum replay-buffer size.
+The replay buffer stays armed in both modes. Use **Desktop** when you want continuous coverage; use **Game Capture** when privacy outside games matters more.
 
-### Audio
+## What happens when capture breaks?
 
-- System audio or selected-game audio.
-- Microphone capture.
-- Separate system/game and microphone volume controls.
-- Microphone boost up to +20 dB.
-- One mixed track or separate audio tracks.
-- AAC in fragmented MP4 or Opus in MKV.
+Captail supervises the recording pipeline instead of assuming that a successful start means it will remain healthy forever.
 
-### Windows integration
+| Situation | Expected behavior |
+| --- | --- |
+| Game closes or crashes | Desktop mode returns to desktop capture. Game Capture mode waits for another game. |
+| You switch between game and desktop | Desktop mode follows the active capture source without stopping the buffer. |
+| A capture source temporarily disappears | Captail keeps the pipeline supervised and retries recovery. |
+| Graphics driver restarts | Video may pause or go black temporarily; the watchdog attempts a controlled restart with retry delay. |
+| Recovery cannot complete | Captail reports the failure and retries instead of silently claiming that replay is active. |
+| DRM-protected video appears | Protected regions may be black. Captail does not bypass DRM and is designed to keep the buffer running. |
 
-- Configurable global hotkeys.
-- System tray with double-click restore.
-- Start with Windows.
-- Native overlay notifications for replay state and saved clips.
-- Single-instance protection.
-- Built-in GitHub release indicator and verified one-click updates.
-- Direct repository link in the footer.
-- English interface by default, with live English/Russian switching.
+Recovery reduces lost footage; it cannot guarantee frames that Windows, a game, an anti-cheat system, or a failed driver never delivered.
 
-### Replay library and editor
+## Where is the rolling buffer stored?
 
-- Scrollable library containing every supported replay in the selected folder.
-- Cached thumbnail strip and responsive seeking.
-- One visual trim range with draggable start and end handles.
-- Independent system/game and microphone track selection.
-- Save as a new clip or overwrite the original after confirmation.
-- Live estimated output size, source size, resolution, FPS, and codec.
+The live replay buffer stores compressed video and audio packets in **RAM**. Only saved replays are written to your selected folder.
 
-### Reliability
+- **Buffer length** controls how much recent time Captail tries to keep.
+- **Buffer limit** caps compressed replay data in RAM. If it is reached first, available replay time becomes shorter.
+- **Bitrate, resolution, FPS, and codec** affect both memory use and saved file size.
+- The dashboard shows free space on the drive containing your replay folder.
 
-- Recording-pipeline watchdog.
-- Automatic replay restart after recoverable capture or encoder failure.
-- Progressive retry delay when the graphics driver is temporarily unavailable.
-- Sequential save boundaries prevent duplicate footage across consecutive clips.
-- Fragmented MP4 output to reduce the risk of losing an entire file after interruption.
-- Protected/DRM surfaces may become black while the rolling buffer continues.
+After a successful save, Captail starts a new replay segment. Saving again five minutes later produces roughly five minutes of new footage instead of duplicating the previous clip.
 
-## Hardware compatibility
+## Which codec should I choose?
+
+Captail detects the current GPU and driver, then hides unavailable hardware codecs.
+
+| Codec | Best for | Trade-off |
+| --- | --- | --- |
+| **AV1** | Best compression on supported modern GPUs | Newest format; some older players and editors may not support it. Hardware support commonly includes GeForce RTX 40/50, Radeon RX 7000, and Intel Arc. |
+| **HEVC / H.265** | Good compression with broader modern-GPU support | Compatibility is better than AV1 but still weaker than H.264 in older software. |
+| **H.264 / AVC** | Easiest playback, editing, and sharing | Larger files or lower quality at the same bitrate. |
+
+Unsure? Start with **H.264** for compatibility. Use **AV1** when your GPU and editor support it and file efficiency matters.
+
+## Does 240 FPS mean 240 real frames?
+
+Captail requests real frames from the capture source; it does not generate duplicates to make a file report a higher FPS.
+
+- **Game Capture:** can record distinct high-rate frames when the game, GPU, encoder, and capture path can sustain them.
+- **Desktop capture:** limited by how often Windows and the monitor present new desktop frames.
+- **Slow motion:** 120–240 FPS is useful only when the source actually produces that many distinct frames.
+
+Higher FPS raises GPU load, RAM use, and file size. Captail supports 30, 60, 120, 144, and 240 FPS.
+
+## How does audio work?
+
+You can record system or detected-game audio, a microphone, or both.
+
+- Change system and microphone volume independently.
+- Add up to `+20 dB` microphone boost when 100% is still too quiet.
+- Use **One mixed track** for maximum player compatibility.
+- Use **Separate tracks** to keep system/game audio and microphone independent for editing.
+- Choose AAC in fragmented MP4 or Opus in MKV.
+
+Some media players play only one track from a multi-track file. Captail's clip editor previews the available tracks together and lets you keep or remove each track from the trimmed result.
+
+## Can I manage and trim replays inside Captail?
+
+Yes. The main window lists supported files from the selected replay folder in a scrollable library.
+
+- Open a replay in File Explorer.
+- Move it to the Recycle Bin after confirmation.
+- Scrub through a responsive preview.
+- Select one trim range with draggable handles.
+- Keep or remove each audio track.
+- Save a new copy or overwrite the original after confirmation.
+- See estimated output size, original size, resolution, source FPS, and codec.
+
+Trimming uses stream copy when possible, avoiding a full video re-encode.
+
+## Can Captail organize clips by game?
+
+Enable **Organize games into folders** in Storage. Replays saved while a game is detected go into a folder named after that game's executable. Replays saved while Desktop remains active stay in the main replay folder.
+
+## Does Captail send or upload my recordings?
+
+No. Captail has no account, cloud upload, analytics, or telemetry. Replays, thumbnails, settings, and logs stay on your PC.
+
+Captail contacts the GitHub Releases API to check whether a newer version exists. It downloads an update package only after you click the update control.
+
+## How is Captail different from ShadowPlay and OBS Replay Buffer?
+
+| | Captail | ShadowPlay | OBS Replay Buffer |
+| --- | --- | --- | --- |
+| Primary job | Instant replay | NVIDIA capture suite | Recording/streaming production |
+| GPU support goal | NVIDIA, AMD, Intel hardware encoders | NVIDIA | Broad through OBS |
+| Setup | Choose settings and leave it in tray | GeForce/NVIDIA App | Configure scenes, sources, and output |
+| Automatic desktop/game switching | Yes, in Desktop mode | Platform-managed | Requires scene/source setup |
+| Capture watchdog and recovery | Built around automatic supervision | Internal behavior | Not Captail's focused workflow |
+| Built-in replay library and trim editor | Yes | Varies by NVIDIA software version | No focused clip library |
+| Open source | Yes | No | Yes |
+
+Captail uses libobs for capture and encoding, but it is not an OBS Studio frontend. It exposes no streaming, scenes, transitions, or plugin management because those features would work against its small, single-purpose UI.
+
+## Will it work on my PC?
+
+Requirements:
+
+- Windows 10 version 2004 or newer, or Windows 11;
+- x64 processor and operating system;
+- a GPU and driver exposing a supported hardware H.264, HEVC, or AV1 encoder.
+
+Current hardware status:
 
 | Hardware | Status |
 | --- | --- |
@@ -158,70 +217,52 @@ Both hotkeys can be changed in Settings.
 | AMD GPUs | Capability detection implemented; public hardware testing needed |
 | Intel GPUs | Capability detection implemented; public hardware testing needed |
 
-Captail currently targets **Windows 10 version 2004 or newer and Windows 11, x64**.
+Codec options are based on detected encoder support. Captail falls back to another available codec if a previously selected encoder disappears.
 
-Codec availability depends on GPU generation and installed graphics driver. Captail hides unavailable codecs automatically.
+## What are the current limitations?
 
-## Known limitations
-
-- This is the first public version. Expect bugs.
-- Captail is currently unsigned, so SmartScreen may warn on first launch.
-- Unique 240 FPS frames require the game and capture path to produce 240 distinct frames. Desktop capture is limited by desktop/monitor presentation rate.
+- This is an early preview; hardware-specific bugs are expected.
+- Release binaries are not Authenticode-signed.
 - Some games or anti-cheat configurations may block Game Capture.
-- DRM-protected video cannot be captured; protected regions may be black.
-- NVIDIA generations older than RTX 40, AMD, and Intel need broader real-world testing.
+- DRM-protected regions cannot be recorded and may appear black.
+- Desktop capture cannot create unique frames beyond the desktop presentation rate.
+- Older NVIDIA, AMD, and Intel hardware needs more real-world testing.
 
-## Reporting bugs
+## What information should I include in a bug report?
 
-Feedback is especially valuable during this preview.
+First check [existing issues](https://github.com/FaulMit/captail/issues), then open the [bug report form](https://github.com/FaulMit/captail/issues/new/choose).
 
-1. Check [existing issues](https://github.com/FaulMit/captail/issues).
-2. Open a [bug report](https://github.com/FaulMit/captail/issues/new/choose).
-3. Include Captail version, Windows version, GPU, driver version, source, codec, FPS, resolution, and reproduction steps.
-4. Attach `%LOCALAPPDATA%\Captail\log.txt` when possible. Review it first and remove personal paths or other sensitive information.
+Include:
 
-Requests for older NVIDIA, AMD, and Intel testing are welcome even when everything works.
+- Captail version and Setup/Portable package type;
+- Windows version;
+- GPU model and graphics-driver version;
+- capture mode, codec, resolution, FPS, and audio configuration;
+- exact reproduction steps and expected/actual behavior;
+- `%LOCALAPPDATA%\Captail\log.txt`, when relevant.
 
-## Building from source
+Review logs before attaching them and remove personal paths or other sensitive information. Report security vulnerabilities privately through the process in [SECURITY.md](SECURITY.md).
 
-Requirements:
+Compatibility reports for older NVIDIA, AMD, and Intel GPUs are useful even when everything works.
 
-- Windows 10/11 x64
-- .NET 9 SDK
-- Visual Studio 2022 Build Tools with **Desktop development with C++**
-- CMake 3.20+
+## How do I build or contribute?
+
+Development requires Windows 10/11 x64, .NET 9 SDK, CMake 3.20+, and Visual Studio 2022 Build Tools with **Desktop development with C++**.
 
 ```powershell
 git clone https://github.com/FaulMit/captail.git
 cd captail
-.\tools\AcquireObsRuntime.ps1
-dotnet build .\Captail.sln -c Release
+dotnet restore .\src\Captail\Captail.csproj --locked-mode
+dotnet build .\Captail.sln -c Debug --no-restore
 ```
 
-Create local release packages:
+The first build acquires the pinned OBS and FFmpeg runtimes when they are missing.
 
-```powershell
-.\tools\BuildRelease.ps1 -Version 0.1.4 -InnoSetupCompiler "C:\Program Files\Inno Setup 7\ISCC.exe"
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and [docs/RELEASING.md](docs/RELEASING.md) for the automated release process.
-
-## Architecture
-
-- `ObsReplayEngine.cs` — libobs lifecycle, sources, scene, encoders, and Replay Buffer.
-- `ObsNative.cs` — focused P/Invoke bindings for libobs.
-- `native/ObsBridge` — safe bridge for variadic OBS logging.
-- `native/ObsCaptureFixture` — D3D11 fixture for Game Capture and high-FPS validation.
-- `App.xaml.cs` — tray, hotkeys, notifications, single-instance behavior, watchdog, and recovery.
-- `SettingsWindow.*` — compact WPF interface.
-- `ReplayLibrary.cs` — replay discovery, metadata, thumbnail cache, delete, and trim orchestration.
-- `ClipEditorWindow.*` — preview, timeline, audio-track selection, and copy/overwrite workflows.
-- `FfmpegAdapter.cs` and `FfplayHost.cs` — bundled media probing, thumbnails, waveforms, trimming, and editor playback.
-- `UpdateService.cs` — GitHub release discovery, package verification, Installer updates, and Portable self-replacement.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Release maintainers should use [docs/RELEASING.md](docs/RELEASING.md); published binaries are built and verified by GitHub Actions.
 
 ## License and attribution
 
-Captail is licensed under **GNU GPL-2.0-or-later**. See [LICENSE](LICENSE).
+Captail is licensed under [GNU GPL-2.0-or-later](LICENSE).
 
 Captail uses libobs and selected OBS Studio runtime components. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
