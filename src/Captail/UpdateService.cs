@@ -422,16 +422,21 @@ internal sealed class UpdateService
             if (File.Exists(destinationPath) &&
                 new FileInfo(destinationPath).Length == asset.Size)
             {
-                await using var cachedFile = new FileStream(
-                    destinationPath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    128 * 1024,
-                    FileOptions.Asynchronous | FileOptions.SequentialScan);
-                byte[] cachedHash = await SHA256.HashDataAsync(
-                    cachedFile,
-                    cancellationToken);
+                byte[] cachedHash;
+                await using (var cachedFile = new FileStream(
+                                 destinationPath,
+                                 FileMode.Open,
+                                 FileAccess.Read,
+                                 FileShare.Read,
+                                 128 * 1024,
+                                 FileOptions.Asynchronous |
+                                 FileOptions.SequentialScan))
+                {
+                    cachedHash = await SHA256.HashDataAsync(
+                        cachedFile,
+                        cancellationToken);
+                }
+
                 if (CryptographicOperations.FixedTimeEquals(
                         Encoding.ASCII.GetBytes(
                             Convert.ToHexString(cachedHash)
@@ -460,65 +465,69 @@ internal sealed class UpdateService
                     "Downloaded update size does not match release metadata.");
             }
 
-            await using Stream source =
-                await response.Content.ReadAsStreamAsync(cancellationToken);
-            await using var destination = new FileStream(
-                temporaryPath,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                128 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            using IncrementalHash hash =
-                IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-
-            byte[] buffer = new byte[128 * 1024];
-            long total = 0;
-            int lastProgress = -1;
-            while (true)
+            await using (Stream source =
+                         await response.Content.ReadAsStreamAsync(
+                             cancellationToken))
+            await using (var destination = new FileStream(
+                             temporaryPath,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             128 * 1024,
+                             FileOptions.Asynchronous |
+                             FileOptions.SequentialScan))
             {
-                int read = await source.ReadAsync(
-                    buffer,
-                    cancellationToken);
-                if (read == 0)
-                    break;
-                total += read;
-                if (total > asset.Size || total > MaximumAssetBytes)
+                using IncrementalHash hash =
+                    IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+
+                byte[] buffer = new byte[128 * 1024];
+                long total = 0;
+                int lastProgress = -1;
+                while (true)
+                {
+                    int read = await source.ReadAsync(
+                        buffer,
+                        cancellationToken);
+                    if (read == 0)
+                        break;
+                    total += read;
+                    if (total > asset.Size || total > MaximumAssetBytes)
+                    {
+                        throw new InvalidDataException(
+                            "Downloaded update exceeds expected size.");
+                    }
+                    hash.AppendData(buffer, 0, read);
+                    await destination.WriteAsync(
+                        buffer.AsMemory(0, read),
+                        cancellationToken);
+
+                    int percent = (int)Math.Clamp(
+                        total * 100L / asset.Size,
+                        0,
+                        100);
+                    if (percent != lastProgress)
+                    {
+                        progress?.Report(percent);
+                        lastProgress = percent;
+                    }
+                }
+                await destination.FlushAsync(cancellationToken);
+
+                if (total != asset.Size)
                 {
                     throw new InvalidDataException(
-                        "Downloaded update exceeds expected size.");
+                        "Downloaded update is incomplete.");
                 }
-                hash.AppendData(buffer, 0, read);
-                await destination.WriteAsync(
-                    buffer.AsMemory(0, read),
-                    cancellationToken);
-
-                int percent = (int)Math.Clamp(
-                    total * 100L / asset.Size,
-                    0,
-                    100);
-                if (percent != lastProgress)
+                string actualHash =
+                    Convert.ToHexString(hash.GetHashAndReset())
+                        .ToLowerInvariant();
+                if (!CryptographicOperations.FixedTimeEquals(
+                        Encoding.ASCII.GetBytes(actualHash),
+                        Encoding.ASCII.GetBytes(expectedHash)))
                 {
-                    progress?.Report(percent);
-                    lastProgress = percent;
+                    throw new InvalidDataException(
+                        "Downloaded update failed SHA-256 verification.");
                 }
-            }
-            await destination.FlushAsync(cancellationToken);
-
-            if (total != asset.Size)
-            {
-                throw new InvalidDataException(
-                    "Downloaded update is incomplete.");
-            }
-            string actualHash =
-                Convert.ToHexString(hash.GetHashAndReset())
-                    .ToLowerInvariant();
-            if (!CryptographicOperations.FixedTimeEquals(
-                    Encoding.ASCII.GetBytes(actualHash),
-                    Encoding.ASCII.GetBytes(expectedHash)))
-            {
-                throw new InvalidDataException(
-                    "Downloaded update failed SHA-256 verification.");
             }
 
             File.Move(temporaryPath, destinationPath, overwrite: true);
