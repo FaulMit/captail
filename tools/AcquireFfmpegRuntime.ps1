@@ -10,6 +10,23 @@ $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-0
 $expectedArchiveSha256 = "289ec4ca5a832cb1f2486ee35301d345c5dfaa28018f6177cdbbfbc2ad6f2e33"
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
+
+function Get-Sha256Hex([string]$Path) {
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = $null
+    try {
+        $stream = [IO.File]::OpenRead($Path)
+        return ([BitConverter]::ToString(
+            $algorithm.ComputeHash($stream))).Replace("-", "")
+    }
+    finally {
+        if ($null -ne $stream) {
+            $stream.Dispose()
+        }
+        $algorithm.Dispose()
+    }
+}
+
 if (-not $Destination) {
     $Destination = Join-Path $allowedRuntimeRoot "ffmpeg"
 }
@@ -28,7 +45,7 @@ $archive = Join-Path $env:TEMP $archiveName
 $extract = Join-Path $env:TEMP "Captail-FFmpeg-$PID-$([Guid]::NewGuid().ToString('N'))"
 try {
     if (Test-Path -LiteralPath $archive) {
-        $existingHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+        $existingHash = Get-Sha256Hex $archive
         if (-not $existingHash.Equals(
                 $expectedArchiveSha256,
                 [StringComparison]::OrdinalIgnoreCase)) {
@@ -39,7 +56,7 @@ try {
         Write-Host "Downloading FFmpeg $version runtime..."
         Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive
     }
-    $actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+    $actualHash = Get-Sha256Hex $archive
     if (-not $actualHash.Equals(
             $expectedArchiveSha256,
             [StringComparison]::OrdinalIgnoreCase)) {
