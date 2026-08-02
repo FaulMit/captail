@@ -30,6 +30,8 @@ public sealed class ObsReplayEngine : IDisposable
     private readonly List<nint> _audioEncoders = [];
 
     private nint _videoSource;
+    private nint _desktopVideoSource;
+    private nint _gameVideoSource;
     private nint _videoEncoder;
     private nint _output;
     private nint _outputSignals;
@@ -46,6 +48,9 @@ public sealed class ObsReplayEngine : IDisposable
     private uint _outputHeight;
     private uint _baseWidth;
     private uint _baseHeight;
+    private bool _automaticGameActive;
+    private bool _automaticGameSourceShowing;
+    private string _activeGameExecutable = "";
 
     public event Action<string>? Faulted;
 
@@ -57,6 +62,7 @@ public sealed class ObsReplayEngine : IDisposable
         EncoderCapabilities.Failed(
             Localization.Text("L.Engine.CapabilitiesPending"));
     public bool IsGameCapture { get; }
+    public bool IsAutomaticCapture { get; }
     public bool IsActive =>
         _started &&
         _output != 0 &&
@@ -68,6 +74,18 @@ public sealed class ObsReplayEngine : IDisposable
     {
         get
         {
+            if (IsAutomaticCapture)
+            {
+                string gameName = Path.GetFileNameWithoutExtension(
+                    _activeGameExecutable);
+                return _automaticGameActive
+                    ? Localization.Format(
+                        "L.Engine.AutoGameCaptured",
+                        string.IsNullOrWhiteSpace(gameName)
+                            ? Localization.Text("L.Video.Game")
+                            : gameName)
+                    : Localization.Text("L.Engine.AutoDesktop");
+            }
             if (!IsGameCapture)
                 return Localization.Text("L.Video.Desktop");
             return IsGameHooked
@@ -77,10 +95,13 @@ public sealed class ObsReplayEngine : IDisposable
     }
 
     public bool IsGameHooked =>
-        IsGameCapture && _videoSource != 0 && ReadBoolProcedure(
-            ObsNative.obs_source_get_proc_handler(_videoSource),
+        _gameVideoSource != 0 &&
+        ReadBoolProcedure(
+            ObsNative.obs_source_get_proc_handler(_gameVideoSource),
             "get_hooked",
             "hooked");
+
+    public string ActiveGameExecutable => _activeGameExecutable;
 
     public bool IsHealthy
     {
@@ -125,6 +146,53 @@ public sealed class ObsReplayEngine : IDisposable
     public uint TotalRenderedFrames => ObsNative.obs_get_total_frames();
     public uint LaggedRenderedFrames => ObsNative.obs_get_lagged_frames();
 
+    /// <summary>
+    /// Updates game-hook metadata and Desktop fallback without restarting
+    /// encoder or replay buffer.
+    /// Must be called on Captail's serialized OBS thread.
+    /// </summary>
+    public bool RefreshCaptureState()
+    {
+        if (_gameVideoSource == 0)
+            return false;
+
+        bool hooked = IsGameHooked;
+        string executable = hooked
+            ? ReadStringProcedure(
+                ObsNative.obs_source_get_proc_handler(_gameVideoSource),
+                "get_hooked",
+                "executable")
+            : "";
+
+        if (IsGameCapture)
+        {
+            _activeGameExecutable = hooked ? executable : "";
+            return false;
+        }
+
+        if (_desktopVideoSource == 0)
+            return false;
+
+        if (hooked == _automaticGameActive)
+        {
+            if (hooked && !string.IsNullOrWhiteSpace(executable))
+                _activeGameExecutable = executable;
+            return false;
+        }
+
+        nint target = hooked ? _gameVideoSource : _desktopVideoSource;
+        ObsNative.obs_set_output_source(0, target);
+        _videoSource = target;
+        _automaticGameActive = hooked;
+        _activeGameExecutable = hooked ? executable : "";
+        Log.Write(
+            hooked
+                ? $"Automatic capture switched to Game Capture: " +
+                  $"{Path.GetFileName(_activeGameExecutable)}"
+                : "Automatic capture returned to Desktop Capture.");
+        return true;
+    }
+
     public ObsReplayEngine(Config config)
     {
         _config = config;
@@ -132,6 +200,7 @@ public sealed class ObsReplayEngine : IDisposable
             config.CaptureSource,
             "game",
             StringComparison.OrdinalIgnoreCase);
+        IsAutomaticCapture = !IsGameCapture;
         _savedCallback = OnReplaySaved;
         _stoppedCallback = OnOutputStopped;
     }
@@ -238,7 +307,13 @@ public sealed class ObsReplayEngine : IDisposable
 
         return new ReplaySaveOperation(
             WaitForSaveCompletionAsync(completion, cancellationToken),
-            initialMuxBytes);
+            initialMuxBytes,
+            IsGameHooked
+                ? ReadStringProcedure(
+                    ObsNative.obs_source_get_proc_handler(_gameVideoSource),
+                    "get_hooked",
+                    "executable")
+                : null);
     }
 
     public Task<string> SaveReplayAsync(
@@ -359,10 +434,9 @@ public sealed class ObsReplayEngine : IDisposable
                 : monitors.FirstOrDefault()
                   ?? throw new InvalidOperationException(
                       Localization.Text("L.Engine.MonitorMissing"));
-        (int captureWidth, int captureHeight) = IsGameCapture
-            ? CaptureInterop.GetGameClientSize(_config.GameExecutablePath) ??
-              (monitor.Width, monitor.Height)
-            : (monitor.Width, monitor.Height);
+        // Both automatic modes can hook different games over pipeline lifetime,
+        // so fixed OBS canvas follows selected monitor rather than one process.
+        (int captureWidth, int captureHeight) = (monitor.Width, monitor.Height);
         _baseWidth = (uint)captureWidth;
         _baseHeight = (uint)captureHeight;
         (uint outputWidth, uint outputHeight) = ResolveOutputSize(
@@ -560,51 +634,22 @@ public sealed class ObsReplayEngine : IDisposable
                 ? monitors[_config.MonitorIndex]
                 : monitors.First();
 
-        nint videoSettings = ObsNative.obs_data_create();
-        try
+        if (IsAutomaticCapture)
         {
-            if (IsGameCapture)
-            {
-                string selector = CaptureInterop.BuildObsWindowSelector(
-                    _config.GameExecutablePath);
-                ObsNative.obs_data_set_string(videoSettings, "capture_mode", "window");
-                ObsNative.obs_data_set_string(videoSettings, "window", selector);
-                ObsNative.obs_data_set_int(videoSettings, "priority", 2);
-                ObsNative.obs_data_set_bool(videoSettings, "capture_cursor", true);
-                ObsNative.obs_data_set_bool(videoSettings, "limit_framerate", false);
-                ObsNative.obs_data_set_bool(videoSettings, "anti_cheat_hook", true);
-                ObsNative.obs_data_set_int(videoSettings, "hook_rate", 1);
-                ObsNative.obs_data_set_bool(
-                    videoSettings,
-                    "capture_audio",
-                    _config.CaptureSystemAudio);
-                _videoSource = ObsNative.obs_source_create(
-                    "game_capture",
-                    "Captail Game Capture",
-                    videoSettings,
-                    0);
-            }
-            else
-            {
-                // WGC handles secure/DRM surfaces and DXGI resets more reliably;
-                // protected regions become black without stopping the source.
-                ObsNative.obs_data_set_int(videoSettings, "method", 2);
-                ObsNative.obs_data_set_string(
-                    videoSettings,
-                    "monitor_id",
-                    monitor.DeviceId);
-                ObsNative.obs_data_set_bool(videoSettings, "capture_cursor", true);
-                ObsNative.obs_data_set_bool(videoSettings, "force_sdr", false);
-                _videoSource = ObsNative.obs_source_create(
-                    "monitor_capture",
-                    "Captail Display Capture",
-                    videoSettings,
-                    0);
-            }
+            _desktopVideoSource = CreateMonitorSource(monitor);
+            _gameVideoSource = CreateGameSource(desktopFallback: true);
+            _videoSource = _desktopVideoSource;
+
+            // Game Capture stops looking for a target when it is not visible.
+            // Keep only its lightweight hook detector visible while Desktop is
+            // rendered. Output still contains one video source at a time.
+            ObsNative.obs_source_inc_showing(_gameVideoSource);
+            _automaticGameSourceShowing = true;
         }
-        finally
+        else
         {
-            ObsNative.obs_data_release(videoSettings);
+            _gameVideoSource = CreateGameSource(desktopFallback: false);
+            _videoSource = _gameVideoSource;
         }
 
         if (_videoSource == 0)
@@ -614,9 +659,9 @@ public sealed class ObsReplayEngine : IDisposable
         const uint systemMix = 1u;
         if (IsGameCapture && _config.CaptureSystemAudio)
         {
-            ObsNative.obs_source_set_audio_mixers(_videoSource, systemMix);
+            ObsNative.obs_source_set_audio_mixers(_gameVideoSource, systemMix);
             ObsNative.obs_source_set_volume(
-                _videoSource,
+                _gameVideoSource,
                 NormalizeVolume(_config.SystemAudioVolume));
         }
 
@@ -651,6 +696,74 @@ public sealed class ObsReplayEngine : IDisposable
                 DecibelsToLinear(_config.MicrophoneBoostDb));
             _audioSources.Add(microphone);
             ObsNative.obs_set_output_source(2, microphone);
+        }
+    }
+
+    private nint CreateGameSource(bool desktopFallback)
+    {
+        nint settings = ObsNative.obs_data_create();
+        try
+        {
+            ObsNative.obs_data_set_string(
+                settings,
+                "capture_mode",
+                "any_fullscreen");
+            ObsNative.obs_data_set_bool(settings, "capture_cursor", true);
+            ObsNative.obs_data_set_bool(settings, "limit_framerate", false);
+            ObsNative.obs_data_set_bool(settings, "anti_cheat_hook", true);
+            ObsNative.obs_data_set_int(settings, "hook_rate", 1);
+            // Automatic mode keeps WASAPI active across source changes. This
+            // prevents an audio gap and duplicate system/game audio at switch.
+            ObsNative.obs_data_set_bool(
+                settings,
+                "capture_audio",
+                !desktopFallback && _config.CaptureSystemAudio);
+            nint source = ObsNative.obs_source_create(
+                "game_capture",
+                desktopFallback
+                    ? "Captail Automatic Game Capture"
+                    : "Captail Game Capture",
+                settings,
+                0);
+            if (source == 0)
+            {
+                throw new InvalidOperationException(
+                    Localization.Text("L.Engine.VideoSourceFailed"));
+            }
+            return source;
+        }
+        finally
+        {
+            ObsNative.obs_data_release(settings);
+        }
+    }
+
+    private static nint CreateMonitorSource(CaptureInterop.MonitorInfo monitor)
+    {
+        nint settings = ObsNative.obs_data_create();
+        try
+        {
+            // WGC handles secure/DRM surfaces and DXGI resets more reliably;
+            // protected regions become black without stopping the source.
+            ObsNative.obs_data_set_int(settings, "method", 2);
+            ObsNative.obs_data_set_string(settings, "monitor_id", monitor.DeviceId);
+            ObsNative.obs_data_set_bool(settings, "capture_cursor", true);
+            ObsNative.obs_data_set_bool(settings, "force_sdr", false);
+            nint source = ObsNative.obs_source_create(
+                "monitor_capture",
+                "Captail Display Capture",
+                settings,
+                0);
+            if (source == 0)
+            {
+                throw new InvalidOperationException(
+                    Localization.Text("L.Engine.VideoSourceFailed"));
+            }
+            return source;
+        }
+        finally
+        {
+            ObsNative.obs_data_release(settings);
         }
     }
 
@@ -924,7 +1037,10 @@ public sealed class ObsReplayEngine : IDisposable
 
     private void CreateReplayBuffer()
     {
-        Directory.CreateDirectory(_config.OutputDirectory);
+        // Game target is discovered at runtime. Save to root first, then move
+        // completed file into game folder without copying across volumes.
+        string captureDirectory = _config.OutputDirectory;
+        Directory.CreateDirectory(captureDirectory);
         bool opus = string.Equals(
             _config.AudioCodec,
             "opus",
@@ -940,7 +1056,7 @@ public sealed class ObsReplayEngine : IDisposable
                 settings,
                 "max_size_mb",
                 Math.Max(0, _config.MaxReplaySizeMb));
-            ObsNative.obs_data_set_string(settings, "directory", _config.OutputDirectory);
+            ObsNative.obs_data_set_string(settings, "directory", captureDirectory);
             ObsNative.obs_data_set_string(
                 settings,
                 "format",
@@ -1183,16 +1299,30 @@ public sealed class ObsReplayEngine : IDisposable
         for (uint channel = 0; channel < 6; channel++)
             ObsNative.obs_set_output_source(channel, 0);
 
-        if (_videoSource != 0)
-            ObsNative.obs_source_remove(_videoSource);
+        if (_automaticGameSourceShowing && _gameVideoSource != 0)
+        {
+            ObsNative.obs_source_dec_showing(_gameVideoSource);
+            _automaticGameSourceShowing = false;
+        }
+
+        if (_desktopVideoSource != 0)
+            ObsNative.obs_source_remove(_desktopVideoSource);
+        if (_gameVideoSource != 0)
+            ObsNative.obs_source_remove(_gameVideoSource);
         foreach (nint source in _audioSources)
             ObsNative.obs_source_remove(source);
 
-        if (_videoSource != 0)
+        if (_desktopVideoSource != 0)
         {
-            ObsNative.obs_source_release(_videoSource);
-            _videoSource = 0;
+            ObsNative.obs_source_release(_desktopVideoSource);
+            _desktopVideoSource = 0;
         }
+        if (_gameVideoSource != 0)
+        {
+            ObsNative.obs_source_release(_gameVideoSource);
+            _gameVideoSource = 0;
+        }
+        _videoSource = 0;
         foreach (nint source in _audioSources)
             ObsNative.obs_source_release(source);
         _audioSources.Clear();
@@ -1214,4 +1344,5 @@ public sealed class ObsReplayEngine : IDisposable
 
 public sealed record ReplaySaveOperation(
     Task<string> Completion,
-    ulong InitialMuxBytes);
+    ulong InitialMuxBytes,
+    string? GameExecutable);

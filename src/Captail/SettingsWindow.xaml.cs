@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Captail.Interop;
 
@@ -12,7 +13,7 @@ namespace Captail;
 
 public partial class SettingsWindow : Window
 {
-    private const double DashboardHeight = 430;
+    private const double DashboardHeight = 650;
 
     private readonly Config _config;
     private readonly Action _saveReplay;
@@ -29,6 +30,7 @@ public partial class SettingsWindow : Window
     private EncoderCapabilities _capabilities;
     private readonly DispatcherTimer _diskTimer;
     private readonly CancellationTokenSource _lifetimeCts = new();
+    private readonly ReplayLibrary _replayLibrary;
     private string _outputDirectory;
     private string _pendingSaveHotkey;
     private string _pendingToggleHotkey;
@@ -38,7 +40,6 @@ public partial class SettingsWindow : Window
     private int _availableReplaySeconds;
     private bool? _animatedRecordingState;
     private int _deviceRefreshVersion;
-    private int _processRefreshVersion;
     private int _diskRefreshInProgress;
     private int _actionInProgress;
     private UpdateRelease? _availableUpdate;
@@ -46,6 +47,8 @@ public partial class SettingsWindow : Window
     private int _updateProgress;
     private bool _updateCheckInProgress;
     private bool _updateInstallInProgress;
+    private int _libraryRefreshInProgress;
+    private ReplayClip? _pendingDeleteClip;
 
     public bool Applied { get; private set; }
 
@@ -78,6 +81,7 @@ public partial class SettingsWindow : Window
         _runtimeActive = runtimeActive;
 
         InitializeComponent();
+        _replayLibrary = new ReplayLibrary(new FfmpegAdapter());
         ApplyHardwareCapabilities();
         _diskTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _diskTimer.Tick += async (_, _) => await RefreshDiskAsync();
@@ -100,8 +104,8 @@ public partial class SettingsWindow : Window
             {
                 await Task.WhenAll(
                     LoadDeviceListsAsync(),
-                    PopulateGameProcessesAsync(),
-                    RefreshDiskAsync());
+                    RefreshDiskAsync(),
+                    RefreshReplayLibraryAsync());
             });
             _ = CheckForUpdatesAsync(force: false);
         };
@@ -295,121 +299,16 @@ public partial class SettingsWindow : Window
         return new DeviceListsSnapshot(renderDevices, captureDevices, monitors);
     }
 
-    private async Task PopulateGameProcessesAsync()
-    {
-        int version = Interlocked.Increment(ref _processRefreshVersion);
-        string selectedPath = GetSelectedTag(GameProcessBox, _config.GameExecutablePath);
-        IReadOnlyList<(string Path, string Label)> choices;
-        try
-        {
-            choices = await Task.Run(CollectGameProcesses, _lifetimeCts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-        catch (Exception exception)
-        {
-            Log.Write($"Game-process list unavailable: {exception.Message}");
-            return;
-        }
-
-        if (version != _processRefreshVersion || _lifetimeCts.IsCancellationRequested)
-            return;
-
-        var visibleChoices = choices.ToDictionary(
-            choice => choice.Path,
-            choice => choice.Label,
-            StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrWhiteSpace(selectedPath) &&
-            !visibleChoices.ContainsKey(selectedPath))
-        {
-            visibleChoices[selectedPath] = Localization.Format(
-                "L.Video.GameNotRunning",
-                Path.GetFileName(selectedPath));
-        }
-
-        GameProcessBox.Items.Clear();
-        GameProcessBox.Items.Add(new ComboBoxItem
-        {
-            Tag = "",
-            Content = Localization.Text("L.Video.ChooseGame"),
-            IsEnabled = false,
-        });
-        foreach ((string path, string label) in visibleChoices.OrderBy(pair => pair.Value))
-            GameProcessBox.Items.Add(new ComboBoxItem { Tag = path, Content = label });
-        SelectByTag(GameProcessBox, selectedPath);
-    }
-
-    private static IReadOnlyList<(string Path, string Label)> CollectGameProcesses()
-    {
-        var choices = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        HashSet<string> shellProcesses = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "ApplicationFrameHost",
-            "codex-computer-use",
-            "explorer",
-            "GameBar",
-            "GameBarFTServer",
-            "LockApp",
-            "RuntimeBroker",
-            "SearchHost",
-            "ShellExperienceHost",
-            "StartMenuExperienceHost",
-            "SystemSettings",
-            "svchost",
-            "Taskmgr",
-            "TextInputHost",
-        };
-
-        foreach (Process process in Process.GetProcesses())
-        {
-            try
-            {
-                if (process.Id == Environment.ProcessId || process.MainWindowHandle == 0)
-                    continue;
-
-                string? path = process.MainModule?.FileName;
-                if (string.IsNullOrWhiteSpace(path))
-                    continue;
-                if (shellProcesses.Contains(Path.GetFileNameWithoutExtension(path)))
-                    continue;
-
-                string title = string.IsNullOrWhiteSpace(process.MainWindowTitle)
-                    ? Path.GetFileNameWithoutExtension(path)
-                    : process.MainWindowTitle;
-                choices[path] = $"{Path.GetFileName(path)} · {title}";
-            }
-            catch
-            {
-                // System and protected processes are inaccessible; omit them.
-            }
-            finally
-            {
-                process.Dispose();
-            }
-        }
-
-        return choices
-            .OrderBy(pair => pair.Value)
-            .Select(pair => (pair.Key, pair.Value))
-            .ToArray();
-    }
-
     private void CaptureSourceBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (IsInitialized)
             UpdateCaptureSourceState();
     }
 
-    private async void GameProcessBox_DropDownOpened(object sender, EventArgs e) =>
-        await RunUiActionAsync(PopulateGameProcessesAsync);
-
     private void UpdateCaptureSourceState()
     {
         bool game = GetSelectedTag(CaptureSourceBox, "desktop") == "game";
-        GameProcessRow.Visibility = game ? Visibility.Visible : Visibility.Collapsed;
-        MonitorBox.IsEnabled = !game;
+        MonitorBox.IsEnabled = true;
         SystemAudioLabel.Text = Localization.Text(
             game ? "L.Audio.GameAudio" : "L.Audio.SystemAudio");
         AudioTrackHintText.Text = Localization.Text(
@@ -426,7 +325,6 @@ public partial class SettingsWindow : Window
             SelectByTag(ReplaySizeLimitBox, _config.MaxReplaySizeMb.ToString());
             SelectRadioByTag(FpsOptions, _config.FrameRate.ToString());
             SelectByTag(CaptureSourceBox, _config.CaptureSource);
-            SelectByTag(GameProcessBox, _config.GameExecutablePath);
             SelectByTag(CodecBox, _config.Codec);
             SelectByTag(BitrateBox, _config.BitrateMbps.ToString());
             SelectByTag(MonitorBox, _config.MonitorIndex.ToString());
@@ -443,6 +341,7 @@ public partial class SettingsWindow : Window
             MicVolumeSlider.Value = Math.Clamp(_config.MicrophoneVolume, 0, 100);
             MicBoostSlider.Value = Math.Clamp(_config.MicrophoneBoostDb, 0, 20);
             AutostartBox.IsChecked = Autostart.IsEnabled();
+            OrganizeByGameBox.IsChecked = _config.OrganizeReplaysByGame;
 
             _pendingSaveHotkey = _config.Hotkey;
             _pendingToggleHotkey = _config.ToggleReplayHotkey;
@@ -587,14 +486,13 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        _ = RunUiActionAsync(async () => await Task.WhenAll(
-            LoadDeviceListsAsync(),
-            PopulateGameProcessesAsync()));
+        _ = RunUiActionAsync(LoadDeviceListsAsync);
         ApplyHardwareCapabilities();
         UpdateCaptureSourceState();
         UpdateRuntimeState(_runtimeActive);
         RenderUpdateStatus();
         _ = RefreshDiskAsync();
+        _ = RefreshReplayLibraryAsync();
     }
 
     private void GitHub_Click(object sender, RoutedEventArgs e)
@@ -839,11 +737,13 @@ public partial class SettingsWindow : Window
         DoneButton.Visibility = Visibility.Collapsed;
         SetWindowHeight(DashboardHeight);
         UpdateRuntimeState(_runtimeActive);
+        _ = RefreshReplayLibraryAsync();
         AnimateView(DashboardPanel);
     }
 
     private void SetWindowHeight(double height)
     {
+        height = Math.Min(height, Math.Max(430, SystemParameters.WorkArea.Height - 32));
         double centerY = Top + ActualHeight / 2;
         Height = height;
         Top = Math.Clamp(centerY - height / 2, SystemParameters.WorkArea.Top + 16,
@@ -1058,6 +958,12 @@ public partial class SettingsWindow : Window
     {
         if (_capturingHotkeyButton is null)
         {
+            if (e.Key == Key.Escape && DeleteConfirmOverlay.Visibility == Visibility.Visible)
+            {
+                CancelDeleteReplay();
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Escape && SettingsPanel.Visibility == Visibility.Visible)
             {
                 LoadSettingsControls();
@@ -1153,15 +1059,6 @@ public partial class SettingsWindow : Window
         candidate.BufferSeconds = GetSelectedRadioInt(BufferOptions, _config.BufferSeconds);
         candidate.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
         candidate.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
-        candidate.GameExecutablePath = GetSelectedTag(GameProcessBox, "");
-        if (candidate.CaptureSource == "game" &&
-            string.IsNullOrWhiteSpace(candidate.GameExecutablePath))
-        {
-            ShowError(
-                Localization.Text("L.Error.GameTitle"),
-                Localization.Text("L.Error.GameMessage"));
-            return;
-        }
         string selectedCodec = GetSelectedTag(CodecBox, _config.Codec);
         if (!_capabilities.Supports(selectedCodec))
         {
@@ -1190,6 +1087,7 @@ public partial class SettingsWindow : Window
             candidate.AudioCodec = GetSelectedTag(AudioCodecBox, "aac");
             candidate.SeparateAudioTracks = separateAudioTracks;
             candidate.OutputDirectory = _outputDirectory;
+            candidate.OrganizeReplaysByGame = OrganizeByGameBox.IsChecked == true;
             candidate.Hotkey = _pendingSaveHotkey;
             candidate.ToggleReplayHotkey = _pendingToggleHotkey;
             candidate.Normalize();
@@ -1313,6 +1211,165 @@ public partial class SettingsWindow : Window
         finally
         {
             Interlocked.Exchange(ref _diskRefreshInProgress, 0);
+        }
+    }
+
+    public void NotifyReplaySaved(string path)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => NotifyReplaySaved(path));
+            return;
+        }
+
+        _ = RefreshReplayLibraryAsync();
+    }
+
+    private async void RefreshLibrary_Click(object sender, RoutedEventArgs e) =>
+        await RunUiActionAsync(RefreshReplayLibraryAsync);
+
+    private async Task RefreshReplayLibraryAsync()
+    {
+        if (Interlocked.Exchange(ref _libraryRefreshInProgress, 1) != 0)
+            return;
+        try
+        {
+            IReadOnlyList<ReplayClip> clips = await _replayLibrary.GetRecentAsync(
+                _outputDirectory,
+                int.MaxValue,
+                _lifetimeCts.Token);
+            if (_lifetimeCts.IsCancellationRequested)
+                return;
+
+            RecentReplaysList.ItemsSource = clips.Select(CreateReplayClipItem).ToArray();
+            ReplayLibraryEmptyText.Visibility = clips.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Replay library refresh failed: {exception}");
+            RecentReplaysList.ItemsSource = null;
+            ReplayLibraryEmptyText.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _libraryRefreshInProgress, 0);
+        }
+    }
+
+    private ReplayClipItem CreateReplayClipItem(ReplayClip clip)
+    {
+        BitmapImage? thumbnail = null;
+        if (clip.ThumbnailPath is not null && File.Exists(clip.ThumbnailPath))
+        {
+            try
+            {
+                thumbnail = new BitmapImage();
+                thumbnail.BeginInit();
+                thumbnail.CacheOption = BitmapCacheOption.OnLoad;
+                thumbnail.UriSource = new Uri(clip.ThumbnailPath);
+                thumbnail.EndInit();
+                thumbnail.Freeze();
+            }
+            catch (Exception exception)
+            {
+                Log.Write($"Replay thumbnail load failed: {exception.Message}");
+            }
+        }
+
+        string saved = clip.SavedAt.ToString("g");
+        string metadata = Localization.Format(
+            "L.Library.Metadata",
+            saved,
+            FormatFileSize(clip.SizeBytes));
+        if (!string.IsNullOrWhiteSpace(clip.Collection))
+            metadata = $"{clip.Collection} · {metadata}";
+        return new ReplayClipItem(
+            clip,
+            Path.GetFileNameWithoutExtension(clip.Name),
+            metadata,
+            FormatTimelineDuration(clip.Duration),
+            thumbnail,
+            clip.Duration > TimeSpan.FromMilliseconds(200));
+    }
+
+    private void RevealReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not ReplayClipItem item)
+            return;
+        try
+        {
+            _replayLibrary.Reveal(_outputDirectory, item.Clip);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Reveal replay", exception);
+        }
+    }
+
+    private void TrimReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not ReplayClipItem item || !item.CanTrim)
+            return;
+        var editor = new ClipEditorWindow(
+            _replayLibrary,
+            _outputDirectory,
+            item.Clip,
+            savedPath =>
+            {
+                Log.Write($"Trimmed replay saved: {savedPath}");
+                _ = RefreshReplayLibraryAsync();
+            })
+        {
+            Owner = this,
+        };
+        editor.ShowDialog();
+    }
+
+    private void RequestDeleteReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not ReplayClipItem item)
+            return;
+        _pendingDeleteClip = item.Clip;
+        DeleteConfirmFileText.Text = item.Clip.Name;
+        DeleteConfirmOverlay.Visibility = Visibility.Visible;
+        AnimateView(DeleteConfirmOverlay);
+    }
+
+    private void CancelDeleteReplay_Click(object sender, RoutedEventArgs e) =>
+        CancelDeleteReplay();
+
+    private void CancelDeleteReplay()
+    {
+        _pendingDeleteClip = null;
+        DeleteConfirmOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private async void ConfirmDeleteReplay_Click(object sender, RoutedEventArgs e)
+    {
+        ReplayClip? clip = _pendingDeleteClip;
+        CancelDeleteReplay();
+        if (clip is null)
+            return;
+        try
+        {
+            await Task.Run(
+                () => _replayLibrary.DeleteToRecycleBin(_outputDirectory, clip),
+                _lifetimeCts.Token);
+            await RefreshReplayLibraryAsync();
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Delete replay", exception);
         }
     }
 
@@ -1484,11 +1541,18 @@ public partial class SettingsWindow : Window
             _ => Localization.Text("L.Video.SourceShort"),
         };
 
-    private string LocalizedCaptureSource(string? _) =>
-        Localization.Text(
+    private string LocalizedCaptureSource(string? activeCaptureSource)
+    {
+        if (!string.IsNullOrWhiteSpace(activeCaptureSource))
+        {
+            return activeCaptureSource;
+        }
+
+        return Localization.Text(
             _config.CaptureSource == "game"
                 ? "L.Video.GameLower"
                 : "L.Video.DesktopLower");
+    }
 
     private enum UpdateDisplayState
     {
@@ -1567,6 +1631,32 @@ public partial class SettingsWindow : Window
             : gigabytes.ToString("0.0");
         return Localization.Format("L.Unit.GB", value);
     }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB"];
+        double value = Math.Max(0, bytes);
+        int unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+        return $"{value:0.#} {units[unit]}";
+    }
+
+    private static string FormatTimelineDuration(TimeSpan duration) =>
+        duration.TotalHours >= 1
+            ? duration.ToString(@"h\:mm\:ss")
+            : duration.ToString(@"m\:ss");
+
+    private sealed record ReplayClipItem(
+        ReplayClip Clip,
+        string Title,
+        string Details,
+        string Duration,
+        BitmapImage? Thumbnail,
+        bool CanTrim);
 
     private Brush FindBrush(string key) => (Brush)FindResource(key);
 }

@@ -1,7 +1,4 @@
-using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Captail.Interop;
 
@@ -25,12 +22,6 @@ internal static class CaptureInterop
         uint deviceNumber,
         ref DisplayDevice displayDevice,
         uint flags);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int GetClassName(nint window, StringBuilder className, int maxCount);
-
-    [DllImport("user32.dll")]
-    private static extern bool GetClientRect(nint window, out Rect rect);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
@@ -118,68 +109,4 @@ internal static class CaptureInterop
         return monitors;
     }
 
-    public static string BuildObsWindowSelector(string executablePath)
-    {
-        Process? target = FindProcess(executablePath, requireWindow: true);
-        if (target is null)
-            return $"::{Encode(Path.GetFileName(executablePath))}";
-
-        using (target)
-        {
-            var className = new StringBuilder(256);
-            _ = GetClassName(target.MainWindowHandle, className, className.Capacity);
-            return $"{Encode(target.MainWindowTitle)}:{Encode(className.ToString())}:" +
-                   $"{Encode(Path.GetFileName(executablePath))}";
-        }
-    }
-
-    public static bool IsProcessRunning(string executablePath)
-    {
-        using Process? process = FindProcess(executablePath, requireWindow: false);
-        return process is not null;
-    }
-
-    public static (int Width, int Height)? GetGameClientSize(string executablePath)
-    {
-        using Process? process = FindProcess(executablePath, requireWindow: true);
-        if (process is null ||
-            !GetClientRect(process.MainWindowHandle, out Rect rect))
-        {
-            return null;
-        }
-
-        int width = rect.Right - rect.Left;
-        int height = rect.Bottom - rect.Top;
-        return width > 0 && height > 0 ? (width, height) : null;
-    }
-
-    private static Process? FindProcess(string executablePath, bool requireWindow)
-    {
-        foreach (Process process in Process.GetProcesses())
-        {
-            try
-            {
-                if ((!requireWindow || process.MainWindowHandle != 0) &&
-                    string.Equals(
-                        process.MainModule?.FileName,
-                        executablePath,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return process;
-                }
-            }
-            catch
-            {
-                // Protected system processes cannot be the selected game.
-            }
-
-            process.Dispose();
-        }
-
-        return null;
-    }
-
-    private static string Encode(string value) =>
-        value.Replace("#", "#22", StringComparison.Ordinal)
-            .Replace(":", "#3A", StringComparison.Ordinal);
 }

@@ -80,6 +80,10 @@
   <Geometry x:Key="IconDisplay">M2 4h20v13H2z M8 21h8 M12 17v4</Geometry>
   <Geometry x:Key="IconMic">M9 2h6v12H9z M5 10v1a7 7 0 0 0 14 0v-1 M12 18v4</Geometry>
   <Geometry x:Key="IconGear">M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z</Geometry>
+  <Geometry x:Key="IconScissors">M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M8.6 8.6L21 21 M8.6 15.4L21 3</Geometry>
+  <Geometry x:Key="IconTrash">M3 6h18 M8 6V3h8v3 M19 6l-1 15H6L5 6 M10 11v6 M14 11v6</Geometry>
+  <Geometry x:Key="IconPlay">M8 5v14l11-7z</Geometry>
+  <Geometry x:Key="IconPause">M8 5h3v14H8z M14 5h3v14h-3z</Geometry>
 
   <Geometry x:Key="IconGitHub">M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.58 9.58 0 0 1 12 7.7a9.6 9.6 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86V21c0 .27.18.58.69.48A10 10 0 0 0 12 2z</Geometry>
 
@@ -294,6 +298,13 @@
         </ControlTemplate>
       </Setter.Value>
     </Setter>
+  </Style>
+
+  <Style x:Key="ClipActionButton" TargetType="Button" BasedOn="{StaticResource SubtleButton}">
+    <Setter Property="Width" Value="31"/>
+    <Setter Property="Height" Value="31"/>
+    <Setter Property="Padding" Value="8"/>
+    <Setter Property="Margin" Value="3,0,0,0"/>
   </Style>
 
   <Style x:Key="DashboardLinkButton" TargetType="Button">

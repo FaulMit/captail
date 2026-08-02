@@ -80,6 +80,19 @@ public partial class App : Application
             bool updateCheckTest = e.Args.Contains(
                 "--qa-update-check",
                 StringComparer.OrdinalIgnoreCase);
+            string? clipEditorTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-clip-editor=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-clip-editor=".Length..];
+            bool clipEditorTest = !string.IsNullOrWhiteSpace(clipEditorTestPath);
+            string? previewGeometryTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-preview-geometry=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-preview-geometry=".Length..];
+            bool previewGeometryTest =
+                !string.IsNullOrWhiteSpace(previewGeometryTestPath);
             _qaUpdateAvailable = e.Args.Contains(
                 "--qa-update-available",
                 StringComparer.OrdinalIgnoreCase);
@@ -90,6 +103,8 @@ public partial class App : Application
             const bool gameCaptureTest = false;
             const bool replaySegmentsTest = false;
             const bool updateCheckTest = false;
+            const bool clipEditorTest = false;
+            const bool previewGeometryTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
                 "--background",
@@ -101,7 +116,8 @@ public partial class App : Application
                     backgroundLaunch,
                     shutdownExisting,
                     _uiOnly || faultTest || codecTest || capabilityModelTest ||
-                    gameCaptureTest || replaySegmentsTest || updateCheckTest))
+                    gameCaptureTest || replaySegmentsTest || updateCheckTest ||
+                    clipEditorTest || previewGeometryTest))
             {
                 Shutdown();
                 return;
@@ -161,6 +177,16 @@ public partial class App : Application
                     force: true,
                     CancellationToken.None);
                 Shutdown(0);
+                return;
+            }
+            if (clipEditorTest)
+            {
+                await RunClipEditorTestAsync(clipEditorTestPath!);
+                return;
+            }
+            if (previewGeometryTest)
+            {
+                await RunPreviewGeometryTestAsync(previewGeometryTestPath!);
                 return;
             }
 #endif
@@ -224,6 +250,74 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private async Task RunClipEditorTestAsync(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("QA replay does not exist.", fullPath);
+
+        var ffmpeg = new FfmpegAdapter();
+        TimeSpan duration = await ffmpeg.ReadDurationAsync(fullPath);
+        var file = new FileInfo(fullPath);
+        var clip = new ReplayClip(
+            fullPath,
+            file.Name,
+            null,
+            file.LastWriteTime,
+            file.Length,
+            duration,
+            null);
+        var window = new ClipEditorWindow(
+            new ReplayLibrary(ffmpeg),
+            file.DirectoryName!,
+            clip,
+            saved => Log.Write($"CLIP_EDITOR_QA saved={saved}"));
+        MainWindow = window;
+        window.ShowDialog();
+        Shutdown(0);
+    }
+
+    private async Task RunPreviewGeometryTestAsync(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("QA replay does not exist.", fullPath);
+
+        var ffmpeg = new FfmpegAdapter();
+        TimeSpan duration = await ffmpeg.ReadDurationAsync(fullPath);
+        var file = new FileInfo(fullPath);
+        var clip = new ReplayClip(
+            fullPath,
+            file.Name,
+            null,
+            file.LastWriteTime,
+            file.Length,
+            duration,
+            null);
+        var window = new ClipEditorWindow(
+            new ReplayLibrary(ffmpeg),
+            file.DirectoryName!,
+            clip,
+            _ => { });
+        MainWindow = window;
+        window.Show();
+        try
+        {
+            (bool passed, string details) =
+                await window.RunPreviewGeometryQaAsync();
+            Log.Write(
+                $"PREVIEW_GEOMETRY_TEST {(passed ? "PASS" : "FAIL")}: {details}");
+            window.Close();
+            Shutdown(passed ? 0 : 15);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"PREVIEW_GEOMETRY_TEST FAIL: {exception}");
+            window.Close();
+            Shutdown(15);
+        }
+    }
+
     private void RunCapabilityModelTest()
     {
         try
@@ -363,7 +457,12 @@ public partial class App : Application
                     continue;
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(6));
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                bool sourceChanged = _obs!.RefreshCaptureState();
+                Log.Write(
+                    $"OBS_CODEC_TEST {codec}: source={_obs.Description}, " +
+                    $"changed={sourceChanged}, game={_obs.ActiveGameExecutable}");
+                await Task.Delay(TimeSpan.FromSeconds(4));
                 string path = await _obs!.SaveReplayAsync();
                 bool saved = File.Exists(path) && new FileInfo(path).Length > 0;
                 allPassed &= saved;
@@ -387,11 +486,6 @@ public partial class App : Application
     {
         try
         {
-            string gamePath = args
-                .First(argument => argument.StartsWith(
-                    "--qa-game-capture=",
-                    StringComparison.OrdinalIgnoreCase))
-                ["--qa-game-capture=".Length..];
             string codec = args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-game-codec=",
@@ -413,7 +507,6 @@ public partial class App : Application
                 BitrateMbps = 50,
                 Codec = codec,
                 CaptureSource = "game",
-                GameExecutablePath = gamePath,
                 CaptureSystemAudio = false,
                 CaptureMicrophone = false,
                 OutputDirectory = root,
@@ -958,16 +1051,18 @@ public partial class App : Application
                 recoveryReason = Localization.Text(
                     "L.Recovery.ModuleStopped");
             }
-            else if (DateTime.UtcNow - _pipelineStartedUtc <
-                TimeSpan.FromSeconds(8))
-            {
-                return;
-            }
             else
             {
+                bool checkHealth = DateTime.UtcNow - _pipelineStartedUtc >=
+                                   TimeSpan.FromSeconds(8);
                 (bool healthy, string? description) =
                     await RunOnObsThreadAsync(() =>
-                        (engine.IsHealthy, engine.Description));
+                    {
+                        engine.RefreshCaptureState();
+                        return (
+                            checkHealth ? engine.IsHealthy : true,
+                            engine.Description);
+                    });
                 if (healthy)
                     _captureDescription = description;
                 else
@@ -1649,6 +1744,7 @@ public partial class App : Application
                 OverlayTone.Neutral,
                 30_000);
             string path = await SaveReplayGuardedAsync(engine);
+            _settingsWindow?.NotifyReplaySaved(path);
             ShowOverlayNotification(
                 "✓",
                 Localization.Text("L.Notify.Saved"),
@@ -1703,7 +1799,18 @@ public partial class App : Application
                 await RunOnObsThreadAsync(engine.ResetReplayWindow)
                     .ConfigureAwait(false);
             }
-            return path;
+            try
+            {
+                return ReplayPaths.RouteSavedReplay(
+                    _config!,
+                    path,
+                    operation.GameExecutable);
+            }
+            catch (Exception exception)
+            {
+                Log.Write($"Could not route replay into game folder: {exception}");
+                return path;
+            }
         }
         finally
         {
