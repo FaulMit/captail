@@ -17,7 +17,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/FaulMit/captail/releases"><strong>Download Captail</strong></a>
+  <a href="https://github.com/FaulMit/captail/releases/latest"><img src="docs/readme-download.svg" alt="Download latest Captail release for Windows" width="286"></a>
+</p>
+
+<p align="center">
+  <a href="https://faulmit.github.io/captail/">Visit the Captail website</a>
   ·
   <a href="https://github.com/FaulMit/captail/issues/new/choose">Report a problem</a>
 </p>
