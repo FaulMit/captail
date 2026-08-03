@@ -104,10 +104,12 @@ public partial class SettingsWindow : Window
             {
                 await Task.WhenAll(
                     LoadDeviceListsAsync(),
+                    LoadAutostartStateAsync(),
                     RefreshDiskAsync(),
                     RefreshReplayLibraryAsync());
             });
-            _ = CheckForUpdatesAsync(force: false);
+            if (!AppDistribution.IsMicrosoftStore)
+                _ = CheckForUpdatesAsync(force: false);
         };
         _diskTimer.Start();
     }
@@ -340,7 +342,6 @@ public partial class SettingsWindow : Window
             SystemVolumeSlider.Value = Math.Clamp(_config.SystemAudioVolume, 0, 100);
             MicVolumeSlider.Value = Math.Clamp(_config.MicrophoneVolume, 0, 100);
             MicBoostSlider.Value = Math.Clamp(_config.MicrophoneBoostDb, 0, 20);
-            AutostartBox.IsChecked = Autostart.IsEnabled();
             OrganizeByGameBox.IsChecked = _config.OrganizeReplaysByGame;
 
             _pendingSaveHotkey = _config.Hotkey;
@@ -516,6 +517,9 @@ public partial class SettingsWindow : Window
         object sender,
         RoutedEventArgs e)
     {
+        if (AppDistribution.IsMicrosoftStore)
+            return;
+
         if (_updateCheckInProgress || _updateInstallInProgress)
             return;
 
@@ -564,6 +568,9 @@ public partial class SettingsWindow : Window
 
     private async Task CheckForUpdatesAsync(bool force)
     {
+        if (AppDistribution.IsMicrosoftStore)
+            return;
+
         if (_updateCheckInProgress || _updateInstallInProgress)
             return;
 
@@ -624,6 +631,20 @@ public partial class SettingsWindow : Window
     private void RenderUpdateStatus()
     {
         string current = UpdateService.CurrentVersionText;
+        if (AppDistribution.IsMicrosoftStore)
+        {
+            UpdateVersionButton.IsEnabled = false;
+            UpdateVersionButton.Tag = "current";
+            UpdateStatusDot.Visibility = Visibility.Collapsed;
+            UpdateStatusText.Text = Localization.Format(
+                "L.Update.StoreManaged",
+                current);
+            UpdateVersionButton.ToolTip =
+                Localization.Text("L.Update.StoreManagedTip");
+            return;
+        }
+
+        UpdateVersionButton.IsEnabled = true;
         string? available = _availableUpdate is null
             ? null
             : UpdateService.FormatVersion(_availableUpdate.Version);
@@ -686,6 +707,20 @@ public partial class SettingsWindow : Window
                         "L.Update.UpToDateTip",
                         current);
                 break;
+        }
+    }
+
+    private async Task LoadAutostartStateAsync()
+    {
+        bool enabled = await Autostart.IsEnabledAsync();
+        _updatingUi = true;
+        try
+        {
+            AutostartBox.IsChecked = enabled;
+        }
+        finally
+        {
+            _updatingUi = false;
         }
     }
 

@@ -24,6 +24,8 @@
   <sys:String x:Key="L.Update.CheckFailedTip">Не удалось проверить обновления · нажмите, чтобы повторить</sys:String>
   <sys:String x:Key="L.Update.CheckFailedTitle">Ошибка проверки обновлений</sys:String>
   <sys:String x:Key="L.Update.InstallFailedTitle">Ошибка обновления</sys:String>
+  <sys:String x:Key="L.Update.StoreManaged">v{0} · Microsoft Store</sys:String>
+  <sys:String x:Key="L.Update.StoreManagedTip">Обновления устанавливает Microsoft Store</sys:String>
 
   <sys:String x:Key="L.Status.Enabled">Мгновенный повтор включён</sys:String>
   <sys:String x:Key="L.Status.Disabled">Мгновенный повтор выключен</sys:String>
@@ -195,6 +197,7 @@
   <sys:String x:Key="L.Error.CodecTitle">Кодек недоступен</sys:String>
   <sys:String x:Key="L.Error.CodecMessage">Выберите кодек, который поддерживается текущим GPU и драйвером.</sys:String>
   <sys:String x:Key="L.Error.AutostartTitle">Не удалось изменить автозапуск</sys:String>
+  <sys:String x:Key="L.Error.AutostartDenied">Windows не разрешила автозапуск Captail. Проверьте раздел «Автозагрузка» в параметрах Windows.</sys:String>
   <sys:String x:Key="L.Error.AudioSourceTitle">Источник звука недоступен</sys:String>
   <sys:String x:Key="L.Error.AudioSourceMessage">Настройка отменена. Предыдущая конфигурация восстановлена.</sys:String>
   <sys:String x:Key="L.Error.SourceTitle">Не удалось изменить источник</sys:String>

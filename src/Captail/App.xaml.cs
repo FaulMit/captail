@@ -107,8 +107,9 @@ public partial class App : Application
             const bool previewGeometryTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
-                "--background",
-                StringComparer.OrdinalIgnoreCase);
+                    "--background",
+                    StringComparer.OrdinalIgnoreCase) ||
+                AppDistribution.IsStartupTaskActivation();
             bool shutdownExisting = e.Args.Contains(
                 "--shutdown-existing",
                 StringComparer.OrdinalIgnoreCase);
@@ -136,7 +137,7 @@ public partial class App : Application
             {
                 try
                 {
-                    Autostart.SetEnabled(true);
+                    await Autostart.SetEnabledAsync(true);
                 }
                 catch (Exception exception)
                 {
@@ -1307,6 +1308,9 @@ public partial class App : Application
         bool force,
         CancellationToken cancellationToken)
     {
+        if (AppDistribution.IsMicrosoftStore)
+            return Task.FromResult<UpdateRelease?>(null);
+
 #if DEBUG
         if (_qaUpdateAvailable)
         {
@@ -1568,7 +1572,7 @@ public partial class App : Application
 
         await _pipelineGate.WaitAsync();
         Config previous = _config!.Clone();
-        bool previousAutostart = Autostart.IsEnabled();
+        bool previousAutostart = await Autostart.IsEnabledAsync();
         bool wasRunning = IsReplayRunning;
         bool pipelineChanged = !previous.PipelineEquals(candidate);
         bool pipelineTouched = false;
@@ -1595,7 +1599,7 @@ public partial class App : Application
                         Localization.Text("L.Engine.BufferStartFailed"));
             }
 
-            Autostart.SetEnabled(autostartEnabled);
+            await Autostart.SetEnabledAsync(autostartEnabled);
             _config.Save();
             UpdateUiState();
 
@@ -1628,7 +1632,7 @@ public partial class App : Application
             }
             try
             {
-                Autostart.SetEnabled(previousAutostart);
+                await Autostart.SetEnabledAsync(previousAutostart);
             }
             catch (Exception rollbackException)
             {

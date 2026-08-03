@@ -74,6 +74,9 @@ internal sealed class UpdateService
         bool force,
         CancellationToken cancellationToken)
     {
+        if (AppDistribution.IsMicrosoftStore)
+            return null;
+
         if (!force &&
             _lastCheckUtc != default &&
             DateTime.UtcNow - _lastCheckUtc < CacheDuration)
@@ -140,6 +143,8 @@ internal sealed class UpdateService
         IProgress<int>? progress,
         CancellationToken cancellationToken)
     {
+        EnsureSelfUpdateAllowed();
+
         bool installed = IsInstalledBuild();
         UpdateAsset package = installed
             ? release.SetupAsset
@@ -202,6 +207,8 @@ internal sealed class UpdateService
 
     internal static void Launch(PreparedUpdate update)
     {
+        EnsureSelfUpdateAllowed();
+
         if (update.Kind == UpdatePackageKind.Installer)
         {
             if (Process.Start(new ProcessStartInfo
@@ -270,6 +277,15 @@ internal sealed class UpdateService
         {
             throw new InvalidOperationException(
                 "Windows did not start the Portable update helper.");
+        }
+    }
+
+    private static void EnsureSelfUpdateAllowed()
+    {
+        if (AppDistribution.IsMicrosoftStore)
+        {
+            throw new InvalidOperationException(
+                "Updates are managed by Microsoft Store.");
         }
     }
 

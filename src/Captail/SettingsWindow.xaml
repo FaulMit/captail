@@ -855,6 +855,7 @@
                     <Button x:Name="UpdateVersionButton"
                             HorizontalAlignment="Right"
                             Style="{StaticResource UpdateVersionButton}"
+                            ToolTipService.ShowOnDisabled="True"
                             Tag="current"
                             Click="UpdateVersion_Click">
                         <StackPanel Orientation="Horizontal">
