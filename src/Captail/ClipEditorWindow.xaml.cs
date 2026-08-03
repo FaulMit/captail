@@ -160,6 +160,7 @@ public partial class ClipEditorWindow : Window
             NoAudioText.Visibility = tracks.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            UpdateMergeAudioState();
 
             await Task.WhenAll(AudioTracks.Select(LoadWaveformAsync));
         }
@@ -171,6 +172,7 @@ public partial class ClipEditorWindow : Window
         {
             Log.Write($"Audio track inspection failed: {exception.Message}");
             NoAudioText.Visibility = Visibility.Visible;
+            MergeAudioCheckBox.Visibility = Visibility.Collapsed;
         }
     }
 
@@ -451,6 +453,7 @@ public partial class ClipEditorWindow : Window
 
     private async void AudioTrackToggle_Click(object sender, RoutedEventArgs e)
     {
+        UpdateMergeAudioState();
         if (!_playing || _playerLoading)
             return;
         double position = CurrentPlaybackPosition();
@@ -588,11 +591,28 @@ public partial class ClipEditorWindow : Window
             .Select(track => track.Track.StreamIndex)
             .ToArray();
 
+    private void UpdateMergeAudioState()
+    {
+        bool hasSeparateTracks = AudioTracks.Count > 1;
+        MergeAudioCheckBox.Visibility = hasSeparateTracks
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        bool canMerge = hasSeparateTracks &&
+            AudioTracks.Count(track => track.IsSelected) > 1;
+        MergeAudioCheckBox.IsEnabled = canMerge;
+        if (!canMerge)
+            MergeAudioCheckBox.IsChecked = false;
+    }
+
     private async void SaveTrim_Click(object sender, RoutedEventArgs e) =>
         await SaveTrimAsync(overwrite: false);
 
     private void RequestOverwrite_Click(object sender, RoutedEventArgs e)
     {
+        OverwriteMessageText.Text = Localization.Text(
+            MergeAudioCheckBox.IsChecked == true
+                ? "L.Library.OverwriteMergeMessage"
+                : "L.Library.OverwriteMessage");
         OverwriteFileText.Text = _clip.Name;
         OverwriteConfirmOverlay.Visibility = Visibility.Visible;
     }
@@ -613,7 +633,12 @@ public partial class ClipEditorWindow : Window
     {
         SaveTrimButton.IsEnabled = false;
         OverwriteButton.IsEnabled = false;
-        EditorStatusText.Text = Localization.Text("L.Library.Trimming");
+        MergeAudioCheckBox.IsEnabled = false;
+        bool mergeAudioTracks = MergeAudioCheckBox.IsChecked == true;
+        EditorStatusText.Text = Localization.Text(
+            mergeAudioTracks
+                ? "L.Library.TrimmingMerge"
+                : "L.Library.Trimming");
         try
         {
             StopNativePlayback();
@@ -627,6 +652,7 @@ public partial class ClipEditorWindow : Window
                     start,
                     end,
                     audioStreams,
+                    mergeAudioTracks,
                     _lifetimeCts.Token)
                 : await _library.TrimAsync(
                     _rootDirectory,
@@ -634,6 +660,7 @@ public partial class ClipEditorWindow : Window
                     start,
                     end,
                     audioStreams,
+                    mergeAudioTracks,
                     _lifetimeCts.Token);
             _onSaved(path);
             DialogResult = true;
@@ -649,6 +676,7 @@ public partial class ClipEditorWindow : Window
             EditorStatusText.Text = exception.Message;
             SaveTrimButton.IsEnabled = true;
             OverwriteButton.IsEnabled = true;
+            UpdateMergeAudioState();
         }
     }
 

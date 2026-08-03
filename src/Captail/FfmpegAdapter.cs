@@ -221,6 +221,7 @@ public sealed class FfmpegAdapter
         TimeSpan start,
         TimeSpan end,
         IReadOnlyList<int>? audioStreamIndices = null,
+        bool mergeAudioTracks = false,
         CancellationToken cancellationToken = default)
     {
         if (start < TimeSpan.Zero || end <= start)
@@ -230,25 +231,58 @@ public sealed class FfmpegAdapter
             Path.GetExtension(destinationPath);
         try
         {
+            int[] selectedAudioStreams = audioStreamIndices?
+                .Distinct()
+                .ToArray() ?? [];
+            bool mixSelectedAudio = mergeAudioTracks && selectedAudioStreams.Length > 1;
             var arguments = new List<string>
             {
                 "-nostdin", "-hide_banner", "-loglevel", "error",
                 "-ss", start.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
                 "-i", sourcePath,
                 "-t", (end - start).TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
-                "-map", "0:v:0",
-                "-c", "copy",
-                "-avoid_negative_ts", "make_zero",
             };
-            if (audioStreamIndices is null)
+            if (mixSelectedAudio)
             {
-                arguments.AddRange(["-map", "0:a?"]);
+                string inputs = string.Concat(
+                    selectedAudioStreams.Select(streamIndex => $"[0:{streamIndex}]"));
+                arguments.AddRange(
+                [
+                    "-filter_complex",
+                    $"{inputs}amix=inputs={selectedAudioStreams.Length}:" +
+                    "duration=longest:dropout_transition=0:normalize=0," +
+                    "alimiter=limit=0.95[mixed_audio]",
+                    "-map", "0:v:0",
+                    "-map", "[mixed_audio]",
+                    "-c:v", "copy",
+                ]);
+                bool opusOutput = Path.GetExtension(destinationPath).Equals(
+                    ".mkv",
+                    StringComparison.OrdinalIgnoreCase) ||
+                    Path.GetExtension(destinationPath).Equals(
+                        ".webm",
+                        StringComparison.OrdinalIgnoreCase);
+                arguments.AddRange(
+                [
+                    "-c:a", opusOutput ? "libopus" : "aac",
+                    "-b:a", opusOutput ? "192k" : "320k",
+                    "-metadata:s:a:0", "title=Mixed audio",
+                ]);
             }
             else
             {
-                foreach (int streamIndex in audioStreamIndices.Distinct())
-                    arguments.AddRange(["-map", $"0:{streamIndex}?"]);
+                arguments.AddRange(["-map", "0:v:0", "-c", "copy"]);
+                if (audioStreamIndices is null)
+                {
+                    arguments.AddRange(["-map", "0:a?"]);
+                }
+                else
+                {
+                    foreach (int streamIndex in selectedAudioStreams)
+                        arguments.AddRange(["-map", $"0:{streamIndex}?"]);
+                }
             }
+            arguments.AddRange(["-avoid_negative_ts", "make_zero"]);
             if (Path.GetExtension(destinationPath).Equals(".mp4", StringComparison.OrdinalIgnoreCase) ||
                 Path.GetExtension(destinationPath).Equals(".mov", StringComparison.OrdinalIgnoreCase))
             {
@@ -277,6 +311,7 @@ public sealed class FfmpegAdapter
         TimeSpan start,
         TimeSpan end,
         IReadOnlyList<int>? audioStreamIndices = null,
+        bool mergeAudioTracks = false,
         CancellationToken cancellationToken = default)
     {
         string directory = Path.GetDirectoryName(sourcePath)!;
@@ -292,6 +327,7 @@ public sealed class FfmpegAdapter
                 start,
                 end,
                 audioStreamIndices,
+                mergeAudioTracks,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             File.Replace(

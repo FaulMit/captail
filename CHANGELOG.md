@@ -4,6 +4,17 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-03
+
+### Added
+
+- Multi-track replays can now mix all enabled audio tracks into one playback-friendly track when saving or overwriting a trimmed clip. Video remains untouched; only audio is re-encoded.
+
+### Fixed
+
+- Settings selected in the window now remain visible when the recording pipeline rejects a change, making it possible to correct the failing option without re-entering resolution, audio, and other pending choices.
+- NVIDIA HEVC encoding no longer requests B-frames, fixing encoder startup on hardware such as the GeForce GTX 1080 where HEVC B-frames are unsupported.
+
 ## [0.1.5] - 2026-08-02
 
 ### Fixed
