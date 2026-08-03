@@ -911,7 +911,7 @@ public sealed class ObsReplayEngine : IDisposable
         switch (encoder.Family)
         {
             case "nvenc":
-                ConfigureNvenc(settings, loadProfile);
+                ConfigureNvenc(settings, loadProfile, encoder.Codec);
                 break;
             case "amf":
                 ConfigureAmf(settings, loadProfile);
@@ -931,7 +931,8 @@ public sealed class ObsReplayEngine : IDisposable
 
     private static void ConfigureNvenc(
         nint settings,
-        EncoderLoadProfile loadProfile)
+        EncoderLoadProfile loadProfile,
+        string codec)
     {
         ObsNative.obs_data_set_string(
             settings,
@@ -955,8 +956,16 @@ public sealed class ObsReplayEngine : IDisposable
         ObsNative.obs_data_set_int(
             settings,
             "bf",
-            loadProfile == EncoderLoadProfile.Standard ? 2 : 0);
+            RecommendedNvencBFrames(
+                codec,
+                loadProfile == EncoderLoadProfile.Standard));
     }
+
+    internal static int RecommendedNvencBFrames(string codec, bool standardLoad) =>
+        standardLoad &&
+        !codec.Equals("hevc", StringComparison.OrdinalIgnoreCase)
+            ? 2
+            : 0;
 
     private static void ConfigureAmf(
         nint settings,

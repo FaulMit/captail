@@ -155,6 +155,7 @@
   <sys:String x:Key="L.Library.Play">Воспроизвести / пауза</sys:String>
   <sys:String x:Key="L.Library.SaveTrim">Сохранить копию</sys:String>
   <sys:String x:Key="L.Library.Trimming">Сохраняю клип…</sys:String>
+  <sys:String x:Key="L.Library.TrimmingMerge">Обрезаю и объединяю звук…</sys:String>
   <sys:String x:Key="L.Library.TrimHint">Создаёт новый файл без перекодирования. Исходный повтор останется нетронутым.</sys:String>
   <sys:String x:Key="L.Library.Trimmed">Обрезанный повтор сохранён</sys:String>
   <sys:String x:Key="L.Library.VideoTrack">ВИДЕО</sys:String>
@@ -165,12 +166,16 @@
   <sys:String x:Key="L.Library.SystemGameTrack">Система / игра</sys:String>
   <sys:String x:Key="L.Library.MicrophoneTrack">Микрофон</sys:String>
   <sys:String x:Key="L.Library.AudioTrackNumber">Аудио {0}</sys:String>
+  <sys:String x:Key="L.Library.MergeAudio">Объединить дорожки</sys:String>
+  <sys:String x:Key="L.Library.MergeAudioSummary">Одна дорожка для плеера</sys:String>
+  <sys:String x:Key="L.Library.MergeAudioTip">Смешивает все включённые аудиодорожки в одну. Видео копируется без перекодирования, звук перекодируется.</sys:String>
   <sys:String x:Key="L.Library.RangeSummary">Выбрано · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Назад на 5 секунд</sys:String>
   <sys:String x:Key="L.Library.Forward5">Вперёд на 5 секунд</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Перезаписать</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Перезаписать исходный повтор?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">Выбранный участок и включённые аудиодорожки заменят исходный файл. Отменить это действие нельзя.</sys:String>
+  <sys:String x:Key="L.Library.OverwriteMergeMessage">Выбранный участок заменит исходный файл, а все включённые аудиодорожки будут смешаны в одну. Отменить это действие нельзя.</sys:String>
 
   <sys:String x:Key="L.Hotkey.SaveReplay">Сохранить повтор</sys:String>
   <sys:String x:Key="L.Hotkey.SaveHint">Сохраняет текущий буфер</sys:String>

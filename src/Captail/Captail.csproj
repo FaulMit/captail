@@ -14,7 +14,7 @@
     <Product>Captail</Product>
     <RootNamespace>Captail</RootNamespace>
     <ApplicationIcon>Assets\Captail.ico</ApplicationIcon>
-    <Version>0.1.5</Version>
+    <Version>0.1.6</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <DefineConstants Condition="'$(MicrosoftStoreBuild)' == 'true'">$(DefineConstants);MICROSOFT_STORE</DefineConstants>
   </PropertyGroup>

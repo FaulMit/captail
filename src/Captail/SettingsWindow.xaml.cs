@@ -1130,10 +1130,8 @@ public partial class SettingsWindow : Window
             if (!await _applySettings(
                     candidate,
                     AutostartBox.IsChecked == true))
-            {
-                LoadSettingsControls();
+                // Keep pending choices visible so the failing setting can be corrected.
                 return;
-            }
 
             Applied = true;
             _ = RefreshDiskAsync();
@@ -1145,7 +1143,6 @@ public partial class SettingsWindow : Window
             ShowError(
                 Localization.Text("L.Error.Attention"),
                 exception.Message);
-            LoadSettingsControls();
         }
         finally
         {

@@ -112,6 +112,7 @@ public sealed class ReplayLibrary
         TimeSpan start,
         TimeSpan end,
         IReadOnlyList<int>? audioStreamIndices = null,
+        bool mergeAudioTracks = false,
         CancellationToken cancellationToken = default)
     {
         string source = ValidateClipPath(rootDirectory, clip.Path);
@@ -133,6 +134,7 @@ public sealed class ReplayLibrary
             start,
             end,
             audioStreamIndices,
+            mergeAudioTracks,
             cancellationToken);
         return destination;
     }
@@ -143,6 +145,7 @@ public sealed class ReplayLibrary
         TimeSpan start,
         TimeSpan end,
         IReadOnlyList<int>? audioStreamIndices = null,
+        bool mergeAudioTracks = false,
         CancellationToken cancellationToken = default)
     {
         string source = ValidateClipPath(rootDirectory, clip.Path);
@@ -160,6 +163,7 @@ public sealed class ReplayLibrary
             start,
             end,
             audioStreamIndices,
+            mergeAudioTracks,
             cancellationToken);
         return source;
     }

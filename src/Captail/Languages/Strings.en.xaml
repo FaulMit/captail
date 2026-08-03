@@ -155,6 +155,7 @@
   <sys:String x:Key="L.Library.Play">Play / pause</sys:String>
   <sys:String x:Key="L.Library.SaveTrim">Save trimmed copy</sys:String>
   <sys:String x:Key="L.Library.Trimming">Saving clip…</sys:String>
+  <sys:String x:Key="L.Library.TrimmingMerge">Trimming and mixing audio…</sys:String>
   <sys:String x:Key="L.Library.TrimHint">Creates a new file without re-encoding. Original replay stays untouched.</sys:String>
   <sys:String x:Key="L.Library.Trimmed">Trimmed replay saved</sys:String>
   <sys:String x:Key="L.Library.VideoTrack">VIDEO</sys:String>
@@ -165,12 +166,16 @@
   <sys:String x:Key="L.Library.SystemGameTrack">System / game</sys:String>
   <sys:String x:Key="L.Library.MicrophoneTrack">Microphone</sys:String>
   <sys:String x:Key="L.Library.AudioTrackNumber">Audio {0}</sys:String>
+  <sys:String x:Key="L.Library.MergeAudio">Merge audio tracks</sys:String>
+  <sys:String x:Key="L.Library.MergeAudioSummary">One playback track</sys:String>
+  <sys:String x:Key="L.Library.MergeAudioTip">Mixes all enabled audio tracks into one. Video is copied without re-encoding; audio is re-encoded.</sys:String>
   <sys:String x:Key="L.Library.RangeSummary">Selected · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Back 5 seconds</sys:String>
   <sys:String x:Key="L.Library.Forward5">Forward 5 seconds</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Overwrite</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Overwrite original replay?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">Selected range and enabled audio tracks will replace original file. This cannot be undone.</sys:String>
+  <sys:String x:Key="L.Library.OverwriteMergeMessage">Selected range will replace original file, and all enabled audio tracks will be mixed into one. This cannot be undone.</sys:String>
 
   <sys:String x:Key="L.Hotkey.SaveReplay">Save replay</sys:String>
   <sys:String x:Key="L.Hotkey.SaveHint">Saves current buffer</sys:String>

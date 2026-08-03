@@ -11,6 +11,63 @@
         Foreground="{StaticResource TextPrimaryBrush}"
         FontFamily="{StaticResource FontUi}"
         PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <Style x:Key="EditorMergeCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="Background" Value="{StaticResource BgControlBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderControlBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="18"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="Box" Width="18" Height="18" CornerRadius="5"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <Path x:Name="Check" Visibility="Collapsed"
+                                      Data="M4 9l3 3 7-7" Stroke="#07110E"
+                                      StrokeThickness="2" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1" Margin="8,0,0,0"
+                                              VerticalAlignment="Center"/>
+                            <Border x:Name="FocusBorder" Grid.ColumnSpan="2" Margin="-4"
+                                    BorderBrush="{StaticResource AccentBrush}"
+                                    BorderThickness="1" CornerRadius="7"
+                                    Visibility="Collapsed" IsHitTestVisible="False"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush"
+                                        Value="{StaticResource TextMutedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Box" Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="FocusBorder" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Border Background="{StaticResource BgWindowGradient}"
             BorderBrush="{StaticResource WindowBorderBrush}" BorderThickness="1"
             CornerRadius="{StaticResource RadiusWindow}">
@@ -234,6 +291,19 @@
                                 Content="{DynamicResource L.Library.Overwrite}"
                                 Style="{StaticResource SubtleButton}" Padding="16,9"
                                 Click="RequestOverwrite_Click"/>
+                        <CheckBox x:Name="MergeAudioCheckBox" Margin="12,0,3,0"
+                                  Style="{StaticResource EditorMergeCheckBox}"
+                                  Visibility="Collapsed"
+                                  ToolTip="{DynamicResource L.Library.MergeAudioTip}"
+                                  ToolTipService.ShowOnDisabled="True">
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource L.Library.MergeAudio}"
+                                           FontSize="11" FontWeight="SemiBold"/>
+                                <TextBlock Text="{DynamicResource L.Library.MergeAudioSummary}"
+                                           FontSize="9.5"
+                                           Foreground="{StaticResource TextMutedBrush}"/>
+                            </StackPanel>
+                        </CheckBox>
                         <Button x:Name="SaveTrimButton" Margin="8,0,0,0"
                                 Content="{DynamicResource L.Library.SaveTrim}"
                                 Style="{StaticResource AccentButton}" Padding="18,9"
@@ -250,7 +320,8 @@
                     <StackPanel>
                         <TextBlock Text="{DynamicResource L.Library.OverwriteTitle}"
                                    FontSize="15" FontWeight="Bold"/>
-                        <TextBlock Text="{DynamicResource L.Library.OverwriteMessage}"
+                        <TextBlock x:Name="OverwriteMessageText"
+                                   Text="{DynamicResource L.Library.OverwriteMessage}"
                                    Margin="0,9,0,0" Style="{StaticResource SecondaryText}"
                                    TextWrapping="Wrap"/>
                         <TextBlock x:Name="OverwriteFileText" Margin="0,9,0,18"

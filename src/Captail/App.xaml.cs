@@ -86,6 +86,12 @@ public partial class App : Application
                     StringComparison.OrdinalIgnoreCase))
                 ?["--qa-clip-editor=".Length..];
             bool clipEditorTest = !string.IsNullOrWhiteSpace(clipEditorTestPath);
+            string? audioMixTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-audio-mix=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-audio-mix=".Length..];
+            bool audioMixTest = !string.IsNullOrWhiteSpace(audioMixTestPath);
             string? previewGeometryTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-preview-geometry=",
@@ -104,6 +110,7 @@ public partial class App : Application
             const bool replaySegmentsTest = false;
             const bool updateCheckTest = false;
             const bool clipEditorTest = false;
+            const bool audioMixTest = false;
             const bool previewGeometryTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
@@ -118,7 +125,7 @@ public partial class App : Application
                     shutdownExisting,
                     _uiOnly || faultTest || codecTest || capabilityModelTest ||
                     gameCaptureTest || replaySegmentsTest || updateCheckTest ||
-                    clipEditorTest || previewGeometryTest))
+                    clipEditorTest || audioMixTest || previewGeometryTest))
             {
                 Shutdown();
                 return;
@@ -183,6 +190,11 @@ public partial class App : Application
             if (clipEditorTest)
             {
                 await RunClipEditorTestAsync(clipEditorTestPath!);
+                return;
+            }
+            if (audioMixTest)
+            {
+                await RunAudioMixTestAsync(audioMixTestPath!);
                 return;
             }
             if (previewGeometryTest)
@@ -251,6 +263,71 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private async Task RunAudioMixTestAsync(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("QA replay does not exist.", fullPath);
+
+        string destination = Path.Combine(
+            Path.GetTempPath(),
+            $"captail_audio_mix_{Guid.NewGuid():N}{Path.GetExtension(fullPath)}");
+        try
+        {
+            var ffmpeg = new FfmpegAdapter();
+            TimeSpan duration = await ffmpeg.ReadDurationAsync(fullPath);
+            IReadOnlyList<AudioTrackInfo> sourceTracks =
+                await ffmpeg.ReadAudioTracksAsync(fullPath);
+            VideoStreamInfo? sourceVideo = await ffmpeg.ReadVideoInfoAsync(fullPath);
+            if (sourceTracks.Count < 2 || sourceVideo is null)
+                throw new InvalidOperationException(
+                    "QA replay requires video and at least two audio tracks.");
+
+            await ffmpeg.TrimCopyAsync(
+                fullPath,
+                destination,
+                TimeSpan.Zero,
+                duration,
+                sourceTracks.Select(track => track.StreamIndex).ToArray(),
+                mergeAudioTracks: true);
+
+            IReadOnlyList<AudioTrackInfo> mixedTracks =
+                await ffmpeg.ReadAudioTracksAsync(destination);
+            VideoStreamInfo? mixedVideo = await ffmpeg.ReadVideoInfoAsync(destination);
+            bool passed = mixedTracks.Count == 1 &&
+                mixedVideo is not null &&
+                mixedVideo.Codec.Equals(
+                    sourceVideo.Codec,
+                    StringComparison.OrdinalIgnoreCase) &&
+                mixedVideo.Width == sourceVideo.Width &&
+                mixedVideo.Height == sourceVideo.Height;
+            Log.Write(
+                $"AUDIO_MIX_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"sourceTracks={sourceTracks.Count}, mixedTracks={mixedTracks.Count}, " +
+                $"video={sourceVideo.Codec}/{mixedVideo?.Codec} " +
+                $"{sourceVideo.Width}x{sourceVideo.Height}/" +
+                $"{mixedVideo?.Width}x{mixedVideo?.Height}");
+            Shutdown(passed ? 0 : 16);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"AUDIO_MIX_TEST FAIL: {exception}");
+            Shutdown(16);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(destination))
+                    File.Delete(destination);
+            }
+            catch (Exception exception)
+            {
+                Log.Write($"Audio mix QA cleanup failed: {exception.Message}");
+            }
+        }
+    }
+
     private async Task RunClipEditorTestAsync(string path)
     {
         string fullPath = Path.GetFullPath(path);
@@ -373,6 +450,9 @@ public partial class App : Application
                 invalidConfig.Codec == "h264" &&
                 invalidConfig.SystemAudioVolume == 100 &&
                 invalidConfig.Hotkey == "Ctrl+Shift+F10" &&
+                ObsReplayEngine.RecommendedNvencBFrames("hevc", true) == 0 &&
+                ObsReplayEngine.RecommendedNvencBFrames("h264", true) == 2 &&
+                ObsReplayEngine.RecommendedNvencBFrames("h264", false) == 0 &&
                 invalidConfig.PipelineEquals(hotkeyOnlyChange) &&
                 !invalidConfig.PipelineEquals(pipelineChange);
             Log.Write(
