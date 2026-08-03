@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Captail — Instant Replay that tries to stay on</title>
+  <meta name="description" content="Free, open-source Instant Replay for Windows with a rolling buffer, hardware encoding, and a recovery watchdog.">
+  <meta name="theme-color" content="#0b0d0f">
+  <meta name="color-scheme" content="dark">
+  <link rel="canonical" href="https://faulmit.github.io/captail/">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/captail-main.png" as="image" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Captail">
+  <meta property="og:title" content="Captail — Instant Replay that tries to stay on">
+  <meta property="og:description" content="A focused, local Instant Replay utility for Windows with automatic capture recovery.">
+  <meta property="og:url" content="https://faulmit.github.io/captail/">
+  <meta property="og:image" content="https://faulmit.github.io/captail/assets/captail-social.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Captail logo and product promise on a dark graphite background">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Captail",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Windows 10 version 2004 or newer, Windows 11",
+    "softwareVersion": "0.1.5",
+    "description": "Free, open-source Instant Replay utility for Windows with a rolling buffer and recovery watchdog.",
+    "downloadUrl": "https://github.com/FaulMit/captail/releases/latest",
+    "codeRepository": "https://github.com/FaulMit/captail",
+    "license": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.html",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="scroll-signal" aria-hidden="true"><span></span></div>
+
+  <header class="site-header" data-header>
+    <a class="brand" href="#top" aria-label="Captail home">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="12" pathLength="100"></circle>
+        <circle class="brand-dot" cx="20" cy="20" r="2.5"></circle>
+      </svg>
+      <span>Captail</span>
+    </a>
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a href="#recovery">How it works</a>
+      <a href="#compatibility">Compatibility</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="header-source" href="https://github.com/FaulMit/captail" target="_blank" rel="noreferrer">
+      GitHub
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3h8v8M13 3 3 13"></path></svg>
+    </a>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top" aria-labelledby="hero-title">
+      <div class="hero-ambient" aria-hidden="true"></div>
+      <div class="hero-word" aria-hidden="true">CAPTAIL</div>
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="live-dot"></span> Windows replay utility · v0.1.5 preview</p>
+        <h1 id="hero-title">Instant Replay that <em>tries to stay on.</em></h1>
+        <p class="hero-lede">Captail keeps recent gameplay ready, watches its capture pipeline, and attempts recovery when recording stops or stalls.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="https://github.com/FaulMit/captail/releases/latest">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 16h14"></path></svg>
+            Download for Windows
+          </a>
+          <a class="button button-secondary" href="https://github.com/FaulMit/captail" target="_blank" rel="noreferrer">
+            View source
+          </a>
+        </div>
+        <p class="hero-proof">Free · GPL open source · Local recordings · No account</p>
+      </div>
+
+      <figure class="hero-product" data-hero-product>
+        <div class="capture-state" aria-hidden="true">
+          <span class="capture-state-dot"></span>
+          <span>REAL APPLICATION UI</span>
+          <span class="capture-state-time">V0.1.5</span>
+        </div>
+        <img src="assets/captail-main.png" width="403" height="658" alt="Captail main window showing Instant Replay status, audio sources, format, disk space, and recent replays" fetchpriority="high" decoding="async">
+      </figure>
+
+      <div class="hero-signal" aria-hidden="true">
+        <span class="signal-label">PIPELINE STATE</span>
+        <span class="signal-line"><i></i></span>
+        <span class="signal-value">VISIBLE</span>
+      </div>
+    </section>
+
+    <section class="problem section" id="problem" aria-labelledby="problem-title">
+      <div class="section-kicker" data-reveal>01 / THE MOMENT</div>
+      <div class="problem-grid">
+        <h2 id="problem-title" data-reveal>Replay failure is easy to miss.<br><span>The moment is not.</span></h2>
+        <div class="problem-copy" data-reveal>
+          <p>A game crashes. A source disappears. A graphics driver restarts. If recording stops quietly, the only warning arrives after you press Save.</p>
+          <p>Captail is built around supervision: show the real state, attempt a controlled restart, then retry instead of pretending the buffer is healthy.</p>
+          <p class="fine-print">Recovery reduces lost footage. It cannot recreate frames Windows, a game, anti-cheat software, or a failed driver never delivered.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="recovery section" id="recovery" aria-labelledby="recovery-title">
+      <div class="section-kicker" data-reveal>02 / THE RECOVERY LOOP</div>
+      <div class="section-heading">
+        <h2 id="recovery-title" data-reveal>Always checking.<br>Never claiming blindly.</h2>
+        <p data-reveal>Rolling capture and recovery are treated as one system.</p>
+      </div>
+
+      <ol class="state-track" aria-label="Captail recovery sequence">
+        <li class="state-step state-active" data-reveal>
+          <span class="state-index">01</span>
+          <strong>Buffer armed</strong>
+          <p>Compressed video and audio packets stay in RAM until you save.</p>
+        </li>
+        <li class="state-step state-break" data-reveal>
+          <span class="state-index">02</span>
+          <strong>Stall detected</strong>
+          <p>Watchdog checks for a stopped module or missing new frames.</p>
+        </li>
+        <li class="state-step state-retry" data-reveal>
+          <span class="state-index">03</span>
+          <strong>Controlled retry</strong>
+          <p>Captail restarts the pipeline, reports failure, and backs off between retries.</p>
+        </li>
+        <li class="state-step state-active" data-reveal>
+          <span class="state-index">04</span>
+          <strong>Recording again</strong>
+          <p>The interface confirms when the replay buffer is healthy again.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="capture section" id="capture" aria-labelledby="capture-title">
+      <div class="capture-media" data-reveal>
+        <img src="assets/captail-settings-video.jpg" width="404" height="720" alt="Captail video settings with Desktop source, AV1 codec, 1080p resolution, and 240 FPS selected" loading="lazy" decoding="async">
+        <div class="media-annotation annotation-source" aria-hidden="true">SOURCE / DESKTOP</div>
+        <div class="media-annotation annotation-rate" aria-hidden="true">240 FPS</div>
+      </div>
+      <div class="capture-copy">
+        <div class="section-kicker" data-reveal>03 / CAPTURE PATH</div>
+        <h2 id="capture-title" data-reveal>Desktop coverage.<br>Direct game capture.</h2>
+        <div class="mode-list">
+          <article data-reveal>
+            <span class="mode-number">A</span>
+            <div>
+              <h3>Desktop mode</h3>
+              <p>Records your selected monitor, then automatically switches to direct Game Capture when a fullscreen game appears.</p>
+            </div>
+          </article>
+          <article data-reveal>
+            <span class="mode-number">B</span>
+            <div>
+              <h3>Game Capture mode</h3>
+              <p>Waits for a fullscreen game and never records the desktop. Better when privacy outside games matters more than continuous coverage.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="codecs section" id="codecs" aria-labelledby="codecs-title">
+      <div class="section-kicker" data-reveal>04 / HARDWARE ENCODING</div>
+      <div class="section-heading codecs-heading">
+        <h2 id="codecs-title" data-reveal>Use the encoder your GPU exposes.</h2>
+        <p data-reveal>Captail detects available hardware encoders and hides unsupported codec choices.</p>
+      </div>
+      <div class="codec-strip">
+        <article data-reveal>
+          <span class="codec-order">01</span>
+          <h3>AV1</h3>
+          <p>Best compression on supported modern hardware. Newer format; check player and editor support.</p>
+        </article>
+        <article data-reveal>
+          <span class="codec-order">02</span>
+          <h3>HEVC</h3>
+          <p>Strong compression with broader modern-GPU support than AV1.</p>
+        </article>
+        <article data-reveal>
+          <span class="codec-order">03</span>
+          <h3>H.264</h3>
+          <p>Most compatible choice for playback, editing, and sharing.</p>
+        </article>
+      </div>
+      <p class="codec-footnote" data-reveal>Encoder families implemented: NVIDIA NVENC · AMD AMF · Intel Quick Sync</p>
+    </section>
+
+    <section class="controls section" id="controls" aria-labelledby="controls-title">
+      <div class="controls-copy">
+        <div class="section-kicker" data-reveal>05 / SAVE WHAT MATTERS</div>
+        <h2 id="controls-title" data-reveal>Sound intact.<br>Timing under control.</h2>
+        <ul class="feature-lines">
+          <li data-reveal><strong>15 sec–15 min</strong><span>Configurable rolling duration, with an optional RAM limit.</span></li>
+          <li data-reveal><strong>Two audio paths</strong><span>System or detected-game audio plus microphone, mixed or separated.</span></li>
+          <li data-reveal><strong>Global hotkeys</strong><span>Save with Ctrl+Shift+F10. Toggle with Ctrl+Shift+F9. Both configurable.</span></li>
+          <li data-reveal><strong>30–240 FPS</strong><span>Real requested capture rates; useful only when source and hardware sustain them.</span></li>
+        </ul>
+      </div>
+      <figure class="controls-media" data-reveal>
+        <img src="assets/captail-settings-audio.jpg" width="404" height="720" alt="Captail audio, replay storage, and hotkey settings" loading="lazy" decoding="async">
+      </figure>
+    </section>
+
+    <section class="editor section" id="editor" aria-labelledby="editor-title">
+      <div class="editor-heading">
+        <div>
+          <div class="section-kicker" data-reveal>06 / AFTER THE SAVE</div>
+          <h2 id="editor-title" data-reveal>Review. Trim. Keep the tracks you need.</h2>
+        </div>
+        <p data-reveal>Saved clips appear in Captail’s replay library. Open one to scrub, set a trim range, and keep or remove each audio track.</p>
+      </div>
+      <figure class="editor-media" data-reveal>
+        <img src="assets/captail-editor.png" width="900" height="789" alt="Captail clip editor showing game footage, trim handles, video thumbnails, and separate audio waveforms" loading="lazy" decoding="async">
+      </figure>
+    </section>
+
+    <section class="privacy section" id="privacy" aria-labelledby="privacy-title">
+      <div class="privacy-word" aria-hidden="true">LOCAL</div>
+      <div class="privacy-copy">
+        <div class="section-kicker section-kicker-dark" data-reveal>07 / PRIVACY</div>
+        <h2 id="privacy-title" data-reveal>Your replay stays yours.</h2>
+        <p data-reveal>No Captail account. No ads. No analytics or telemetry. No automatic upload. Captures, settings, thumbnails, and logs stay on your PC.</p>
+        <p class="privacy-exception" data-reveal><strong>Honest network note:</strong> GitHub builds may contact the GitHub Releases API to check for updates. An update package downloads only after you click the update control. Store builds use Microsoft Store updates.</p>
+        <a class="text-link text-link-dark" href="https://github.com/FaulMit/captail/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Read privacy policy <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+
+    <section class="comparison section" id="comparison" aria-labelledby="comparison-title">
+      <div class="section-kicker" data-reveal>08 / CHOOSE FOR THE JOB</div>
+      <div class="section-heading comparison-heading">
+        <h2 id="comparison-title" data-reveal>Focused replay, not a streaming suite.</h2>
+        <p data-reveal>Scope comparison, not a performance benchmark.</p>
+      </div>
+      <section class="table-wrap" data-reveal tabindex="0" aria-label="Captail, ShadowPlay, and OBS Replay Buffer comparison">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Workflow</th>
+              <th scope="col" class="is-captail">Captail</th>
+              <th scope="col">ShadowPlay</th>
+              <th scope="col">OBS Replay Buffer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Primary shape</th>
+              <td class="is-captail">Single-purpose replay utility</td>
+              <td>NVIDIA capture overlay</td>
+              <td>Recording and streaming studio</td>
+            </tr>
+            <tr>
+              <th scope="row">Capture setup</th>
+              <td class="is-captail">Desktop auto-switch or game-only</td>
+              <td>Instant Replay through NVIDIA overlay</td>
+              <td>Configure scene, source, output, and save hotkey</td>
+            </tr>
+            <tr>
+              <th scope="row">Recovery promise</th>
+              <td class="is-captail">Explicit watchdog, visible state, retries</td>
+              <td>Not evaluated here</td>
+              <td>Not evaluated here</td>
+            </tr>
+            <tr>
+              <th scope="row">Best fit</th>
+              <td class="is-captail">Leave replay armed in tray</td>
+              <td>Use NVIDIA’s integrated capture tools</td>
+              <td>Build scenes or combine replay with production tools</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+      <p class="comparison-sources">Sources: <a href="https://github.com/FaulMit/captail#how-is-captail-different-from-shadowplay-and-obs-replay-buffer" target="_blank" rel="noreferrer">Captail README</a> · <a href="https://www.nvidia.com/en-us/software/nvidia-app/" target="_blank" rel="noreferrer">NVIDIA App</a> · <a href="https://obsproject.com/kb/obs-studio-overview" target="_blank" rel="noreferrer">OBS overview</a> · Captail is not affiliated with NVIDIA or OBS Project.</p>
+    </section>
+
+    <section class="compatibility section" id="compatibility" aria-labelledby="compatibility-title">
+      <div class="compatibility-main">
+        <div class="section-kicker" data-reveal>09 / HARDWARE TRUTH</div>
+        <h2 id="compatibility-title" data-reveal>Early preview.<br>Tested scope stated plainly.</h2>
+        <dl class="hardware-list" data-reveal>
+          <div><dt>Windows</dt><dd>10 version 2004+ or 11 · x64</dd></div>
+          <div><dt>RTX 40 / 50</dt><dd><span class="status tested">Tested</span></dd></div>
+          <div><dt>Older NVIDIA</dt><dd><span class="status pending">Needs public testing</span></dd></div>
+          <div><dt>AMD / Intel</dt><dd><span class="status pending">Detection implemented · testing needed</span></dd></div>
+        </dl>
+      </div>
+      <aside class="limitations" aria-labelledby="limitations-title" data-reveal>
+        <span class="warning-mark" aria-hidden="true">!</span>
+        <h3 id="limitations-title">Know before installing</h3>
+        <ul>
+          <li>GitHub release binaries are not Authenticode-signed. SmartScreen may show “Unknown publisher.”</li>
+          <li>Some games or anti-cheat configurations may block Game Capture.</li>
+          <li>DRM-protected regions may appear black. Captail does not bypass DRM.</li>
+          <li>Desktop capture cannot create unique frames beyond the desktop presentation rate.</li>
+        </ul>
+        <p>Verify downloads with <code>SHA256SUMS.txt</code> and GitHub build provenance.</p>
+      </aside>
+    </section>
+
+    <section class="quickstart section" id="quickstart" aria-labelledby="quickstart-title">
+      <div class="section-kicker" data-reveal>10 / QUICK START</div>
+      <h2 id="quickstart-title" data-reveal>Three steps. Then leave it armed.</h2>
+      <ol class="quickstart-list">
+        <li data-reveal>
+          <span>01</span>
+          <div><h3>Download</h3><p>Choose Setup for normal installation or Portable for a self-contained folder.</p></div>
+        </li>
+        <li data-reveal>
+          <span>02</span>
+          <div><h3>Choose capture</h3><p>Select Desktop or Game Capture, then set duration, codec, FPS, and audio.</p></div>
+        </li>
+        <li data-reveal>
+          <span>03</span>
+          <div><h3>Save the moment</h3><p>Leave Instant Replay enabled. Press Ctrl+Shift+F10 when something happens.</p></div>
+        </li>
+      </ol>
+    </section>
+
+    <section class="faq section" id="faq" aria-labelledby="faq-title">
+      <div class="faq-heading">
+        <div class="section-kicker" data-reveal>11 / FAQ</div>
+        <h2 id="faq-title" data-reveal>Before you press download.</h2>
+      </div>
+      <div class="faq-list">
+        <details data-reveal>
+          <summary>Is Captail a full OBS Studio replacement?</summary>
+          <p>No. Captail uses libobs, but deliberately omits scenes, streaming, transitions, and plugin management. It is focused on Instant Replay.</p>
+        </details>
+        <details data-reveal>
+          <summary>Which download should I choose?</summary>
+          <p>Use the Setup EXE for a normal per-user Windows installation and uninstaller. Use Portable ZIP when you want a movable folder; extract the entire archive before launching Captail.exe.</p>
+        </details>
+        <details data-reveal>
+          <summary>Does Captail upload clips or use telemetry?</summary>
+          <p>No. Captail has no cloud clip service, account, analytics, advertising, telemetry, or automatic upload. Non-Store builds may contact GitHub for update checks.</p>
+        </details>
+        <details data-reveal>
+          <summary>Will it work on AMD or Intel graphics?</summary>
+          <p>AMD AMF and Intel Quick Sync capability detection is implemented, but those GPU families still need broader public hardware testing. RTX 40 and RTX 50 series are currently tested.</p>
+        </details>
+        <details data-reveal>
+          <summary>Why does Windows show an unknown-publisher warning?</summary>
+          <p>GitHub release binaries are not Authenticode-signed yet. Verify the package against SHA256SUMS.txt and GitHub build provenance before running it.</p>
+        </details>
+        <details data-reveal>
+          <summary>Can recovery guarantee every replay?</summary>
+          <p>No. Captail can detect some stopped or stalled pipeline states and attempt recovery. It cannot recreate frames never delivered by Windows, the game, anti-cheat software, or a failed graphics driver.</p>
+        </details>
+        <details data-reveal>
+          <summary>I am on Captail 0.1.3 or 0.1.4. How do I update?</summary>
+          <p>Download and run the 0.1.5 Setup EXE manually once. Those two versions contain a Windows file-lock bug in their updater. In-app updates work normally starting with 0.1.5.</p>
+        </details>
+      </div>
+    </section>
+
+    <section class="final-cta" aria-labelledby="final-title">
+      <div class="final-ring" aria-hidden="true"><i></i></div>
+      <div class="final-content">
+        <p class="eyebrow"><span class="live-dot"></span> Free · Open source · Windows</p>
+        <h2 id="final-title">Keep the last moment within reach.</h2>
+        <p>Download Captail’s latest early-preview release from GitHub.</p>
+        <div class="hero-actions final-actions">
+          <a class="button button-primary" href="https://github.com/FaulMit/captail/releases/latest">Download latest release</a>
+          <a class="button button-secondary" href="https://github.com/FaulMit/captail" target="_blank" rel="noreferrer">View source</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+        <circle cx="20" cy="20" r="12" pathLength="100"></circle>
+        <circle class="brand-dot" cx="20" cy="20" r="2.5"></circle>
+      </svg>
+      <div><strong>Captail</strong><span>Instant Replay that tries to stay on.</span></div>
+    </div>
+    <nav aria-label="Project links">
+      <a href="https://github.com/FaulMit/captail/releases/latest">Releases</a>
+      <a href="https://github.com/FaulMit/captail/issues">Issues</a>
+      <a href="https://github.com/FaulMit/captail/blob/main/CONTRIBUTING.md">Contribute</a>
+      <a href="https://github.com/FaulMit/captail/blob/main/PRIVACY.md">Privacy</a>
+      <a href="https://github.com/FaulMit/captail/blob/main/LICENSE">GPL-2.0-or-later</a>
+    </nav>
+    <p>Not affiliated with or endorsed by NVIDIA or OBS Project.</p>
+  </footer>
+
+  <script src="script.js" defer></script>
+</body>
+</html>

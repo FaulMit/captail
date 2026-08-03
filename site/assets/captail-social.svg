@@ -1,0 +1,33 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B0D0F"/>
+      <stop offset="1" stop-color="#151C1E"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0" cy="0" r="1" gradientTransform="translate(930 300) rotate(90) scale(430)">
+      <stop stop-color="#63E0BD" stop-opacity=".18"/>
+      <stop offset="1" stop-color="#63E0BD" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="24" stdDeviation="24" flood-color="#000" flood-opacity=".55"/>
+    </filter>
+    <clipPath id="screen"><rect x="850" y="54" width="300" height="522" rx="16"/></clipPath>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#halo)"/>
+  <path d="M0 72H1200M0 558H1200" stroke="#263034"/>
+  <circle cx="74" cy="72" r="20" stroke="#63E0BD" stroke-width="6" stroke-linecap="round" stroke-dasharray="92 34" transform="rotate(-55 74 72)"/>
+  <circle cx="74" cy="72" r="4" fill="#63E0BD"/>
+  <text x="112" y="83" fill="#E7ECEA" font-family="Segoe UI, sans-serif" font-size="32" font-weight="700">Captail</text>
+  <text x="72" y="225" fill="#E7ECEA" font-family="Segoe UI, sans-serif" font-size="72" font-weight="700" letter-spacing="-4">Instant Replay that</text>
+  <text x="72" y="305" fill="#63E0BD" font-family="Segoe UI, sans-serif" font-size="72" font-weight="650" letter-spacing="-4">tries to stay on.</text>
+  <text x="76" y="366" fill="#A6B0B2" font-family="Segoe UI, sans-serif" font-size="24">Free · Open source · Local · Windows</text>
+  <text x="76" y="508" fill="#63E0BD" font-family="Cascadia Mono, Consolas, monospace" font-size="15" letter-spacing="2">ROLLING BUFFER / RECOVERY WATCHDOG</text>
+  <path d="M75 536H744" stroke="#2B363A"/>
+  <path d="M75 536H346" stroke="#63E0BD" stroke-width="3"/>
+  <g filter="url(#shadow)" clip-path="url(#screen)">
+    <rect x="850" y="54" width="300" height="522" rx="16" fill="#141719"/>
+    <image href="captail-main.png" x="850" y="54" width="300" height="490" preserveAspectRatio="xMidYMin slice"/>
+  </g>
+  <rect x="850" y="54" width="300" height="522" rx="16" stroke="#30413F"/>
+</svg>

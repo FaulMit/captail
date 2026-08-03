@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="572" height="112" viewBox="0 0 572 112" role="img" aria-labelledby="title desc">
+  <title id="title">Download Captail for Windows</title>
+  <desc id="desc">Mint download button linking to the latest Captail release.</desc>
+  <rect x="2" y="2" width="568" height="108" rx="20" fill="#65d9bd" stroke="#8be8d1" stroke-width="4"/>
+  <path d="M65 29v34m0 0 13-13M65 63 52 50M47 76h36" fill="none" stroke="#0b1113" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="108" y="51" fill="#0b1113" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Download for Windows</text>
+  <text x="108" y="79" fill="#263c39" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Latest release</text>
+  <path d="M519 41l14 15-14 15M502 56h30" fill="none" stroke="#0b1113" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -16,6 +16,7 @@ native/**/build/
 
 # Test and diagnostic output
 .qa/
+output/
 TestResults/
 *.pdb
 *.log
