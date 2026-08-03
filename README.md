@@ -266,6 +266,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Release maint
 
 Captail is licensed under [GNU GPL-2.0-or-later](LICENSE).
 
+Privacy details are documented in [PRIVACY.md](PRIVACY.md).
+
 Captail uses libobs and selected OBS Studio runtime components. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Captail is not affiliated with or endorsed by NVIDIA or OBS Project. NVIDIA and ShadowPlay are trademarks of NVIDIA Corporation.

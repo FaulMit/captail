@@ -24,6 +24,8 @@
   <sys:String x:Key="L.Update.CheckFailedTip">Could not check for updates · click to retry</sys:String>
   <sys:String x:Key="L.Update.CheckFailedTitle">Update check failed</sys:String>
   <sys:String x:Key="L.Update.InstallFailedTitle">Update failed</sys:String>
+  <sys:String x:Key="L.Update.StoreManaged">v{0} · Microsoft Store</sys:String>
+  <sys:String x:Key="L.Update.StoreManagedTip">Updates are delivered by Microsoft Store</sys:String>
 
   <sys:String x:Key="L.Status.Enabled">Instant Replay is on</sys:String>
   <sys:String x:Key="L.Status.Disabled">Instant Replay is off</sys:String>
@@ -195,6 +197,7 @@
   <sys:String x:Key="L.Error.CodecTitle">Codec unavailable</sys:String>
   <sys:String x:Key="L.Error.CodecMessage">Choose a codec supported by current GPU and driver.</sys:String>
   <sys:String x:Key="L.Error.AutostartTitle">Could not update startup</sys:String>
+  <sys:String x:Key="L.Error.AutostartDenied">Windows did not allow Captail to start automatically. Check Startup apps in Windows Settings.</sys:String>
   <sys:String x:Key="L.Error.AudioSourceTitle">Audio source unavailable</sys:String>
   <sys:String x:Key="L.Error.AudioSourceMessage">Change cancelled. Previous audio configuration restored.</sys:String>
   <sys:String x:Key="L.Error.SourceTitle">Could not change source</sys:String>

@@ -76,3 +76,18 @@ Output is written to `artifacts\release\0.1.1`.
 - Major: breaking change (`0.x` → `1.0.0`)
 
 Never replace published binaries under an existing tag. Publish a new version.
+
+## Microsoft Store release
+
+Microsoft Store is a separate package channel. It must not be attached to a
+GitHub Release because Store installs, signs, and updates the package.
+
+Build an upload-ready package locally:
+
+```powershell
+.\tools\BuildStorePackage.ps1 -Version 0.1.5
+```
+
+Upload `artifacts\store\0.1.5\Captail-0.1.5.0-x64.msixupload` in Partner
+Center. Full identity, validation, update-channel, and submission instructions
+are in [`packaging/msix/README.md`](../packaging/msix/README.md).

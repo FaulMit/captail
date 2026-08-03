@@ -1,15 +1,25 @@
 using Microsoft.Win32;
+using Windows.ApplicationModel;
 
 namespace Captail;
 
-/// <summary>Per-user startup through HKCU\...\Run; administrator rights are not required.</summary>
+/// <summary>Per-user startup through MSIX StartupTask or HKCU Run.</summary>
 public static class Autostart
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "Captail";
+    private const string StoreTaskId = "CaptailStartup";
 
-    public static bool IsEnabled()
+    public static async Task<bool> IsEnabledAsync()
     {
+        if (AppDistribution.IsMicrosoftStore)
+        {
+            StartupTask task = await StartupTask.GetAsync(StoreTaskId);
+            return task.State is
+                StartupTaskState.Enabled or
+                StartupTaskState.EnabledByPolicy;
+        }
+
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
         return string.Equals(
             ReadCommand(key),
@@ -19,12 +29,44 @@ public static class Autostart
 
     internal static bool HasEntry()
     {
+        if (AppDistribution.IsMicrosoftStore)
+            return false;
+
         using var key = Registry.CurrentUser.OpenSubKey(RunKey);
         return !string.IsNullOrWhiteSpace(ReadCommand(key));
     }
 
-    public static void SetEnabled(bool enabled)
+    public static async Task SetEnabledAsync(bool enabled)
     {
+        if (AppDistribution.IsMicrosoftStore)
+        {
+            StartupTask task = await StartupTask.GetAsync(StoreTaskId);
+            if (!enabled)
+            {
+                if (task.State is
+                    StartupTaskState.Enabled or
+                    StartupTaskState.EnabledByPolicy)
+                {
+                    task.Disable();
+                }
+                return;
+            }
+
+            StartupTaskState state = task.State is
+                StartupTaskState.Enabled or
+                StartupTaskState.EnabledByPolicy
+                    ? task.State
+                    : await task.RequestEnableAsync();
+            if (state is not
+                (StartupTaskState.Enabled or
+                 StartupTaskState.EnabledByPolicy))
+            {
+                throw new InvalidOperationException(
+                    Localization.Text("L.Error.AutostartDenied"));
+            }
+            return;
+        }
+
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
         if (enabled)
         {
