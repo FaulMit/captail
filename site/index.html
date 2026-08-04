@@ -30,9 +30,9 @@
     "name": "Captail",
     "applicationCategory": "UtilitiesApplication",
     "operatingSystem": "Windows 10 version 2004 or newer, Windows 11",
-    "softwareVersion": "0.1.5",
+    "softwareVersion": "0.1.6",
     "description": "Free, open-source Instant Replay utility for Windows with a rolling buffer and recovery watchdog.",
-    "downloadUrl": "https://github.com/FaulMit/captail/releases/latest",
+    "downloadUrl": "https://github.com/FaulMit/captail/releases/download/v0.1.6/Captail-0.1.6-Setup-win-x64.exe",
     "codeRepository": "https://github.com/FaulMit/captail",
     "license": "https://www.gnu.org/licenses/old-licenses/gpl-2.0.html",
     "offers": {
@@ -71,14 +71,14 @@
       <div class="hero-ambient" aria-hidden="true"></div>
       <div class="hero-word" aria-hidden="true">CAPTAIL</div>
       <div class="hero-copy">
-        <p class="eyebrow"><span class="live-dot"></span> Windows replay utility · v0.1.5 preview</p>
+        <p class="eyebrow"><span class="live-dot"></span> Windows replay utility · <span data-current-version>v0.1.6</span> preview</p>
         <h1 id="hero-title">Instant Replay that <em>tries to stay on.</em></h1>
         <p class="hero-lede">Captail keeps recent gameplay ready, watches its capture pipeline, and attempts recovery when recording stops or stalls.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="https://github.com/FaulMit/captail/releases/latest">
+          <button class="button button-primary" type="button" data-download-trigger>
             <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2v10m0 0 4-4m-4 4L6 8M3 16h14"></path></svg>
             Download for Windows
-          </a>
+          </button>
           <a class="button button-secondary" href="https://github.com/FaulMit/captail" target="_blank" rel="noreferrer">
             View source
           </a>
@@ -90,7 +90,7 @@
         <div class="capture-state" aria-hidden="true">
           <span class="capture-state-dot"></span>
           <span>REAL APPLICATION UI</span>
-          <span class="capture-state-time">V0.1.5</span>
+          <span class="capture-state-time" data-current-version>V0.1.6</span>
         </div>
         <img src="assets/captail-main.png" width="403" height="658" alt="Captail main window showing Instant Replay status, audio sources, format, disk space, and recent replays" fetchpriority="high" decoding="async">
       </figure>
@@ -146,11 +146,6 @@
     </section>
 
     <section class="capture section" id="capture" aria-labelledby="capture-title">
-      <div class="capture-media" data-reveal>
-        <img src="assets/captail-settings-video.jpg" width="404" height="720" alt="Captail video settings with Desktop source, AV1 codec, 1080p resolution, and 240 FPS selected" loading="lazy" decoding="async">
-        <div class="media-annotation annotation-source" aria-hidden="true">SOURCE / DESKTOP</div>
-        <div class="media-annotation annotation-rate" aria-hidden="true">240 FPS</div>
-      </div>
       <div class="capture-copy">
         <div class="section-kicker" data-reveal>03 / CAPTURE PATH</div>
         <h2 id="capture-title" data-reveal>Desktop coverage.<br>Direct game capture.</h2>
@@ -170,6 +165,11 @@
             </div>
           </article>
         </div>
+      </div>
+      <div class="capture-media" data-reveal>
+        <img src="assets/captail-settings-video.jpg" width="404" height="720" alt="Captail video settings with Desktop source, AV1 codec, 1080p resolution, and 240 FPS selected" loading="lazy" decoding="async">
+        <div class="media-annotation annotation-source" aria-hidden="true">SOURCE / DESKTOP</div>
+        <div class="media-annotation annotation-rate" aria-hidden="true">240 FPS</div>
       </div>
     </section>
 
@@ -224,7 +224,7 @@
         <p data-reveal>Saved clips appear in Captail’s replay library. Open one to scrub, set a trim range, and keep or remove each audio track.</p>
       </div>
       <figure class="editor-media" data-reveal>
-        <img src="assets/captail-editor.png" width="900" height="789" alt="Captail clip editor showing game footage, trim handles, video thumbnails, and separate audio waveforms" loading="lazy" decoding="async">
+        <img src="assets/captail-editor.png" width="898" height="789" alt="Captail clip editor showing game footage, trim handles, video thumbnails, and separate audio waveforms" loading="lazy" decoding="async">
       </figure>
     </section>
 
@@ -373,12 +373,43 @@
         <h2 id="final-title">Keep the last moment within reach.</h2>
         <p>Download Captail’s latest early-preview release from GitHub.</p>
         <div class="hero-actions final-actions">
-          <a class="button button-primary" href="https://github.com/FaulMit/captail/releases/latest">Download latest release</a>
+          <button class="button button-primary" type="button" data-download-trigger>Download latest release</button>
           <a class="button button-secondary" href="https://github.com/FaulMit/captail" target="_blank" rel="noreferrer">View source</a>
         </div>
       </div>
     </section>
   </main>
+
+  <dialog class="download-dialog" data-download-dialog aria-labelledby="download-title">
+    <div class="download-panel">
+      <button class="download-close" type="button" data-download-close aria-label="Close download options">×</button>
+      <p class="eyebrow"><span class="live-dot"></span> Windows x64 · Early preview</p>
+      <h2 id="download-title">Choose your build.</h2>
+      <p class="download-status" data-download-status aria-live="polite">Latest GitHub preview · v0.1.6</p>
+
+      <div class="download-options">
+        <a class="download-option" data-download-setup href="https://github.com/FaulMit/captail/releases/download/v0.1.6/Captail-0.1.6-Setup-win-x64.exe">
+          <span class="download-format">.EXE</span>
+          <span>
+            <strong>Setup</strong>
+            <small>Normal per-user installation with updater and uninstaller.</small>
+          </span>
+          <span class="download-recommendation">Recommended</span>
+        </a>
+        <a class="download-option" data-download-portable href="https://github.com/FaulMit/captail/releases/download/v0.1.6/Captail-0.1.6-Portable-win-x64.zip">
+          <span class="download-format">.ZIP</span>
+          <span>
+            <strong>Portable</strong>
+            <small>Self-contained folder. Extract the entire archive before use.</small>
+          </span>
+          <span class="download-arrow" aria-hidden="true">↓</span>
+        </a>
+      </div>
+
+      <p class="download-note">Unsigned preview. Windows may show “Unknown publisher.”</p>
+      <a class="download-release-link" data-download-release href="https://github.com/FaulMit/captail/releases/tag/v0.1.6" target="_blank" rel="noreferrer">Release notes, checksums, and provenance <span aria-hidden="true">↗</span></a>
+    </div>
+  </dialog>
 
   <footer class="site-footer">
     <div class="footer-brand">
@@ -389,7 +420,7 @@
       <div><strong>Captail</strong><span>Instant Replay that tries to stay on.</span></div>
     </div>
     <nav aria-label="Project links">
-      <a href="https://github.com/FaulMit/captail/releases/latest">Releases</a>
+      <a href="https://github.com/FaulMit/captail/releases">Releases</a>
       <a href="https://github.com/FaulMit/captail/issues">Issues</a>
       <a href="https://github.com/FaulMit/captail/blob/main/CONTRIBUTING.md">Contribute</a>
       <a href="https://github.com/FaulMit/captail/blob/main/PRIVACY.md">Privacy</a>
