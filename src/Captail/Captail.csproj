@@ -14,13 +14,15 @@
     <Product>Captail</Product>
     <RootNamespace>Captail</RootNamespace>
     <ApplicationIcon>Assets\Captail.ico</ApplicationIcon>
-    <Version>0.1.6</Version>
+    <Version>0.1.7</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <DefineConstants Condition="'$(MicrosoftStoreBuild)' == 'true'">$(DefineConstants);MICROSOFT_STORE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.3.0" />
+    <PackageReference Include="Endpne.LibMPV.Windows" Version="0.41.0"
+                      GeneratePathProperty="true" />
     <!-- 2.4.x currently publishes .NET Framework-only assets; keep last
          compatible modern-WPF build until upstream restores net targets. -->
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.1.4" />
@@ -49,7 +51,18 @@
     <AcquireFfmpegRuntimeOnBuild Condition="'$(AcquireFfmpegRuntimeOnBuild)' == ''">true</AcquireFfmpegRuntimeOnBuild>
     <ObsBridgeSource>$(MSBuildProjectDirectory)\..\..\native\ObsBridge</ObsBridgeSource>
     <ObsBridgeBuild>$(ObsBridgeSource)\build</ObsBridgeBuild>
+    <MpvWindowsX64Enabled>false</MpvWindowsX64Enabled>
+    <MpvWindowsArm64Enabled>false</MpvWindowsArm64Enabled>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="$(PkgEndpne_LibMPV_Windows)\build\x64\libmpv-2.dll"
+             Link="libmpv-2.dll">
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
 
   <Target Name="AcquireObsRuntime"
           BeforeTargets="PrepareForBuild"
@@ -67,22 +80,26 @@
           AfterTargets="Build"
           DependsOnTargets="AcquireFfmpegRuntime">
     <ItemGroup>
-      <_FfmpegBuildFile Include="$(FfmpegRuntimeRoot)\**\*" />
+      <_FfmpegBuildFile Include="$(FfmpegRuntimeRoot)\**\*"
+                        Exclude="$(FfmpegRuntimeRoot)\ffplay.exe" />
     </ItemGroup>
     <Copy SourceFiles="@(_FfmpegBuildFile)"
           DestinationFiles="@(_FfmpegBuildFile->'$(OutDir)ffmpeg\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+    <Delete Files="$(OutDir)ffmpeg\ffplay.exe" />
   </Target>
 
   <Target Name="CopyFfmpegRuntimeToPublish"
           AfterTargets="Publish"
           DependsOnTargets="AcquireFfmpegRuntime">
     <ItemGroup>
-      <_FfmpegPublishFile Include="$(FfmpegRuntimeRoot)\**\*" />
+      <_FfmpegPublishFile Include="$(FfmpegRuntimeRoot)\**\*"
+                          Exclude="$(FfmpegRuntimeRoot)\ffplay.exe" />
     </ItemGroup>
     <Copy SourceFiles="@(_FfmpegPublishFile)"
           DestinationFiles="@(_FfmpegPublishFile->'$(PublishDir)ffmpeg\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+    <Delete Files="$(PublishDir)ffmpeg\ffplay.exe" />
   </Target>
 
   <Target Name="BuildObsBridge" BeforeTargets="Build">

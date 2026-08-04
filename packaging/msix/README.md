@@ -11,7 +11,10 @@ Windows reports package identity.
 - Publisher: `CN=1BD9448E-C83F-401D-B530-ED5258C6319A`
 - Publisher display name: `faulmit`
 - Package family name: `faulmit.Captail_ryepxmzt2jqew`
+- Package SID: `S-1-15-2-2570374564-3604720510-221884595-2273346317-2344629589-1903721979-2982860682`
 - Store product ID: `9PKVNVLKPTPS`
+- Store protocol link: `ms-windows-store://pdp/?productid=9PKVNVLKPTPS`
+- Store web listing: <https://apps.microsoft.com/detail/9PKVNVLKPTPS>
 
 Do not change package name or publisher. Partner Center rejects packages whose
 manifest identity does not match the reserved product.
@@ -21,15 +24,15 @@ manifest identity does not match the reserved product.
 From repository root:
 
 ```powershell
-.\tools\BuildStorePackage.ps1 -Version 0.1.5
+.\tools\BuildStorePackage.ps1 -Version 0.1.7
 ```
 
 Output:
 
 ```text
-artifacts\store\0.1.5\Captail-0.1.5.0-x64.msix
-artifacts\store\0.1.5\Captail-0.1.5.0-x64.msixupload
-artifacts\store\0.1.5\SHA256SUMS.txt
+artifacts\store\0.1.7\Captail-0.1.7.0-x64.msix
+artifacts\store\0.1.7\Captail-0.1.7.0-x64.msixupload
+artifacts\store\0.1.7\SHA256SUMS.txt
 ```
 
 Upload `.msixupload` on Partner Center's **Packages** page. Do not publish this
@@ -43,8 +46,8 @@ certification.
 
 ## Versioning
 
-MSIX requires four numeric components. Captail `0.1.5` becomes package version
-`0.1.5.0`. Every Store submission must use a strictly higher package version.
+MSIX requires four numeric components. Captail `0.1.7` becomes package version
+`0.1.7.0`. Every Store submission must use a strictly higher package version.
 Never reuse a version already submitted to Partner Center.
 
 ## Store-specific behavior

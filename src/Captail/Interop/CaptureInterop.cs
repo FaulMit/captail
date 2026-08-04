@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Captail.Interop;
@@ -22,6 +24,14 @@ internal static class CaptureInterop
         uint deviceNumber,
         ref DisplayDevice displayDevice,
         uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(
+        nint window,
+        out uint processId);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
@@ -107,6 +117,23 @@ internal static class CaptureInterop
             return true;
         }, 0);
         return monitors;
+    }
+
+    public static string ForegroundExecutable()
+    {
+        nint window = GetForegroundWindow();
+        if (window == 0 || GetWindowThreadProcessId(window, out uint processId) == 0)
+            return "";
+        try
+        {
+            using Process process = Process.GetProcessById((int)processId);
+            return process.ProcessName + ".exe";
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+            return "";
+        }
     }
 
 }

@@ -12,7 +12,21 @@ namespace Captail;
 public sealed class ObsReplayEngine : IDisposable
 {
     private const string RequiredObsVersion = "32.1.2";
+    private const int AutomaticHookStableChecks = 2;
     private static readonly string[] CapabilityCodecNames = ["h264", "hevc", "av1"];
+    private static readonly HashSet<string> AutomaticCaptureRejectedProcesses = new(
+        [
+            "applicationframehost", "brave", "captail", "chrome", "discord",
+            "discordcanary", "discordptb", "dwm", "eadesktop", "epicgameslauncher",
+            "explorer", "firefox", "galaxyclient", "lockapp", "livelywpf",
+            "mediaplayer", "mpv", "ms-teams", "msedge", "nvcontainer", "obs32",
+            "obs64", "opera", "opera_gx", "searchapp", "searchhost",
+            "shellexperiencehost", "signal", "slack", "spotify", "startmenuexperiencehost",
+            "steam", "steamwebhelper", "systemsettings", "telegram", "textinputhost",
+            "ubisoftconnect", "vivaldi", "vlc", "wallpaper32", "wallpaper64",
+            "wallpaper_engine", "webviewhost", "whatsapp", "wmplayer", "zoom",
+        ],
+        StringComparer.OrdinalIgnoreCase);
     private static readonly string[] DiagnosticEffectNames =
     [
         "default.effect", "opaque.effect", "solid.effect",
@@ -51,6 +65,9 @@ public sealed class ObsReplayEngine : IDisposable
     private bool _automaticGameActive;
     private bool _automaticGameSourceShowing;
     private string _activeGameExecutable = "";
+    private string _pendingAutomaticGameExecutable = "";
+    private int _automaticHookStableChecks;
+    private string _lastRejectedAutomaticExecutable = "";
 
     public event Action<string>? Faulted;
 
@@ -102,6 +119,24 @@ public sealed class ObsReplayEngine : IDisposable
             "hooked");
 
     public string ActiveGameExecutable => _activeGameExecutable;
+
+    internal static bool IsAutomaticCaptureCandidate(string executable)
+    {
+        string processName = Path.GetFileNameWithoutExtension(executable.Trim());
+        return processName.Length > 0 &&
+               !AutomaticCaptureRejectedProcesses.Contains(processName);
+    }
+
+    internal static bool ShouldUseAutomaticGameCapture(
+        string hookedExecutable,
+        string foregroundExecutable,
+        bool hasVideo) =>
+        hasVideo &&
+        IsAutomaticCaptureCandidate(hookedExecutable) &&
+        string.Equals(
+            Path.GetFileNameWithoutExtension(hookedExecutable),
+            Path.GetFileNameWithoutExtension(foregroundExecutable),
+            StringComparison.OrdinalIgnoreCase);
 
     public bool IsHealthy
     {
@@ -173,24 +208,83 @@ public sealed class ObsReplayEngine : IDisposable
         if (_desktopVideoSource == 0)
             return false;
 
-        if (hooked == _automaticGameActive)
+        bool processCandidate = hooked &&
+                                IsAutomaticCaptureCandidate(executable);
+        bool hasVideo = hooked &&
+                        ObsNative.obs_source_get_width(_gameVideoSource) > 0 &&
+                        ObsNative.obs_source_get_height(_gameVideoSource) > 0;
+        string foregroundExecutable = CaptureInterop.ForegroundExecutable();
+        bool candidate = ShouldUseAutomaticGameCapture(
+            executable,
+            foregroundExecutable,
+            hasVideo);
+        if (!candidate)
         {
-            if (hooked && !string.IsNullOrWhiteSpace(executable))
-                _activeGameExecutable = executable;
+            ResetPendingAutomaticHook();
+            if (!hooked)
+                _lastRejectedAutomaticExecutable = "";
+            if (hooked && !processCandidate &&
+                !string.Equals(
+                    _lastRejectedAutomaticExecutable,
+                    executable,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _lastRejectedAutomaticExecutable = executable;
+                Log.Write(
+                    $"Automatic Game Capture ignored non-game process: " +
+                    $"{Path.GetFileName(executable)}");
+            }
+            if (_automaticGameActive)
+                return SwitchAutomaticCapture(useGame: false, executable: "");
             return false;
         }
 
-        nint target = hooked ? _gameVideoSource : _desktopVideoSource;
+        _lastRejectedAutomaticExecutable = "";
+        if (_automaticGameActive)
+        {
+            _activeGameExecutable = executable;
+            return false;
+        }
+
+        if (!string.Equals(
+                _pendingAutomaticGameExecutable,
+                executable,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _pendingAutomaticGameExecutable = executable;
+            _automaticHookStableChecks = 1;
+            return false;
+        }
+        _automaticHookStableChecks++;
+        if (_automaticHookStableChecks < AutomaticHookStableChecks)
+            return false;
+
+        ResetPendingAutomaticHook();
+        return SwitchAutomaticCapture(useGame: true, executable);
+    }
+
+    private bool SwitchAutomaticCapture(bool useGame, string executable)
+    {
+        if (useGame == _automaticGameActive)
+            return false;
+
+        nint target = useGame ? _gameVideoSource : _desktopVideoSource;
         ObsNative.obs_set_output_source(0, target);
         _videoSource = target;
-        _automaticGameActive = hooked;
-        _activeGameExecutable = hooked ? executable : "";
+        _automaticGameActive = useGame;
+        _activeGameExecutable = useGame ? executable : "";
         Log.Write(
-            hooked
+            useGame
                 ? $"Automatic capture switched to Game Capture: " +
                   $"{Path.GetFileName(_activeGameExecutable)}"
                 : "Automatic capture returned to Desktop Capture.");
         return true;
+    }
+
+    private void ResetPendingAutomaticHook()
+    {
+        _pendingAutomaticGameExecutable = "";
+        _automaticHookStableChecks = 0;
     }
 
     public ObsReplayEngine(Config config)
@@ -427,6 +521,13 @@ public sealed class ObsReplayEngine : IDisposable
         ObsNative.obs_add_data_path(
             ToObsPath(Path.Combine(dataRoot, "libobs")) + "/");
 
+        // OBS injects graphics-hook*.dll into captured games. Windows can keep
+        // that image mapped until the game exits, even after OBS shuts down.
+        // Serve plugin data from a user cache so games never lock Captail's
+        // installation or portable directory.
+        string pluginDataRoot = ObsPluginDataCache.Prepare(dataRoot);
+        Log.Write($"OBS plugin data cache ready: {pluginDataRoot}");
+
         List<CaptureInterop.MonitorInfo> monitors = CaptureInterop.EnumerateMonitors();
         CaptureInterop.MonitorInfo monitor =
             _config.MonitorIndex >= 0 && _config.MonitorIndex < monitors.Count
@@ -492,7 +593,7 @@ public sealed class ObsReplayEngine : IDisposable
 
         ObsNative.obs_add_module_path(
             ToObsPath(Path.Combine(baseDirectory, "obs-plugins", "64bit")),
-            ToObsPath(Path.Combine(dataRoot, "obs-plugins", "%module%")));
+            ToObsPath(Path.Combine(pluginDataRoot, "obs-plugins", "%module%")));
         ObsNative.obs_load_all_modules();
         ObsNative.obs_post_load_modules();
     }

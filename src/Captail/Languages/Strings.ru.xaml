@@ -139,7 +139,9 @@
   <sys:String x:Key="L.Storage.OrganizeByGameHint">Найденные игры сохраняются в свои папки. Повторы, сохранённые во время записи рабочего стола, остаются в основной папке.</sys:String>
 
   <sys:String x:Key="L.Library.Recent">ПОСЛЕДНИЕ ПОВТОРЫ</sys:String>
-  <sys:String x:Key="L.Library.Empty">Сохранённые повторы появятся здесь.</sys:String>
+  <sys:String x:Key="L.Library.Empty">Повторов пока нет. Сохранённые повторы появятся здесь.</sys:String>
+  <sys:String x:Key="L.Library.Loading">Загрузка повторов…</sys:String>
+  <sys:String x:Key="L.Library.LoadFailed">Не удалось загрузить повторы.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Обновить список</sys:String>
   <sys:String x:Key="L.Library.Open">Показать в папке</sys:String>
   <sys:String x:Key="L.Library.Trim">Обрезать</sys:String>
@@ -153,9 +155,13 @@
   <sys:String x:Key="L.Library.Start">Начало</sys:String>
   <sys:String x:Key="L.Library.End">Конец</sys:String>
   <sys:String x:Key="L.Library.Play">Воспроизвести / пауза</sys:String>
+  <sys:String x:Key="L.Library.Fullscreen">На весь экран</sys:String>
+  <sys:String x:Key="L.Library.ExitFullscreen">Выйти из полноэкранного режима</sys:String>
   <sys:String x:Key="L.Library.SaveTrim">Сохранить копию</sys:String>
   <sys:String x:Key="L.Library.Trimming">Сохраняю клип…</sys:String>
   <sys:String x:Key="L.Library.TrimmingMerge">Обрезаю и объединяю звук…</sys:String>
+  <sys:String x:Key="L.Library.SavingTitle">Сохранение повтора</sys:String>
+  <sys:String x:Key="L.Library.FileInUse">Файл повтора всё ещё используется. Закройте внешние проигрыватели и попробуйте снова.</sys:String>
   <sys:String x:Key="L.Library.TrimHint">Создаёт новый файл без перекодирования. Исходный повтор останется нетронутым.</sys:String>
   <sys:String x:Key="L.Library.Trimmed">Обрезанный повтор сохранён</sys:String>
   <sys:String x:Key="L.Library.VideoTrack">ВИДЕО</sys:String>

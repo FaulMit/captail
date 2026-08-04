@@ -20,9 +20,19 @@ Captail dynamically uses and may redistribute selected components from OBS Studi
 
 `tools/AcquireFfmpegRuntime.ps1` downloads a pinned, SHA-256-verified build. Captail uses it for clip metadata, thumbnails, and non-destructive trimming.
 
+## mpv / libmpv
+
+- Project: https://mpv.io/
+- Source release: https://github.com/mpv-player/mpv/tree/v0.41.0
+- Native Windows package: `Endpne.LibMPV.Windows` 0.41.0
+- License: GNU Lesser General Public License 2.1 or later
+
+Captail dynamically loads the replaceable `libmpv-2.dll` for embedded editor playback, hardware decoding, seeking, and local mixing of selected audio tracks. Captail does not bundle or launch the standalone `mpv.exe` player.
+
 ## NuGet dependencies
 
 - NAudio — MIT License: https://github.com/naudio/NAudio
+- Endpne.LibMPV.Windows — LGPL-2.1-or-later: https://www.nuget.org/packages/Endpne.LibMPV.Windows/0.41.0
 - H.NotifyIcon — MIT License: https://github.com/HavenDV/H.NotifyIcon
 - System.Drawing.Common — MIT License: https://github.com/dotnet/runtime
 

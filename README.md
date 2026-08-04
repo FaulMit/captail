@@ -18,6 +18,7 @@
 
 <p align="center">
   <a href="https://github.com/FaulMit/captail/releases/latest"><img src="docs/readme-download.svg" alt="Download latest Captail release for Windows" width="286"></a>
+  <a href="https://apps.microsoft.com/detail/9PKVNVLKPTPS"><img src="docs/readme-store.svg" alt="Get Captail from Microsoft Store" width="286"></a>
 </p>
 
 <p align="center">
@@ -64,15 +65,16 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 
 ## How do I install it?
 
-Open [GitHub Releases](https://github.com/FaulMit/captail/releases) and choose one package:
+Install Captail from [Microsoft Store](https://apps.microsoft.com/detail/9PKVNVLKPTPS), or open [GitHub Releases](https://github.com/FaulMit/captail/releases) and choose a package:
 
 | Package | Choose it when | Installation |
 | --- | --- | --- |
+| **Microsoft Store** | You want Microsoft-managed installation and automatic updates | Open the [Store listing](https://apps.microsoft.com/detail/9PKVNVLKPTPS) and select **Install**. |
 | `Captail-x.y.z-Setup-win-x64.exe` | You want the normal Windows experience | Run Setup. It installs Captail for your Windows account and adds an uninstaller to Windows Settings. |
 | `Captail-x.y.z-Portable-win-x64.zip` | You want a movable, self-contained folder | Extract the entire ZIP, then run `Captail.exe` inside it. Do not run it from the archive. |
 | `SHA256SUMS.txt` | You want to verify the download | Compare the package SHA-256 with the published value before running it. |
 
-Both packages include .NET, libobs, and FFmpeg. You do not need to install OBS Studio or extra runtimes.
+Every Captail package includes .NET, libobs, FFmpeg, and the embedded preview player. You do not need to install OBS Studio or extra runtimes.
 
 > [!NOTE]
 > Release binaries are not Authenticode-signed yet. Windows SmartScreen may show “Unknown publisher.” Verify `SHA256SUMS.txt` and GitHub build provenance if you want to confirm the download.
@@ -189,7 +191,7 @@ Enable **Organize games into folders** in Storage. Replays saved while a game is
 
 No. Captail has no account, cloud upload, analytics, or telemetry. Replays, thumbnails, settings, and logs stay on your PC.
 
-Captail contacts the GitHub Releases API to check whether a newer version exists. It downloads an update package only after you click the update control.
+GitHub builds contact the GitHub Releases API to check whether a newer version exists. They download an update package only after you click the update control. The Microsoft Store build uses Store-managed updates instead.
 
 ## How is Captail different from ShadowPlay and OBS Replay Buffer?
 

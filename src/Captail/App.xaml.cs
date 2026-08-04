@@ -31,10 +31,12 @@ public partial class App : Application
     private string _activationPipeName = "";
     private string? _pendingUiError;
     private DispatcherTimer? _healthTimer;
+    private DispatcherTimer? _captureStateTimer;
     private DateTime _pipelineStartedUtc;
     private DateTime _nextRecoveryUtc;
     private int _recoveryFailures;
     private int _recoveryInProgress;
+    private int _captureStateRefreshInProgress;
     private OverlayNotificationWindow? _overlayNotification;
     private readonly UpdateService _updateService = new();
     private DispatcherTimer? _updateShutdownTimer;
@@ -77,6 +79,12 @@ public partial class App : Application
             bool replaySegmentsTest = e.Args.Contains(
                 "--qa-replay-segments",
                 StringComparer.OrdinalIgnoreCase);
+            bool fileRetryTest = e.Args.Contains(
+                "--qa-file-retry",
+                StringComparer.OrdinalIgnoreCase);
+            bool automaticCapturePolicyTest = e.Args.Contains(
+                "--qa-auto-capture-policy",
+                StringComparer.OrdinalIgnoreCase);
             bool updateCheckTest = e.Args.Contains(
                 "--qa-update-check",
                 StringComparer.OrdinalIgnoreCase);
@@ -99,6 +107,13 @@ public partial class App : Application
                 ?["--qa-preview-geometry=".Length..];
             bool previewGeometryTest =
                 !string.IsNullOrWhiteSpace(previewGeometryTestPath);
+            string? trimOverwriteTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-trim-overwrite=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-trim-overwrite=".Length..];
+            bool trimOverwriteTest =
+                !string.IsNullOrWhiteSpace(trimOverwriteTestPath);
             _qaUpdateAvailable = e.Args.Contains(
                 "--qa-update-available",
                 StringComparer.OrdinalIgnoreCase);
@@ -108,10 +123,13 @@ public partial class App : Application
             const bool capabilityModelTest = false;
             const bool gameCaptureTest = false;
             const bool replaySegmentsTest = false;
+            const bool fileRetryTest = false;
+            const bool automaticCapturePolicyTest = false;
             const bool updateCheckTest = false;
             const bool clipEditorTest = false;
             const bool audioMixTest = false;
             const bool previewGeometryTest = false;
+            const bool trimOverwriteTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
                     "--background",
@@ -125,7 +143,9 @@ public partial class App : Application
                     shutdownExisting,
                     _uiOnly || faultTest || codecTest || capabilityModelTest ||
                     gameCaptureTest || replaySegmentsTest || updateCheckTest ||
-                    clipEditorTest || audioMixTest || previewGeometryTest))
+                    clipEditorTest || audioMixTest || previewGeometryTest ||
+                    fileRetryTest || trimOverwriteTest ||
+                    automaticCapturePolicyTest))
             {
                 Shutdown();
                 return;
@@ -179,6 +199,16 @@ public partial class App : Application
                 RunReplaySegmentsTest();
                 return;
             }
+            if (fileRetryTest)
+            {
+                await RunFileRetryTestAsync();
+                return;
+            }
+            if (automaticCapturePolicyTest)
+            {
+                RunAutomaticCapturePolicyTest();
+                return;
+            }
             if (updateCheckTest)
             {
                 await _updateService.CheckAsync(
@@ -200,6 +230,11 @@ public partial class App : Application
             if (previewGeometryTest)
             {
                 await RunPreviewGeometryTestAsync(previewGeometryTestPath!);
+                return;
+            }
+            if (trimOverwriteTest)
+            {
+                await RunTrimOverwriteTestAsync(trimOverwriteTestPath!);
                 return;
             }
 #endif
@@ -235,6 +270,7 @@ public partial class App : Application
             CreateTrayIcon();
             BindHotkeyAtStartup();
             StartHealthMonitor();
+            StartCaptureStateMonitor();
             StartActivationServer();
             if (!backgroundLaunch)
                 OpenSettings();
@@ -263,6 +299,188 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private void RunAutomaticCapturePolicyTest()
+    {
+        string[] rejected =
+        [
+            "Telegram.exe", @"C:\Apps\Telegram.exe", "Discord.exe", "chrome.exe", "msedge.exe",
+            "firefox.exe", "explorer.exe", "dwm.exe", "Spotify.exe",
+            "vlc.exe", "mpv.exe", "obs64.exe", "Captail.exe",
+            "ApplicationFrameHost.exe", "ShellExperienceHost.exe", "SearchHost.exe",
+        ];
+        string[] accepted =
+        [
+            "cs2.exe", @"D:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe",
+            "GTA5.exe", "hl2.exe",
+            "ExampleGame-Win64-Shipping.exe", "Minecraft.Windows.exe",
+        ];
+        string[] falsePositives = rejected
+            .Where(ObsReplayEngine.IsAutomaticCaptureCandidate)
+            .ToArray();
+        string[] falseNegatives = accepted
+            .Where(executable =>
+                !ObsReplayEngine.IsAutomaticCaptureCandidate(executable))
+            .ToArray();
+        bool altTabRejected = !ObsReplayEngine.ShouldUseAutomaticGameCapture(
+            "cs2.exe",
+            "explorer.exe",
+            hasVideo: true);
+        bool focusedGameAccepted = ObsReplayEngine.ShouldUseAutomaticGameCapture(
+            "cs2.exe",
+            "CS2.exe",
+            hasVideo: true);
+        bool missingVideoRejected = !ObsReplayEngine.ShouldUseAutomaticGameCapture(
+            "cs2.exe",
+            "cs2.exe",
+            hasVideo: false);
+        bool passed = falsePositives.Length == 0 &&
+                      falseNegatives.Length == 0 &&
+                      !ObsReplayEngine.IsAutomaticCaptureCandidate("") &&
+                      altTabRejected && focusedGameAccepted &&
+                      missingVideoRejected;
+        Log.Write(
+            $"AUTO_CAPTURE_POLICY_TEST {(passed ? "PASS" : "FAIL")}: " +
+            $"falsePositives={string.Join(',', falsePositives)}, " +
+            $"falseNegatives={string.Join(',', falseNegatives)}, " +
+            $"altTabRejected={altTabRejected}, " +
+            $"focusedGameAccepted={focusedGameAccepted}, " +
+            $"missingVideoRejected={missingVideoRejected}");
+        Shutdown(passed ? 0 : 22);
+    }
+
+    private async Task RunTrimOverwriteTestAsync(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("QA replay does not exist.", fullPath);
+
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"captail_trim_overwrite_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        string workingPath = Path.Combine(
+            directory,
+            "overwrite-source" + Path.GetExtension(fullPath));
+        try
+        {
+            File.Copy(fullPath, workingPath);
+            var ffmpeg = new FfmpegAdapter();
+            TimeSpan originalDuration = await ffmpeg.ReadDurationAsync(workingPath);
+            IReadOnlyList<AudioTrackInfo> audioTracks =
+                await ffmpeg.ReadAudioTracksAsync(workingPath);
+            var file = new FileInfo(workingPath);
+            var clip = new ReplayClip(
+                workingPath,
+                file.Name,
+                null,
+                file.LastWriteTime,
+                file.Length,
+                originalDuration,
+                null);
+            TimeSpan start = TimeSpan.FromMilliseconds(250);
+            TimeSpan end = originalDuration - TimeSpan.FromMilliseconds(500);
+            if (end <= start)
+                throw new InvalidOperationException("QA replay must be longer than one second.");
+
+            var library = new ReplayLibrary(ffmpeg);
+            await library.TrimOverwriteAsync(
+                directory,
+                clip,
+                start,
+                end,
+                audioTracks.Select(track => track.StreamIndex).ToArray());
+            TimeSpan trimmedDuration = await ffmpeg.ReadDurationAsync(workingPath);
+            string[] internalFiles = Directory.EnumerateFiles(directory)
+                .Where(ReplayLibrary.IsInternalWorkingFile)
+                .ToArray();
+            bool passed = File.Exists(workingPath) &&
+                          new FileInfo(workingPath).Length > 0 &&
+                          trimmedDuration < originalDuration &&
+                          internalFiles.Length == 0;
+            Log.Write(
+                $"TRIM_OVERWRITE_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"duration={originalDuration.TotalSeconds:0.000}->" +
+                $"{trimmedDuration.TotalSeconds:0.000}, " +
+                $"audioTracks={audioTracks.Count}, leftovers={internalFiles.Length}");
+            Shutdown(passed ? 0 : 21);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"TRIM_OVERWRITE_TEST FAIL: {exception}");
+            Shutdown(21);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception)
+            {
+                Log.Write($"Trim overwrite QA cleanup failed: {exception.Message}");
+            }
+        }
+    }
+
+    private async Task RunFileRetryTestAsync()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            $"captail_file_retry_{Guid.NewGuid():N}");
+        string source = Path.Combine(directory, "clip.tmp");
+        string destination = Path.Combine(directory, "clip.mkv");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            await File.WriteAllTextAsync(source, "captail");
+            using var locked = new ManualResetEventSlim();
+            Task locker = Task.Run(() =>
+            {
+                using FileStream stream = File.Open(
+                    source,
+                    FileMode.Open,
+                    FileAccess.ReadWrite,
+                    FileShare.None);
+                locked.Set();
+                Thread.Sleep(650);
+            });
+            locked.Wait();
+
+            var watch = Stopwatch.StartNew();
+            await FfmpegAdapter.MoveFileWithRetryAsync(source, destination);
+            watch.Stop();
+            await locker;
+
+            const string legacyWorkingName =
+                ".Replay.test.replacement.mkv.deadbeef.tmp.mkv";
+            bool filtered = ReplayLibrary.IsInternalWorkingFile(legacyWorkingName);
+            bool passed = File.Exists(destination) &&
+                          watch.ElapsedMilliseconds >= 500 &&
+                          filtered;
+            Log.Write(
+                $"FILE_RETRY_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"moved={File.Exists(destination)}, " +
+                $"elapsed={watch.ElapsedMilliseconds}ms, filtered={filtered}");
+            Shutdown(passed ? 0 : 20);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"FILE_RETRY_TEST FAIL: {exception}");
+            Shutdown(20);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (Exception exception)
+            {
+                Log.Write($"File retry QA cleanup failed: {exception.Message}");
+            }
+        }
+    }
+
     private async Task RunAudioMixTestAsync(string path)
     {
         string fullPath = Path.GetFullPath(path);
@@ -1096,6 +1314,62 @@ public partial class App : Application
         };
         _healthTimer.Tick += async (_, _) => await MonitorPipelineSafeAsync();
         _healthTimer.Start();
+    }
+
+    private void StartCaptureStateMonitor()
+    {
+        _captureStateTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500),
+        };
+        _captureStateTimer.Tick += async (_, _) =>
+            await RefreshAutomaticCaptureStateSafeAsync();
+        _captureStateTimer.Start();
+    }
+
+    private async Task RefreshAutomaticCaptureStateSafeAsync()
+    {
+        if (_uiOnly || !IsReplayRunning ||
+            Volatile.Read(ref _exiting) != 0 ||
+            Interlocked.Exchange(ref _captureStateRefreshInProgress, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!await _pipelineGate.WaitAsync(0))
+                return;
+            try
+            {
+                ObsReplayEngine? engine = _obs;
+                if (engine is null || !engine.IsAutomaticCapture)
+                    return;
+                (bool changed, string description) =
+                    await RunOnObsThreadAsync(() =>
+                    {
+                        bool sourceChanged = engine.RefreshCaptureState();
+                        return (sourceChanged, engine.Description);
+                    });
+                if (changed && ReferenceEquals(engine, _obs))
+                {
+                    _captureDescription = description;
+                    UpdateUiState();
+                }
+            }
+            finally
+            {
+                _pipelineGate.Release();
+            }
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Capture source monitor failed: {exception.Message}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _captureStateRefreshInProgress, 0);
+        }
     }
 
     private async Task MonitorPipelineSafeAsync()
@@ -2041,6 +2315,7 @@ public partial class App : Application
             return;
 
         _healthTimer?.Stop();
+        _captureStateTimer?.Stop();
         await _pipelineGate.WaitAsync();
         try
         {
@@ -2063,6 +2338,7 @@ public partial class App : Application
             Interlocked.Exchange(ref _exiting, 1) != 0 && _obs is null;
         Localization.Changed -= OnLanguageChanged;
         _healthTimer?.Stop();
+        _captureStateTimer?.Stop();
         _updateShutdownTimer?.Stop();
         _activationServerCts?.Cancel();
         _activationServerCts?.Dispose();

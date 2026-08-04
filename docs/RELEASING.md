@@ -20,8 +20,8 @@ Before running the workflow:
 
 ```powershell
 .\tools\New-ReleaseNotes.ps1 `
-  -Version 0.1.6 `
-  -PreviousTag v0.1.5 `
+  -Version 0.1.7 `
+  -PreviousTag v0.1.6 `
   -OutputPath "$env:TEMP\captail-release-notes.md"
 ```
 
@@ -85,9 +85,9 @@ GitHub Release because Store installs, signs, and updates the package.
 Build an upload-ready package locally:
 
 ```powershell
-.\tools\BuildStorePackage.ps1 -Version 0.1.5
+.\tools\BuildStorePackage.ps1 -Version 0.1.7
 ```
 
-Upload `artifacts\store\0.1.5\Captail-0.1.5.0-x64.msixupload` in Partner
+Upload `artifacts\store\0.1.7\Captail-0.1.7.0-x64.msixupload` in Partner
 Center. Full identity, validation, update-channel, and submission instructions
 are in [`packaging/msix/README.md`](../packaging/msix/README.md).

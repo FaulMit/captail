@@ -4,6 +4,27 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-04
+
+### Added
+
+- **Fast embedded replay preview:** The clip editor now uses a hardware-accelerated built-in player with responsive seeking, simultaneous playback of selected audio tracks, fullscreen viewing, keyboard controls, and a fullscreen progress bar.
+- **Clear loading states:** The replay library and clip preview now distinguish loading, empty, failed, and ready states instead of appearing blank while work is in progress.
+- **Microsoft Store availability:** Captail can now be installed from Microsoft Store with Store-managed updates.
+
+### Improved
+
+- **Safer clip editing:** Saving and overwriting show a focused progress overlay, release the preview file before replacement, retry short Windows file-lock races, and keep temporary working files out of the replay library.
+- **Automatic capture switching:** Desktop mode uses Game Capture only while the hooked game is producing video and remains the foreground application. Alt-tabbing returns recording to the desktop instead of leaving a stale game frame active.
+
+### Fixed
+
+- Fixed black or incorrectly cropped video in the clip editor while keeping fast hardware-accelerated playback.
+- Fixed native video covering overwrite confirmation and saving overlays.
+- Fixed non-game applications such as Telegram being selected as the active automatic capture source.
+- Fixed closing Captail leaving its installation or Portable folder locked by a running game. Game Capture hooks now load from a validated per-user cache instead of the application directory.
+- Fixed misaligned loading indicators and saving text in the replay library and clip editor.
+
 ## [0.1.6] - 2026-08-03
 
 ### Added
