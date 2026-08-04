@@ -83,8 +83,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "obs.dll"))) {
 if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "ffmpeg\ffmpeg.exe"))) {
     throw "Published FFmpeg runtime not found."
 }
-if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "ffmpeg\ffplay.exe"))) {
-    throw "Published FFplay runtime not found."
+if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "libmpv-2.dll"))) {
+    throw "Published libmpv runtime not found."
 }
 
 Write-Host "Creating Portable archive..."

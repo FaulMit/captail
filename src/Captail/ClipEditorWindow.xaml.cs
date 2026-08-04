@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -10,6 +9,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
@@ -19,13 +19,15 @@ public partial class ClipEditorWindow : Window
 {
     private const double MinimumSelectionSeconds = 0.25;
     private const int TimelineFrameCount = 12;
+    private static readonly TimeSpan FullscreenControlsTimeout = TimeSpan.FromSeconds(2.4);
+    private const double FullscreenControlsHeight = 58;
     private readonly ReplayLibrary _library;
     private readonly string _rootDirectory;
     private readonly ReplayClip _clip;
     private readonly Action<string> _onSaved;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly DispatcherTimer _playbackTimer;
-    private readonly Stopwatch _playbackClock = new();
+    private readonly DispatcherTimer _fullscreenUiTimer;
     private readonly List<BitmapImage> _timelineImages = [];
     private double _selectionStart;
     private double _selectionEnd;
@@ -33,7 +35,18 @@ public partial class ClipEditorWindow : Window
     private bool _playing;
     private bool _playerLoading;
     private bool _resumeAfterScrub;
-    private int _stillRequest;
+    private bool _fullscreenProgressScrubbing;
+    private bool _updatingFullscreenProgress;
+    private bool _resumeAfterOverwriteConfirmation;
+    private bool _saveInProgress;
+    private Visibility _playerVisibilityBeforeOverwrite = Visibility.Collapsed;
+    private Visibility _imageVisibilityBeforeOverwrite = Visibility.Visible;
+    private bool _isFullscreen;
+    private bool _restoreTopmost;
+    private Rect _restoreBounds;
+    private WindowState _restoreWindowState;
+    private NativePoint _lastCursorPosition;
+    private DateTime _lastPointerActivityUtc;
     private VideoStreamInfo? _videoInfo;
 
     public ObservableCollection<AudioTrackRow> AudioTracks { get; } = [];
@@ -59,27 +72,28 @@ public partial class ClipEditorWindow : Window
 
         _playbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
         _playbackTimer.Tick += async (_, _) => await UpdatePlaybackAsync();
+        _fullscreenUiTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(150) };
+        _fullscreenUiTimer.Tick += (_, _) => UpdateFullscreenControls();
         Loaded += async (_, _) => await LoadEditorAsync();
         SourceInitialized += (_, _) => ApplyNativeCornerPreference();
         Closed += (_, _) =>
         {
             _playbackTimer.Stop();
-            _playbackClock.Stop();
+            _fullscreenUiTimer.Stop();
+            Topmost = _restoreTopmost;
             _lifetimeCts.Cancel();
-            PreviewPlayer.Stop();
+            PreviewPlayer.Shutdown();
             _lifetimeCts.Dispose();
         };
     }
 
     private async Task LoadEditorAsync()
     {
-        await Task.WhenAll(
-            LoadTimelineThumbnailsAsync(),
-            LoadAudioTracksAsync(),
-            LoadVideoInfoAsync(),
-            UpdateStillFrameAsync(_selectionStart));
-        if (!_lifetimeCts.IsCancellationRequested)
-            PlayButton.IsEnabled = true;
+        Task timelineTask = LoadTimelineThumbnailsAsync();
+        Task videoInfoTask = LoadVideoInfoAsync();
+        await LoadAudioTracksAsync();
+        await InitializePreviewAsync();
+        await Task.WhenAll(timelineTask, videoInfoTask);
     }
 
     private async Task LoadVideoInfoAsync()
@@ -108,14 +122,117 @@ public partial class ClipEditorWindow : Window
     {
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-        await Task.Delay(200, _lifetimeCts.Token);
+        DateTime readyDeadline = DateTime.UtcNow.AddSeconds(10);
+        while ((_playerLoading || !PreviewPlayer.IsReady) &&
+               DateTime.UtcNow < readyDeadline)
+        {
+            await Task.Delay(50, _lifetimeCts.Token);
+        }
+        if (!PreviewPlayer.IsReady)
+            return (false, "preview player did not become ready");
+
+        RequestOverwrite_Click(this, new RoutedEventArgs());
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool overwriteOpened =
+            OverwriteConfirmOverlay.Visibility == Visibility.Visible;
+        bool playerSuppressed = PreviewPlayer.Visibility != Visibility.Visible;
+        CancelOverwrite();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool playerRestored = PreviewPlayer.Visibility == Visibility.Visible;
+        bool overwriteOverlayPassed =
+            overwriteOpened && playerSuppressed && playerRestored;
+
+        PreviewPlayer.Visibility = Visibility.Collapsed;
+        SavingStatusText.Text = Localization.Text("L.Library.Trimming");
+        ShowSavingOverlay();
+        await Task.Delay(220, _lifetimeCts.Token);
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        string savingScreenshot = Path.Combine(
+            Path.GetTempPath(),
+            "Captail",
+            "saving-overlay-qa.png");
+        CaptureVisualToPng(savingScreenshot);
+        bool savingOverlayPassed =
+            SavingOverlay.Visibility == Visibility.Visible &&
+            PreviewPlayer.Visibility != Visibility.Visible &&
+            TextOptions.GetTextRenderingMode(SavingOverlay) ==
+                TextRenderingMode.Grayscale;
+        HideSavingOverlay();
+        PreviewPlayer.Visibility = Visibility.Visible;
+
         await StartPlaybackAsync(_selectionStart);
-        await Task.Delay(700, _lifetimeCts.Token);
-        string details = "preview window is not ready";
-        bool passed = PreviewPlayer.IsReady &&
-                      PreviewPlayer.TryValidateGeometry(out details);
-        StopNativePlayback();
+        double playbackStart = PreviewPlayer.PositionSeconds;
+        double playbackAfter = playbackStart;
+        DateTime playbackDeadline = DateTime.UtcNow.AddSeconds(3);
+        while (playbackAfter < playbackStart + 0.2 &&
+               DateTime.UtcNow < playbackDeadline)
+        {
+            await Task.Delay(100, _lifetimeCts.Token);
+            playbackAfter = PreviewPlayer.PositionSeconds;
+        }
+        bool clockAdvanced = playbackAfter >= playbackStart + 0.2;
+
+        PreviewPlayer.Pause();
+        _playing = false;
+        _playbackTimer.Stop();
+        double seekTarget = Math.Clamp(
+            _clip.Duration.TotalSeconds * 0.5,
+            _selectionStart,
+            _selectionEnd);
+        PreviewPlayer.Seek(seekTarget, exact: true);
+        await Task.Delay(350, _lifetimeCts.Token);
+        double seekPosition = PreviewPlayer.PositionSeconds;
+        bool seekPassed = Math.Abs(seekPosition - seekTarget) <= 1.0;
+
+        int[] allTrackIds = AudioTracks
+            .Select(track => track.Track.Ordinal + 1)
+            .ToArray();
+        if (allTrackIds.Length > 0)
+            PreviewPlayer.SetAudioTracks([allTrackIds[0]]);
+        if (allTrackIds.Length > 1)
+            PreviewPlayer.SetAudioTracks(allTrackIds);
+        bool tracksPassed = PreviewPlayer.IsReady &&
+                            PreviewPlayer.DetectedAudioTrackCount == allTrackIds.Length;
+
+        string geometry = "preview window is not ready";
+        bool geometryPassed = PreviewPlayer.TryValidateGeometry(out geometry);
+        string videoOutput = "video output is not ready";
+        bool videoOutputPassed = PreviewPlayer.TryValidateVideoOutput(out videoOutput);
+        await PreviewPlayer.StopAsync(_lifetimeCts.Token);
+        bool stopPassed = !PreviewPlayer.IsReady;
+        bool passed = overwriteOverlayPassed && savingOverlayPassed &&
+                      seekPassed && tracksPassed &&
+                      geometryPassed && videoOutputPassed && stopPassed;
+        string details =
+            $"overlay={(overwriteOverlayPassed ? "clear" : "occluded")}, " +
+            $"saving={(savingOverlayPassed ? "visible" : "hidden")}, " +
+            $"savingScreenshot={savingScreenshot}, " +
+            $"{geometry}, {videoOutput}, " +
+            $"clock={playbackStart:0.000}->{playbackAfter:0.000}" +
+            $"{(clockAdvanced ? "" : " (startup pending)")}, " +
+            $"seek={seekPosition:0.000}/{seekTarget:0.000}, " +
+            $"tracks={PreviewPlayer.DetectedAudioTrackCount}/{allTrackIds.Length}, " +
+            $"stop={(stopPassed ? "released" : "busy")}";
         return (passed, details);
+    }
+
+    private void CaptureVisualToPng(string path)
+    {
+        DpiScale dpi = VisualTreeHelper.GetDpi(this);
+        int width = Math.Max(1, (int)Math.Ceiling(ActualWidth * dpi.DpiScaleX));
+        int height = Math.Max(1, (int)Math.Ceiling(ActualHeight * dpi.DpiScaleY));
+        var bitmap = new RenderTargetBitmap(
+            width,
+            height,
+            dpi.PixelsPerInchX,
+            dpi.PixelsPerInchY,
+            PixelFormats.Pbgra32);
+        bitmap.Render(this);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using FileStream stream = File.Create(path);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        encoder.Save(stream);
     }
 #endif
 
@@ -162,7 +279,8 @@ public partial class ClipEditorWindow : Window
                 : Visibility.Collapsed;
             UpdateMergeAudioState();
 
-            await Task.WhenAll(AudioTracks.Select(LoadWaveformAsync));
+            foreach (AudioTrackRow row in AudioTracks)
+                _ = LoadWaveformAsync(row);
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
@@ -198,37 +316,27 @@ public partial class ClipEditorWindow : Window
         }
     }
 
-    private async Task StartPlaybackAsync(double position)
+    private async Task InitializePreviewAsync()
     {
         if (_playerLoading || _lifetimeCts.IsCancellationRequested)
             return;
         _playerLoading = true;
         PlayButton.IsEnabled = false;
-        _playbackTimer.Stop();
-        _playbackClock.Reset();
-        _playing = false;
-        _playbackPosition = Math.Clamp(position, _selectionStart, _selectionEnd);
-        UpdatePlayIcon();
-        UpdatePlaybackText();
         try
         {
-            double remaining = Math.Max(
-                MinimumSelectionSeconds,
-                _selectionEnd - _playbackPosition);
+            PreviewLoadingOverlay.Visibility = Visibility.Visible;
             PreviewPlayer.Visibility = Visibility.Visible;
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
-            TimeSpan startupDelay = await PreviewPlayer.PlayAsync(
+            PreviewPlayer.Visibility = Visibility.Collapsed;
+            await PreviewPlayer.LoadAsync(
                 _clip.Path,
                 TimeSpan.FromSeconds(_playbackPosition),
-                TimeSpan.FromSeconds(remaining),
-                SelectedAudioStreamIndices(),
+                SelectedAudioTrackIds(),
                 _lifetimeCts.Token);
-            _playbackPosition = Math.Min(
-                _selectionEnd,
-                _playbackPosition + startupDelay.TotalSeconds);
-            _playing = true;
-            _playbackClock.Restart();
-            _playbackTimer.Start();
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
+            PreviewPlayer.Visibility = Visibility.Visible;
+            _playbackPosition = PreviewPlayer.PositionSeconds;
             EditorStatusText.Text = "";
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
@@ -238,15 +346,41 @@ public partial class ClipEditorWindow : Window
         catch (Exception exception)
         {
             PreviewPlayer.Visibility = Visibility.Collapsed;
+            PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
+            PreviewImage.Visibility = Visibility.Visible;
             Log.Write($"Clip preview failed ({_clip.Name}): {exception}");
             EditorStatusText.Text = exception.Message;
         }
         finally
         {
             _playerLoading = false;
-            PlayButton.IsEnabled = !_lifetimeCts.IsCancellationRequested;
+            PlayButton.IsEnabled =
+                !_lifetimeCts.IsCancellationRequested && PreviewPlayer.IsReady;
             UpdatePlayIcon();
+            UpdatePlaybackText();
+            UpdateTimelineVisual();
         }
+    }
+
+    private async Task StartPlaybackAsync(double position)
+    {
+        if (_playerLoading || _lifetimeCts.IsCancellationRequested)
+            return;
+        if (!PreviewPlayer.IsReady)
+            await InitializePreviewAsync();
+        if (!PreviewPlayer.IsReady)
+            return;
+
+        _playbackPosition = Math.Clamp(position, _selectionStart, _selectionEnd);
+        PreviewPlayer.SetAudioTracks(SelectedAudioTrackIds());
+        PreviewPlayer.Seek(_playbackPosition, exact: true);
+        PreviewPlayer.Play();
+        _playing = true;
+        _playbackTimer.Start();
+        EditorStatusText.Text = "";
+        UpdatePreviewLoadingState();
+        UpdatePlayIcon();
+        UpdatePlaybackText();
     }
 
     private async void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -264,81 +398,70 @@ public partial class ClipEditorWindow : Window
         await StartPlaybackAsync(start);
     }
 
-    private async Task UpdatePlaybackAsync()
+    private Task UpdatePlaybackAsync()
     {
         double position = CurrentPlaybackPosition();
         if (position >= _selectionEnd || !PreviewPlayer.IsReady)
         {
-            StopNativePlayback();
+            PauseNativePlayback();
             _playbackPosition = _selectionStart;
+            if (PreviewPlayer.IsReady)
+                PreviewPlayer.Seek(_selectionStart, exact: true);
             UpdatePlayIcon();
             UpdatePlaybackText();
             UpdateTimelineVisual();
-            await UpdateStillFrameAsync(_playbackPosition);
-            return;
+            return Task.CompletedTask;
         }
         UpdatePlaybackText();
         UpdateTimelineVisual();
+        UpdatePreviewLoadingState();
+        return Task.CompletedTask;
     }
 
-    private double CurrentPlaybackPosition() =>
-        Math.Min(
-            _selectionEnd,
-            _playbackPosition + (_playing ? _playbackClock.Elapsed.TotalSeconds : 0));
+    private double CurrentPlaybackPosition()
+    {
+        if (PreviewPlayer.IsReady)
+            _playbackPosition = PreviewPlayer.PositionSeconds;
+        return Math.Clamp(_playbackPosition, _selectionStart, _selectionEnd);
+    }
 
-    private async Task PausePlaybackAsync(bool updateStill = true)
+    private Task PausePlaybackAsync()
     {
         if (_playing)
             _playbackPosition = CurrentPlaybackPosition();
-        StopNativePlayback();
+        PauseNativePlayback();
         UpdatePlayIcon();
         UpdatePlaybackText();
         UpdateTimelineVisual();
-        if (updateStill)
-            await UpdateStillFrameAsync(_playbackPosition);
+        return Task.CompletedTask;
     }
 
-    private void StopNativePlayback()
+    private void PauseNativePlayback()
     {
-        _playbackClock.Reset();
         _playing = false;
         _playbackTimer.Stop();
-        PreviewPlayer.Stop();
-        PreviewPlayer.Visibility = Visibility.Collapsed;
+        PreviewPlayer.Pause();
+        UpdatePreviewLoadingState();
     }
 
-    private async Task UpdateStillFrameAsync(double position)
+    private void UpdatePreviewLoadingState()
     {
-        int request = Interlocked.Increment(ref _stillRequest);
-        try
-        {
-            string? path = await _library.GetPreviewThumbnailAsync(
-                _rootDirectory,
-                _clip,
-                TimeSpan.FromSeconds(position),
-                _lifetimeCts.Token);
-            if (request == Volatile.Read(ref _stillRequest) &&
-                path is not null && File.Exists(path) &&
-                !_lifetimeCts.IsCancellationRequested)
-            {
-                PreviewImage.Source = LoadBitmap(path, 900);
-            }
-        }
-        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
-        {
-            // Window is closing.
-        }
-        catch (Exception exception)
-        {
-            Log.Write($"Preview still generation failed: {exception.Message}");
-        }
+        if (_playerLoading || !PreviewPlayer.IsReady)
+            return;
+        bool buffering = _playing && PreviewPlayer.IsBuffering;
+        PreviewLoadingOverlay.Visibility = buffering
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        PreviewPlayer.Visibility = buffering
+            ? Visibility.Collapsed
+            : Visibility.Visible;
     }
 
     private void PauseForTimelineEdit()
     {
         if (_playing)
             _playbackPosition = CurrentPlaybackPosition();
-        StopNativePlayback();
+        PauseNativePlayback();
         UpdatePlayIcon();
     }
 
@@ -350,7 +473,7 @@ public partial class ClipEditorWindow : Window
             0,
             _selectionEnd - MinimumSelectionSeconds);
         _playbackPosition = _selectionStart;
-        ShowNearestTimelineFrame(_playbackPosition);
+        PreviewPlayer.Seek(_playbackPosition, exact: false);
         UpdateRangeText();
         UpdateTimelineVisual();
     }
@@ -364,18 +487,17 @@ public partial class ClipEditorWindow : Window
             Math.Max(MinimumSelectionSeconds, _clip.Duration.TotalSeconds));
         if (_playbackPosition > _selectionEnd)
             _playbackPosition = _selectionEnd;
-        ShowNearestTimelineFrame(_playbackPosition);
+        PreviewPlayer.Seek(_playbackPosition, exact: false);
         UpdateRangeText();
         UpdateTimelineVisual();
     }
 
-    private async void RangeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    private void RangeThumb_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         _playbackPosition = sender == StartThumb ? _selectionStart : _selectionEnd;
-        ShowNearestTimelineFrame(_playbackPosition);
+        PreviewPlayer.Seek(_playbackPosition, exact: true);
         UpdatePlaybackText();
         UpdateTimelineVisual();
-        await UpdateStillFrameAsync(_playbackPosition);
     }
 
     private void PlayheadThumb_DragStarted(object sender, DragStartedEventArgs e)
@@ -390,22 +512,26 @@ public partial class ClipEditorWindow : Window
             _playbackPosition + PixelsToSeconds(e.HorizontalChange),
             _selectionStart,
             _selectionEnd);
-        ShowNearestTimelineFrame(_playbackPosition);
+        PreviewPlayer.Seek(_playbackPosition, exact: false);
         UpdatePlaybackText();
         UpdateTimelineVisual();
     }
 
-    private async void PlayheadThumb_DragCompleted(object sender, DragCompletedEventArgs e)
+    private void PlayheadThumb_DragCompleted(object sender, DragCompletedEventArgs e)
     {
         bool resume = _resumeAfterScrub;
         _resumeAfterScrub = false;
+        PreviewPlayer.Seek(_playbackPosition, exact: true);
         if (resume)
-            await StartPlaybackAsync(_playbackPosition);
-        else
-            await UpdateStillFrameAsync(_playbackPosition);
+        {
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+            UpdatePlayIcon();
+        }
     }
 
-    private async void RangeTimeline_MouseLeftButtonDown(
+    private void RangeTimeline_MouseLeftButtonDown(
         object sender,
         MouseButtonEventArgs e)
     {
@@ -421,13 +547,16 @@ public partial class ClipEditorWindow : Window
             fraction * Math.Max(MinimumSelectionSeconds, _clip.Duration.TotalSeconds),
             _selectionStart,
             _selectionEnd);
-        ShowNearestTimelineFrame(_playbackPosition);
+        PreviewPlayer.Seek(_playbackPosition, exact: true);
         UpdatePlaybackText();
         UpdateTimelineVisual();
         if (resume)
-            await StartPlaybackAsync(_playbackPosition);
-        else
-            await UpdateStillFrameAsync(_playbackPosition);
+        {
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+            UpdatePlayIcon();
+        }
         e.Handled = true;
     }
 
@@ -437,28 +566,95 @@ public partial class ClipEditorWindow : Window
     private async void Forward_Click(object sender, RoutedEventArgs e) =>
         await SeekAsync(CurrentPlaybackPosition() + 5);
 
-    private async Task SeekAsync(double position)
+    private Task SeekAsync(double position)
     {
         bool resume = _playing;
         PauseForTimelineEdit();
         _playbackPosition = Math.Clamp(position, _selectionStart, _selectionEnd);
-        ShowNearestTimelineFrame(_playbackPosition);
-        UpdatePlaybackText();
+        PreviewPlayer.Seek(_playbackPosition, exact: true);
+        UpdatePlaybackText(readPlayerPosition: false);
         UpdateTimelineVisual();
         if (resume)
-            await StartPlaybackAsync(_playbackPosition);
-        else
-            await UpdateStillFrameAsync(_playbackPosition);
+        {
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+            UpdatePlayIcon();
+        }
+        return Task.CompletedTask;
     }
 
-    private async void AudioTrackToggle_Click(object sender, RoutedEventArgs e)
+    private void FullscreenProgress_DragStarted(
+        object sender,
+        DragStartedEventArgs e)
+    {
+        ShowFullscreenControls();
+        _fullscreenProgressScrubbing = true;
+        _resumeAfterScrub = _playing;
+        PauseForTimelineEdit();
+    }
+
+    private void FullscreenProgress_ValueChanged(
+        object sender,
+        RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_updatingFullscreenProgress || !PreviewPlayer.IsReady)
+            return;
+        if (!_fullscreenProgressScrubbing)
+        {
+            _ = SeekAsync(e.NewValue);
+            ShowFullscreenControls();
+            return;
+        }
+        _playbackPosition = Math.Clamp(
+            e.NewValue,
+            _selectionStart,
+            _selectionEnd);
+        PreviewPlayer.Seek(_playbackPosition, exact: false);
+        UpdatePlaybackText(readPlayerPosition: false);
+        UpdateTimelineVisual();
+        ShowFullscreenControls();
+    }
+
+    private void FullscreenProgress_DragCompleted(
+        object sender,
+        DragCompletedEventArgs e)
+    {
+        if (!_fullscreenProgressScrubbing)
+            return;
+        bool resume = _resumeAfterScrub;
+        _resumeAfterScrub = false;
+        _fullscreenProgressScrubbing = false;
+        _playbackPosition = Math.Clamp(
+            FullscreenProgressSlider.Value,
+            _selectionStart,
+            _selectionEnd);
+        PreviewPlayer.Seek(_playbackPosition, exact: true);
+        UpdatePlaybackText(readPlayerPosition: false);
+        UpdateTimelineVisual();
+        if (resume)
+        {
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+            UpdatePlayIcon();
+        }
+        ShowFullscreenControls();
+    }
+
+    private void FullscreenProgress_MouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        ShowFullscreenControls();
+    }
+
+    private void AudioTrackToggle_Click(object sender, RoutedEventArgs e)
     {
         UpdateMergeAudioState();
-        if (!_playing || _playerLoading)
+        if (_playerLoading || !PreviewPlayer.IsReady)
             return;
-        double position = CurrentPlaybackPosition();
-        PauseForTimelineEdit();
-        await StartPlaybackAsync(position);
+        PreviewPlayer.SetAudioTracks(SelectedAudioTrackIds());
     }
 
     private void RangeTimeline_SizeChanged(object sender, SizeChangedEventArgs e) =>
@@ -493,18 +689,6 @@ public partial class ClipEditorWindow : Window
         Canvas.SetLeft(
             PlayheadThumb,
             Math.Clamp(playhead - PlayheadThumb.Width / 2, 0, playheadLimit));
-    }
-
-    private void ShowNearestTimelineFrame(double position)
-    {
-        if (_timelineImages.Count == 0)
-            return;
-        double duration = Math.Max(MinimumSelectionSeconds, _clip.Duration.TotalSeconds);
-        int index = Math.Clamp(
-            (int)(position / duration * _timelineImages.Count),
-            0,
-            _timelineImages.Count - 1);
-        PreviewImage.Source = _timelineImages[index];
     }
 
     private void UpdateRangeText()
@@ -569,26 +753,57 @@ public partial class ClipEditorWindow : Window
             : $"{bytes / megabyte:0.#} MB";
     }
 
-    private void UpdatePlaybackText()
+    private void UpdatePlaybackText(bool readPlayerPosition = true)
     {
         if (PlaybackTimeText is null)
             return;
+        double position = readPlayerPosition
+            ? CurrentPlaybackPosition()
+            : _playbackPosition;
         PlaybackTimeText.Text =
-            $"{FormatTime(TimeSpan.FromSeconds(CurrentPlaybackPosition()), false)} / " +
+            $"{FormatTime(TimeSpan.FromSeconds(position), false)} / " +
             FormatTime(_clip.Duration, false);
+        if (FullscreenPlaybackTimeText is not null)
+            FullscreenPlaybackTimeText.Text = PlaybackTimeText.Text;
+        if (FullscreenProgressSlider is not null && !_fullscreenProgressScrubbing)
+        {
+            _updatingFullscreenProgress = true;
+            try
+            {
+                FullscreenProgressSlider.Minimum = _selectionStart;
+                FullscreenProgressSlider.Maximum = _selectionEnd;
+                FullscreenProgressSlider.Value = Math.Clamp(
+                    position,
+                    _selectionStart,
+                    _selectionEnd);
+            }
+            finally
+            {
+                _updatingFullscreenProgress = false;
+            }
+        }
     }
 
     private void UpdatePlayIcon()
     {
         if (PlayIcon is null)
             return;
-        PlayIcon.Data = (Geometry)FindResource(_playing ? "IconPause" : "IconPlay");
+        Geometry icon = (Geometry)FindResource(_playing ? "IconPause" : "IconPlay");
+        PlayIcon.Data = icon;
+        if (FullscreenPlayIcon is not null)
+            FullscreenPlayIcon.Data = icon;
     }
 
     private IReadOnlyList<int> SelectedAudioStreamIndices() =>
         AudioTracks
             .Where(track => track.IsSelected)
             .Select(track => track.Track.StreamIndex)
+            .ToArray();
+
+    private IReadOnlyList<int> SelectedAudioTrackIds() =>
+        AudioTracks
+            .Where(track => track.IsSelected)
+            .Select(track => track.Track.Ordinal + 1)
             .ToArray();
 
     private void UpdateMergeAudioState()
@@ -609,6 +824,18 @@ public partial class ClipEditorWindow : Window
 
     private void RequestOverwrite_Click(object sender, RoutedEventArgs e)
     {
+        if (OverwriteConfirmOverlay.Visibility == Visibility.Visible)
+            return;
+        _resumeAfterOverwriteConfirmation = _playing;
+        if (_playing)
+            _playbackPosition = CurrentPlaybackPosition();
+        PauseNativePlayback();
+        _playerVisibilityBeforeOverwrite = PreviewPlayer.Visibility;
+        _imageVisibilityBeforeOverwrite = PreviewImage.Visibility;
+        PreviewPlayer.Visibility = Visibility.Collapsed;
+        if (PreviewImage.Source is not null)
+            PreviewImage.Visibility = Visibility.Visible;
+
         OverwriteMessageText.Text = Localization.Text(
             MergeAudioCheckBox.IsChecked == true
                 ? "L.Library.OverwriteMergeMessage"
@@ -620,28 +847,52 @@ public partial class ClipEditorWindow : Window
     private void CancelOverwrite_Click(object sender, RoutedEventArgs e) =>
         CancelOverwrite();
 
-    private void CancelOverwrite() =>
+    private void CancelOverwrite(bool resumePlayback = true)
+    {
         OverwriteConfirmOverlay.Visibility = Visibility.Collapsed;
+        PreviewPlayer.Visibility = _playerVisibilityBeforeOverwrite;
+        PreviewImage.Visibility = _imageVisibilityBeforeOverwrite;
+        bool resume = resumePlayback && _resumeAfterOverwriteConfirmation &&
+                      PreviewPlayer.IsReady;
+        _resumeAfterOverwriteConfirmation = false;
+        if (resume)
+        {
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+        }
+        UpdatePlayIcon();
+        UpdatePlaybackText(readPlayerPosition: false);
+    }
 
     private async void ConfirmOverwrite_Click(object sender, RoutedEventArgs e)
     {
-        CancelOverwrite();
+        CancelOverwrite(resumePlayback: false);
         await SaveTrimAsync(overwrite: true);
     }
 
     private async Task SaveTrimAsync(bool overwrite)
     {
+        if (_saveInProgress)
+            return;
+        _saveInProgress = true;
         SaveTrimButton.IsEnabled = false;
         OverwriteButton.IsEnabled = false;
         MergeAudioCheckBox.IsEnabled = false;
         bool mergeAudioTracks = MergeAudioCheckBox.IsChecked == true;
-        EditorStatusText.Text = Localization.Text(
+        string savingStatus = Localization.Text(
             mergeAudioTracks
                 ? "L.Library.TrimmingMerge"
                 : "L.Library.Trimming");
+        EditorStatusText.Text = savingStatus;
+        SavingStatusText.Text = savingStatus;
         try
         {
-            StopNativePlayback();
+            PauseNativePlayback();
+            PreviewPlayer.Visibility = Visibility.Collapsed;
+            ShowSavingOverlay();
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            await PreviewPlayer.StopAsync(_lifetimeCts.Token);
             TimeSpan start = TimeSpan.FromSeconds(_selectionStart);
             TimeSpan end = TimeSpan.FromSeconds(_selectionEnd);
             IReadOnlyList<int> audioStreams = SelectedAudioStreamIndices();
@@ -673,12 +924,44 @@ public partial class ClipEditorWindow : Window
         catch (Exception exception)
         {
             Log.Write($"Replay trim failed: {exception}");
-            EditorStatusText.Text = exception.Message;
+            HideSavingOverlay();
+            EditorStatusText.Text = IsSharingViolation(exception)
+                ? Localization.Text("L.Library.FileInUse")
+                : exception.Message;
             SaveTrimButton.IsEnabled = true;
             OverwriteButton.IsEnabled = true;
             UpdateMergeAudioState();
+            await InitializePreviewAsync();
+        }
+        finally
+        {
+            _saveInProgress = false;
         }
     }
+
+    private void ShowSavingOverlay()
+    {
+        SavingBackdrop.BeginAnimation(OpacityProperty, null);
+        SavingBackdrop.Opacity = 0;
+        SavingOverlay.Visibility = Visibility.Visible;
+        SavingBackdrop.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            });
+    }
+
+    private void HideSavingOverlay()
+    {
+        SavingBackdrop.BeginAnimation(OpacityProperty, null);
+        SavingBackdrop.Opacity = 0;
+        SavingOverlay.Visibility = Visibility.Collapsed;
+    }
+
+    private static bool IsSharingViolation(Exception exception) =>
+        exception is IOException &&
+        (exception.HResult & 0xFFFF) is 32 or 33;
 
     private static string AudioLabel(AudioTrackInfo track, int count)
     {
@@ -702,6 +985,168 @@ public partial class ClipEditorWindow : Window
         return Localization.Format("L.Library.AudioTrackNumber", track.Ordinal + 1);
     }
 
+    private void EnterFullscreen_Click(object sender, RoutedEventArgs e) =>
+        EnterFullscreen();
+
+    private void ExitFullscreen_Click(object sender, RoutedEventArgs e) =>
+        ExitFullscreen();
+
+    private void EnterFullscreen()
+    {
+        if (_isFullscreen)
+            return;
+
+        _restoreBounds = new Rect(Left, Top, ActualWidth, ActualHeight);
+        _restoreWindowState = WindowState;
+        _restoreTopmost = Topmost;
+        _isFullscreen = true;
+
+        WindowState = WindowState.Normal;
+        Rect monitor = CurrentMonitorBounds();
+        WindowStartupLocation = WindowStartupLocation.Manual;
+        Left = monitor.Left;
+        Top = monitor.Top;
+        Width = monitor.Width;
+        Height = monitor.Height;
+        Topmost = true;
+
+        HeaderRow.Height = new GridLength(0);
+        EditorHeader.Visibility = Visibility.Collapsed;
+        EditorWorkspace.Margin = new Thickness(0);
+        PreviewRow.Height = new GridLength(1, GridUnitType.Star);
+        PlaybackRow.Height = new GridLength(FullscreenControlsHeight);
+        TimelineRow.Height = new GridLength(0);
+        ActionsRow.Height = new GridLength(0);
+        NormalPlaybackBar.Visibility = Visibility.Collapsed;
+        WindowChrome.BorderThickness = new Thickness(0);
+        WindowChrome.CornerRadius = new CornerRadius(0);
+        PreviewBorder.BorderThickness = new Thickness(0);
+        PreviewBorder.CornerRadius = new CornerRadius(0);
+
+        _lastPointerActivityUtc = DateTime.UtcNow;
+        if (GetCursorPos(out NativePoint cursor))
+            _lastCursorPosition = cursor;
+        ShowFullscreenControls();
+        _fullscreenUiTimer.Start();
+        RefreshFullscreenLayout();
+        Focus();
+    }
+
+    private void ExitFullscreen()
+    {
+        if (!_isFullscreen)
+            return;
+
+        _isFullscreen = false;
+        _fullscreenUiTimer.Stop();
+        FullscreenControlBar.BeginAnimation(OpacityProperty, null);
+        FullscreenControlBar.Visibility = Visibility.Collapsed;
+        FullscreenControlBar.Opacity = 0;
+
+        HeaderRow.Height = new GridLength(56);
+        EditorHeader.Visibility = Visibility.Visible;
+        EditorWorkspace.Margin = new Thickness(20, 0, 20, 20);
+        PreviewRow.Height = new GridLength(390);
+        PlaybackRow.Height = GridLength.Auto;
+        TimelineRow.Height = new GridLength(1, GridUnitType.Star);
+        ActionsRow.Height = GridLength.Auto;
+        NormalPlaybackBar.Visibility = Visibility.Visible;
+        WindowChrome.BorderThickness = new Thickness(1);
+        WindowChrome.CornerRadius = (CornerRadius)FindResource("RadiusWindow");
+        PreviewBorder.BorderThickness = new Thickness(1);
+        PreviewBorder.CornerRadius = new CornerRadius(12);
+
+        Topmost = _restoreTopmost;
+        WindowState = WindowState.Normal;
+        Left = _restoreBounds.Left;
+        Top = _restoreBounds.Top;
+        Width = _restoreBounds.Width;
+        Height = _restoreBounds.Height;
+        WindowState = _restoreWindowState;
+        EditorWorkspace.UpdateLayout();
+        Focus();
+    }
+
+    private void FullscreenControls_MouseMove(object sender, MouseEventArgs e) =>
+        ShowFullscreenControls();
+
+    private void UpdateFullscreenControls()
+    {
+        if (!_isFullscreen)
+            return;
+        if (GetCursorPos(out NativePoint cursor) &&
+            (cursor.X != _lastCursorPosition.X || cursor.Y != _lastCursorPosition.Y))
+        {
+            _lastCursorPosition = cursor;
+            ShowFullscreenControls();
+            return;
+        }
+        if (!FullscreenControlBar.IsMouseOver &&
+            DateTime.UtcNow - _lastPointerActivityUtc >= FullscreenControlsTimeout)
+        {
+            HideFullscreenControls();
+        }
+    }
+
+    private void ShowFullscreenControls()
+    {
+        if (!_isFullscreen)
+            return;
+        _lastPointerActivityUtc = DateTime.UtcNow;
+        PlaybackRow.Height = new GridLength(FullscreenControlsHeight);
+        FullscreenControlBar.Visibility = Visibility.Visible;
+        var animation = new DoubleAnimation(1, TimeSpan.FromMilliseconds(120))
+        {
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        FullscreenControlBar.BeginAnimation(OpacityProperty, animation);
+        RefreshFullscreenLayout();
+    }
+
+    private void HideFullscreenControls()
+    {
+        if (!_isFullscreen || FullscreenControlBar.Visibility != Visibility.Visible)
+            return;
+        var animation = new DoubleAnimation(0, TimeSpan.FromMilliseconds(170));
+        animation.Completed += (_, _) =>
+        {
+            if (!_isFullscreen || FullscreenControlBar.IsMouseOver ||
+                DateTime.UtcNow - _lastPointerActivityUtc < FullscreenControlsTimeout)
+            {
+                return;
+            }
+            FullscreenControlBar.Visibility = Visibility.Collapsed;
+            PlaybackRow.Height = new GridLength(0);
+            RefreshFullscreenLayout();
+        };
+        FullscreenControlBar.BeginAnimation(OpacityProperty, animation);
+    }
+
+    private void RefreshFullscreenLayout()
+    {
+        EditorWorkspace.UpdateLayout();
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+        {
+            EditorWorkspace.UpdateLayout();
+            PreviewPlayer.InvalidateVisual();
+        });
+    }
+
+    private Rect CurrentMonitorBounds()
+    {
+        nint window = new WindowInteropHelper(this).Handle;
+        nint monitor = MonitorFromWindow(window, 2);
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (monitor == 0 || !GetMonitorInfoW(monitor, ref info))
+            return SystemParameters.WorkArea;
+
+        Matrix fromDevice = PresentationSource.FromVisual(this)?
+                                .CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        Point topLeft = fromDevice.Transform(new Point(info.Monitor.Left, info.Monitor.Top));
+        Point bottomRight = fromDevice.Transform(new Point(info.Monitor.Right, info.Monitor.Bottom));
+        return new Rect(topLeft, bottomRight);
+    }
+
     private void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState == MouseButtonState.Pressed)
@@ -710,26 +1155,47 @@ public partial class ClipEditorWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (_saveInProgress)
+        {
+            e.Handled = true;
+            return;
+        }
         if (e.Key == Key.Escape &&
             OverwriteConfirmOverlay.Visibility == Visibility.Visible)
         {
             CancelOverwrite();
             e.Handled = true;
         }
+        else if (e.Key == Key.Escape && _isFullscreen)
+        {
+            ExitFullscreen();
+            e.Handled = true;
+        }
         else if (e.Key == Key.Escape)
             Close();
-        else if (e.Key == Key.Space)
+        else if (e.Key == Key.F)
         {
+            if (_isFullscreen)
+                ExitFullscreen();
+            else
+                EnterFullscreen();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Space && !e.IsRepeat)
+        {
+            ShowFullscreenControls();
             PlayPause_Click(PlayButton, new RoutedEventArgs());
             e.Handled = true;
         }
         else if (e.Key == Key.Left)
         {
+            ShowFullscreenControls();
             Back_Click(this, new RoutedEventArgs());
             e.Handled = true;
         }
         else if (e.Key == Key.Right)
         {
+            ShowFullscreenControls();
             Forward_Click(this, new RoutedEventArgs());
             e.Handled = true;
         }
@@ -779,6 +1245,41 @@ public partial class ClipEditorWindow : Window
         milliseconds
             ? $"{(int)time.TotalMinutes:00}:{time.Seconds:00}.{time.Milliseconds:000}"
             : $"{(int)time.TotalMinutes:00}:{time.Seconds:00}";
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect WorkArea;
+        public uint Flags;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out NativePoint point);
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint window, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfoW(nint monitor, ref MonitorInfo info);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(

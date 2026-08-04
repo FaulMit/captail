@@ -139,7 +139,9 @@
   <sys:String x:Key="L.Storage.OrganizeByGameHint">Detected games save into their own folders. Replays saved while Desktop is active stay in the main folder.</sys:String>
 
   <sys:String x:Key="L.Library.Recent">RECENT REPLAYS</sys:String>
-  <sys:String x:Key="L.Library.Empty">Saved replays will appear here.</sys:String>
+  <sys:String x:Key="L.Library.Empty">No replays yet. Saved replays will appear here.</sys:String>
+  <sys:String x:Key="L.Library.Loading">Loading replays…</sys:String>
+  <sys:String x:Key="L.Library.LoadFailed">Could not load replays.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Refresh replays</sys:String>
   <sys:String x:Key="L.Library.Open">Show in folder</sys:String>
   <sys:String x:Key="L.Library.Trim">Trim</sys:String>
@@ -153,9 +155,13 @@
   <sys:String x:Key="L.Library.Start">Start</sys:String>
   <sys:String x:Key="L.Library.End">End</sys:String>
   <sys:String x:Key="L.Library.Play">Play / pause</sys:String>
+  <sys:String x:Key="L.Library.Fullscreen">Full screen</sys:String>
+  <sys:String x:Key="L.Library.ExitFullscreen">Exit full screen</sys:String>
   <sys:String x:Key="L.Library.SaveTrim">Save trimmed copy</sys:String>
   <sys:String x:Key="L.Library.Trimming">Saving clip…</sys:String>
   <sys:String x:Key="L.Library.TrimmingMerge">Trimming and mixing audio…</sys:String>
+  <sys:String x:Key="L.Library.SavingTitle">Saving replay</sys:String>
+  <sys:String x:Key="L.Library.FileInUse">Replay is still in use. Close external players and try again.</sys:String>
   <sys:String x:Key="L.Library.TrimHint">Creates a new file without re-encoding. Original replay stays untouched.</sys:String>
   <sys:String x:Key="L.Library.Trimmed">Trimmed replay saved</sys:String>
   <sys:String x:Key="L.Library.VideoTrack">VIDEO</sys:String>

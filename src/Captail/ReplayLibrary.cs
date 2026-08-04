@@ -51,7 +51,9 @@ public sealed class ReplayLibrary
                 AttributesToSkip = FileAttributes.ReparsePoint,
             };
             files = Directory.EnumerateFiles(root, "*", options)
-                .Where(path => VideoExtensions.Contains(Path.GetExtension(path)))
+                .Where(path =>
+                    VideoExtensions.Contains(Path.GetExtension(path)) &&
+                    !IsInternalWorkingFile(path))
                 .Select(path => new FileInfo(path))
                 .Where(file => file.Exists && file.Length > 0)
                 .OrderByDescending(file => file.LastWriteTimeUtc)
@@ -335,6 +337,15 @@ public sealed class ReplayLibrary
         Path.GetFullPath(rootDirectory).TrimEnd(
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+    internal static bool IsInternalWorkingFile(string path)
+    {
+        string name = Path.GetFileName(path);
+        return name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) ||
+               name.Contains(".tmp.", StringComparison.OrdinalIgnoreCase) ||
+               (name.StartsWith('.') &&
+                name.Contains(".replacement", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static string UniquePath(string directory, string baseName, string extension)
     {

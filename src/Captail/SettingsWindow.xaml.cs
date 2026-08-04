@@ -1264,6 +1264,7 @@ public partial class SettingsWindow : Window
     {
         if (Interlocked.Exchange(ref _libraryRefreshInProgress, 1) != 0)
             return;
+        SetReplayLibraryState(loading: true);
         try
         {
             IReadOnlyList<ReplayClip> clips = await _replayLibrary.GetRecentAsync(
@@ -1274,9 +1275,7 @@ public partial class SettingsWindow : Window
                 return;
 
             RecentReplaysList.ItemsSource = clips.Select(CreateReplayClipItem).ToArray();
-            ReplayLibraryEmptyText.Visibility = clips.Count == 0
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            SetReplayLibraryState(empty: clips.Count == 0);
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
@@ -1286,12 +1285,31 @@ public partial class SettingsWindow : Window
         {
             Log.Write($"Replay library refresh failed: {exception}");
             RecentReplaysList.ItemsSource = null;
-            ReplayLibraryEmptyText.Visibility = Visibility.Visible;
+            SetReplayLibraryState(error: true);
         }
         finally
         {
             Interlocked.Exchange(ref _libraryRefreshInProgress, 0);
         }
+    }
+
+    private void SetReplayLibraryState(
+        bool loading = false,
+        bool empty = false,
+        bool error = false)
+    {
+        ReplayLibraryLoading.Visibility = loading
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ReplayLibraryEmptyText.Visibility = empty
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ReplayLibraryErrorText.Visibility = error
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        RecentReplaysScrollViewer.Visibility = !loading && !empty && !error
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private ReplayClipItem CreateReplayClipItem(ReplayClip clip)

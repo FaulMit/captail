@@ -227,8 +227,8 @@ public sealed class FfmpegAdapter
         if (start < TimeSpan.Zero || end <= start)
             throw new ArgumentOutOfRangeException(nameof(start));
 
-        string temporaryPath = destinationPath + $".{Guid.NewGuid():N}.tmp" +
-            Path.GetExtension(destinationPath);
+        string outputFormat = OutputFormatForPath(destinationPath);
+        string temporaryPath = destinationPath + $".{Guid.NewGuid():N}.tmp";
         try
         {
             int[] selectedAudioStreams = audioStreamIndices?
@@ -288,7 +288,7 @@ public sealed class FfmpegAdapter
             {
                 arguments.AddRange(["-movflags", "+faststart"]);
             }
-            arguments.AddRange(["-y", temporaryPath]);
+            arguments.AddRange(["-f", outputFormat, "-y", temporaryPath]);
             await RunAsync(
                 _ffmpegPath,
                 arguments,
@@ -297,12 +297,14 @@ public sealed class FfmpegAdapter
 
             if (!File.Exists(temporaryPath) || new FileInfo(temporaryPath).Length == 0)
                 throw new InvalidOperationException("FFmpeg produced an empty clip.");
-            File.Move(temporaryPath, destinationPath);
+            await MoveFileWithRetryAsync(
+                temporaryPath,
+                destinationPath,
+                cancellationToken);
         }
         finally
         {
-            if (File.Exists(temporaryPath))
-                File.Delete(temporaryPath);
+            TryDeleteWorkingFile(temporaryPath);
         }
     }
 
@@ -330,16 +332,84 @@ public sealed class FfmpegAdapter
                 mergeAudioTracks,
                 cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
-            File.Replace(
+            await ReplaceFileWithRetryAsync(
                 replacementPath,
                 sourcePath,
-                destinationBackupFileName: null,
-                ignoreMetadataErrors: true);
+                cancellationToken);
         }
         finally
         {
-            if (File.Exists(replacementPath))
-                File.Delete(replacementPath);
+            TryDeleteWorkingFile(replacementPath);
+        }
+    }
+
+    private static string OutputFormatForPath(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".mkv" => "matroska",
+            ".mp4" => "mp4",
+            ".mov" => "mov",
+            ".webm" => "webm",
+            string extension => throw new NotSupportedException(
+                $"Unsupported replay container '{extension}'."),
+        };
+
+    internal static Task MoveFileWithRetryAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken = default) =>
+        RunFileOperationWithRetryAsync(
+            () => File.Move(sourcePath, destinationPath),
+            cancellationToken);
+
+    private static Task ReplaceFileWithRetryAsync(
+        string replacementPath,
+        string sourcePath,
+        CancellationToken cancellationToken) =>
+        RunFileOperationWithRetryAsync(
+            () => File.Replace(
+                replacementPath,
+                sourcePath,
+                destinationBackupFileName: null,
+                ignoreMetadataErrors: true),
+            cancellationToken);
+
+    private static async Task RunFileOperationWithRetryAsync(
+        Action operation,
+        CancellationToken cancellationToken)
+    {
+        const int attempts = 8;
+        for (int attempt = 1; ; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                operation();
+                return;
+            }
+            catch (IOException) when (attempt < attempts)
+            {
+                await Task.Delay(
+                    TimeSpan.FromMilliseconds(Math.Min(250, 40 * attempt)),
+                    cancellationToken);
+            }
+        }
+    }
+
+    private static void TryDeleteWorkingFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (IOException exception)
+        {
+            Log.Write($"Temporary replay cleanup deferred ({Path.GetFileName(path)}): {exception.Message}");
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Log.Write($"Temporary replay cleanup denied ({Path.GetFileName(path)}): {exception.Message}");
         }
     }
 

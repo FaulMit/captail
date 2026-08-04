@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="572" height="112" viewBox="0 0 572 112" role="img" aria-labelledby="title desc">
+  <title id="title">Get Captail from Microsoft Store</title>
+  <desc id="desc">Graphite Microsoft Store button with automatic update support.</desc>
+  <rect x="2" y="2" width="568" height="108" rx="20" fill="#12191c" stroke="#65d9bd" stroke-width="4"/>
+  <path d="M47 43h36v34H47zM55 43v-5c0-7 5-12 10-12s10 5 10 12v5" fill="none" stroke="#65d9bd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M55 53h9v9h-9zM67 53h9v9h-9zM55 65h9v9h-9zM67 65h9v9h-9z" fill="#65d9bd"/>
+  <text x="108" y="51" fill="#f1f5f4" font-family="Segoe UI, Arial, sans-serif" font-size="27" font-weight="700">Get it from Microsoft Store</text>
+  <text x="108" y="79" fill="#91a19e" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Automatic Store updates</text>
+  <path d="M519 41l14 15-14 15M502 56h30" fill="none" stroke="#65d9bd" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

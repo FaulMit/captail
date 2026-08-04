@@ -74,17 +74,12 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $binRoot "ffprobe.exe"))) {
         throw "ffprobe.exe not found in FFmpeg archive."
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $binRoot "ffplay.exe"))) {
-        throw "ffplay.exe not found in FFmpeg archive."
-    }
-
     if (Test-Path -LiteralPath $Destination) {
         Remove-Item -LiteralPath $Destination -Recurse -Force
     }
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     Copy-Item -LiteralPath (Join-Path $binRoot "ffmpeg.exe") -Destination $Destination
     Copy-Item -LiteralPath (Join-Path $binRoot "ffprobe.exe") -Destination $Destination
-    Copy-Item -LiteralPath (Join-Path $binRoot "ffplay.exe") -Destination $Destination
     Get-ChildItem -LiteralPath $binRoot -File -Filter *.dll |
         Copy-Item -Destination $Destination
 

@@ -84,6 +84,8 @@
   <Geometry x:Key="IconTrash">M3 6h18 M8 6V3h8v3 M19 6l-1 15H6L5 6 M10 11v6 M14 11v6</Geometry>
   <Geometry x:Key="IconPlay">M8 5v14l11-7z</Geometry>
   <Geometry x:Key="IconPause">M8 5h3v14H8z M14 5h3v14h-3z</Geometry>
+  <Geometry x:Key="IconFullscreen">M8 3H3v5 M16 3h5v5 M8 21H3v-5 M16 21h5v-5</Geometry>
+  <Geometry x:Key="IconExitFullscreen">M3 8h5V3 M21 8h-5V3 M3 16h5v5 M21 16h-5v5</Geometry>
 
   <Geometry x:Key="IconGitHub">M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.58 9.58 0 0 1 12 7.7a9.6 9.6 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86V21c0 .27.18.58.69.48A10 10 0 0 0 12 2z</Geometry>
 
@@ -109,6 +111,43 @@
     <Setter Property="FontFamily" Value="{StaticResource FontUi}"/>
     <Setter Property="FontSize" Value="{StaticResource FontSizeSmall}"/>
     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+  </Style>
+
+  <Style x:Key="LoadingIndicator" TargetType="Control">
+    <Setter Property="Width" Value="24"/>
+    <Setter Property="Height" Value="24"/>
+    <Setter Property="IsHitTestVisible" Value="False"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Control">
+          <Viewbox Stretch="Uniform">
+            <Grid Width="24" Height="24">
+              <Ellipse Margin="2" Stroke="{StaticResource AccentBrush}"
+                       StrokeThickness="2" Opacity="0.14"/>
+              <Ellipse x:Name="LoadingArc" Margin="2" Stroke="{StaticResource AccentBrush}"
+                       StrokeThickness="2.2" StrokeDashArray="8,20"
+                       StrokeDashCap="Round" Fill="Transparent"
+                       RenderTransformOrigin="0.5,0.5">
+                <Ellipse.RenderTransform>
+                  <RotateTransform/>
+                </Ellipse.RenderTransform>
+                <Ellipse.Triggers>
+                  <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                    <BeginStoryboard>
+                      <Storyboard RepeatBehavior="Forever">
+                        <DoubleAnimation
+                            Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                            From="0" To="360" Duration="0:0:0.85"/>
+                      </Storyboard>
+                    </BeginStoryboard>
+                  </EventTrigger>
+                </Ellipse.Triggers>
+              </Ellipse>
+            </Grid>
+          </Viewbox>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 
   <Style x:Key="MonoText" TargetType="TextBlock">
@@ -516,6 +555,71 @@
               <Setter Property="Opacity" Value="0.38"/>
             </Trigger>
           </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="FullscreenProgressSlider" TargetType="Slider">
+    <Setter Property="Minimum" Value="0"/>
+    <Setter Property="SmallChange" Value="1"/>
+    <Setter Property="LargeChange" Value="5"/>
+    <Setter Property="Height" Value="15"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="IsMoveToPointEnabled" Value="True"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid Background="Transparent">
+            <Track x:Name="PART_Track" VerticalAlignment="Center" Height="12">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
+                  <RepeatButton.Template>
+                    <ControlTemplate TargetType="RepeatButton">
+                      <Border Height="4" Background="{StaticResource AccentBrush}"
+                              CornerRadius="2,0,0,2"/>
+                    </ControlTemplate>
+                  </RepeatButton.Template>
+                </RepeatButton>
+              </Track.DecreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Width="12" Height="12">
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Ellipse x:Name="ProgressKnob"
+                               Fill="{StaticResource AccentBrush}"
+                               Stroke="#FF17352E" StrokeThickness="1">
+                        <Ellipse.RenderTransform>
+                          <ScaleTransform ScaleX="0.84" ScaleY="0.84"/>
+                        </Ellipse.RenderTransform>
+                      </Ellipse>
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="ProgressKnob" Property="Fill"
+                                  Value="{StaticResource AccentHoverBrush}"/>
+                          <Setter TargetName="ProgressKnob" Property="RenderTransform">
+                            <Setter.Value>
+                              <ScaleTransform ScaleX="1" ScaleY="1"/>
+                            </Setter.Value>
+                          </Setter>
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
+                  <RepeatButton.Template>
+                    <ControlTemplate TargetType="RepeatButton">
+                      <Border Height="4" Background="#FF2A3235"
+                              CornerRadius="0,2,2,0"/>
+                    </ControlTemplate>
+                  </RepeatButton.Template>
+                </RepeatButton>
+              </Track.IncreaseRepeatButton>
+            </Track>
+          </Grid>
         </ControlTemplate>
       </Setter.Value>
     </Setter>

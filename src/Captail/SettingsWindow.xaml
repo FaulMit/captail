@@ -249,8 +249,22 @@
                             <TextBlock Text="↻" FontSize="16"/>
                         </Button>
                     </Grid>
+                    <StackPanel x:Name="ReplayLibraryLoading" Grid.Row="1"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Control Style="{StaticResource LoadingIndicator}"
+                                 Width="24" Height="24" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource L.Library.Loading}"
+                                   Style="{StaticResource SecondaryText}"
+                                   Margin="0,10,6,0" TextAlignment="Center"/>
+                    </StackPanel>
                     <TextBlock x:Name="ReplayLibraryEmptyText" Grid.Row="1"
                                Text="{DynamicResource L.Library.Empty}"
+                               Style="{StaticResource SecondaryText}"
+                               TextAlignment="Center" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" Margin="0,0,6,0"
+                               Visibility="Collapsed"/>
+                    <TextBlock x:Name="ReplayLibraryErrorText" Grid.Row="1"
+                               Text="{DynamicResource L.Library.LoadFailed}"
                                Style="{StaticResource SecondaryText}"
                                TextAlignment="Center" HorizontalAlignment="Center"
                                VerticalAlignment="Center" Margin="0,0,6,0"
@@ -258,7 +272,8 @@
                     <ScrollViewer x:Name="RecentReplaysScrollViewer" Grid.Row="1"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Disabled"
-                                  PanningMode="VerticalOnly" Padding="0,0,6,0">
+                                  PanningMode="VerticalOnly" Padding="0,0,6,0"
+                                  Visibility="Collapsed">
                 <ItemsControl x:Name="RecentReplaysList"
                               VirtualizingPanel.IsVirtualizing="True"
                               VirtualizingPanel.VirtualizationMode="Recycling">
