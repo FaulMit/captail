@@ -26,10 +26,7 @@ public sealed class ReplayLibrary
     public ReplayLibrary(FfmpegAdapter ffmpeg)
     {
         _ffmpeg = ffmpeg;
-        _thumbnailDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Captail",
-            "thumbnails");
+        _thumbnailDirectory = AppDataPaths.ThumbnailDirectory;
     }
 
     public async Task<IReadOnlyList<ReplayClip>> GetRecentAsync(

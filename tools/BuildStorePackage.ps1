@@ -33,6 +33,13 @@ $uploadPath = Join-Path $outputRoot "$packageName.msixupload"
 $uploadZipPath = Join-Path $outputRoot "$packageName.zip"
 $checksumPath = Join-Path $outputRoot "SHA256SUMS.txt"
 $project = Join-Path $repoRoot "src\Captail\Captail.csproj"
+$storeFfmpegRoot = Join-Path $repoRoot "runtime\ffmpeg-store-static"
+$acquireFfmpeg = Join-Path $repoRoot "tools\AcquireFfmpegRuntime.ps1"
+$testFfmpegIsolation = Join-Path $repoRoot "tools\TestStoreFfmpegIsolation.ps1"
+$testNativeDependencies =
+    Join-Path $repoRoot "tools\TestStoreNativeDependencies.ps1"
+$testStoreLifecycle =
+    Join-Path $repoRoot "tools\TestStoreLifecycleIsolation.ps1"
 $manifestTemplate = Join-Path $repoRoot "packaging\msix\AppxManifest.xml.template"
 $iconPath = Join-Path $repoRoot "src\Captail\Assets\Captail.ico"
 
@@ -66,6 +73,8 @@ if (-not $MakeAppxPath -or -not (Test-Path -LiteralPath $MakeAppxPath)) {
 }
 
 Write-Host "Publishing Captail $Version for Microsoft Store..."
+& $testStoreLifecycle
+& $acquireFfmpeg -Destination $storeFfmpegRoot -Flavor Static
 dotnet restore $project `
     --locked-mode `
     --runtime win-x64 `
@@ -82,6 +91,8 @@ dotnet publish $project `
     -o $packageRoot `
     -p:Version=$Version `
     -p:MicrosoftStoreBuild=true `
+    -p:FfmpegRuntimeRoot=$storeFfmpegRoot `
+    -p:AcquireFfmpegRuntimeOnBuild=false `
     -p:PublishSingleFile=true `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:EnableCompressionInSingleFile=true `
@@ -176,6 +187,8 @@ if ($identity.Name -ne "faulmit.Captail" -or
     $identity.ProcessorArchitecture -ne "x64") {
     throw "Generated MSIX identity does not match Partner Center."
 }
+& $testFfmpegIsolation -PackageRoot $validationRoot
+& $testNativeDependencies -PackageRoot $validationRoot
 
 Write-Host "Creating Partner Center upload archive..."
 Compress-Archive -LiteralPath $msixPath `

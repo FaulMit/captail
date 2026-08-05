@@ -1,13 +1,27 @@
 [CmdletBinding()]
 param(
-    [string]$Destination = ""
+    [string]$Destination = "",
+
+    [ValidateSet("Shared", "Static")]
+    [string]$Flavor = "Shared"
 )
 
 $ErrorActionPreference = "Stop"
 $version = "n7.1.5-12-g1fdbca85aa"
-$archiveName = "ffmpeg-$version-win64-lgpl-shared-7.1.zip"
+$isStatic = $Flavor -eq "Static"
+$archiveName = if ($isStatic) {
+    "ffmpeg-$version-win64-lgpl-7.1.zip"
+}
+else {
+    "ffmpeg-$version-win64-lgpl-shared-7.1.zip"
+}
 $url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-01-13-21/$archiveName"
-$expectedArchiveSha256 = "289ec4ca5a832cb1f2486ee35301d345c5dfaa28018f6177cdbbfbc2ad6f2e33"
+$expectedArchiveSha256 = if ($isStatic) {
+    "bc25a2260a1eaa6fd91d5774a8d8bc425c7d43ae9e8c74297d2d6ebc38e188cb"
+}
+else {
+    "289ec4ca5a832cb1f2486ee35301d345c5dfaa28018f6177cdbbfbc2ad6f2e33"
+}
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
 
@@ -28,7 +42,8 @@ function Get-Sha256Hex([string]$Path) {
 }
 
 if (-not $Destination) {
-    $Destination = Join-Path $allowedRuntimeRoot "ffmpeg"
+    $runtimeName = if ($isStatic) { "ffmpeg-static" } else { "ffmpeg" }
+    $Destination = Join-Path $allowedRuntimeRoot $runtimeName
 }
 
 $Destination = [IO.Path]::GetFullPath($Destination)
@@ -85,6 +100,8 @@ try {
 
     Set-Content -LiteralPath (Join-Path $Destination "VERSION") `
         -Value $version -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $Destination "FLAVOR") `
+        -Value $Flavor.ToLowerInvariant() -Encoding ascii
     Set-Content -LiteralPath (Join-Path $Destination "SOURCE_URL") `
         -Value $url -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $Destination "SOURCE_SHA256") `
@@ -104,4 +121,4 @@ finally {
     }
 }
 
-Write-Host "FFmpeg runtime $version ready: $Destination"
+Write-Host "FFmpeg runtime $version ($Flavor) ready: $Destination"

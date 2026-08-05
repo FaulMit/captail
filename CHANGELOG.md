@@ -4,6 +4,10 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Prevented Microsoft Store builds from loading libobs media DLLs into the bundled FFmpeg tools, which could stop replay metadata, waveform, and trim operations before FFmpeg started.
+
 ## [0.1.7] - 2026-08-04
 
 ### Added

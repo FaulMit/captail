@@ -7,18 +7,13 @@ namespace Captail;
 
 internal static class ObsPluginDataCache
 {
-    private const string CacheDirectoryName = "obs-plugin-cache";
-
     public static string Prepare(string packagedDataRoot)
     {
         string sourceRoot = Path.Combine(packagedDataRoot, "obs-plugins");
         if (!Directory.Exists(sourceRoot))
             throw new DirectoryNotFoundException(sourceRoot);
 
-        string cacheRoot = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Captail",
-            CacheDirectoryName);
+        string cacheRoot = AppDataPaths.ObsPluginCacheDirectory;
         Directory.CreateDirectory(cacheRoot);
 
         string cacheKey = ComputeTreeHash(sourceRoot)[..20].ToLowerInvariant();

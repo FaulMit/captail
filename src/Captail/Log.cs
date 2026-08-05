@@ -7,9 +7,7 @@ public static class Log
     private static readonly Lock _lock = new();
     private static StreamWriter? _writer;
     private static int _pendingLines;
-    public static readonly string Path = System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Captail", "log.txt");
+    public static readonly string Path = AppDataPaths.LogFile;
 
     static Log() => AppDomain.CurrentDomain.ProcessExit += (_, _) => Close();
 

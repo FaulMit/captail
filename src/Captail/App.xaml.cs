@@ -49,6 +49,7 @@ public partial class App : Application
     private string? _captureDescription;
     private int _exiting;
     private bool _shutdownExistingSucceeded = true;
+    private StorePackageLifecycle? _storePackageLifecycle;
 #if DEBUG
     private bool _qaUpdateAvailable;
 #endif
@@ -84,6 +85,9 @@ public partial class App : Application
                 StringComparer.OrdinalIgnoreCase);
             bool automaticCapturePolicyTest = e.Args.Contains(
                 "--qa-auto-capture-policy",
+                StringComparer.OrdinalIgnoreCase);
+            bool replayRoutingTest = e.Args.Contains(
+                "--qa-replay-routing",
                 StringComparer.OrdinalIgnoreCase);
             bool updateCheckTest = e.Args.Contains(
                 "--qa-update-check",
@@ -125,6 +129,7 @@ public partial class App : Application
             const bool replaySegmentsTest = false;
             const bool fileRetryTest = false;
             const bool automaticCapturePolicyTest = false;
+            const bool replayRoutingTest = false;
             const bool updateCheckTest = false;
             const bool clipEditorTest = false;
             const bool audioMixTest = false;
@@ -145,7 +150,7 @@ public partial class App : Application
                     gameCaptureTest || replaySegmentsTest || updateCheckTest ||
                     clipEditorTest || audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
-                    automaticCapturePolicyTest))
+                    automaticCapturePolicyTest || replayRoutingTest))
             {
                 Shutdown();
                 return;
@@ -156,6 +161,9 @@ public partial class App : Application
                 return;
             }
 
+            AppDataPaths.PrepareStoreData();
+            _storePackageLifecycle = StorePackageLifecycle.Start(
+                OnStorePackageStopping);
             _config = Config.Load();
             Localization.SetLanguage(_config.Language);
             Localization.Changed += OnLanguageChanged;
@@ -207,6 +215,11 @@ public partial class App : Application
             if (automaticCapturePolicyTest)
             {
                 RunAutomaticCapturePolicyTest();
+                return;
+            }
+            if (replayRoutingTest)
+            {
+                RunReplayRoutingTest();
                 return;
             }
             if (updateCheckTest)
@@ -2177,6 +2190,108 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private void RunReplayRoutingTest()
+    {
+        try
+        {
+            string? automaticGame =
+                ObsReplayEngine.ResolveReplayGameExecutable(
+                    isAutomaticCapture: true,
+                    automaticGameActive: true,
+                    activeGameExecutable: @"C:\Games\Counter-Strike 2\cs2.exe",
+                    isGameHooked: true,
+                    hookedExecutable: @"C:\Users\User\Telegram.exe");
+            string? automaticDesktop =
+                ObsReplayEngine.ResolveReplayGameExecutable(
+                    isAutomaticCapture: true,
+                    automaticGameActive: false,
+                    activeGameExecutable: "",
+                    isGameHooked: true,
+                    hookedExecutable: @"C:\Users\User\Telegram.exe");
+            string? manualGame =
+                ObsReplayEngine.ResolveReplayGameExecutable(
+                    isAutomaticCapture: false,
+                    automaticGameActive: false,
+                    activeGameExecutable: @"C:\Games\Counter-Strike 2\cs2.exe",
+                    isGameHooked: true,
+                    hookedExecutable: @"C:\Games\Counter-Strike 2\cs2.exe");
+            string? noHook =
+                ObsReplayEngine.ResolveReplayGameExecutable(
+                    isAutomaticCapture: false,
+                    automaticGameActive: false,
+                    activeGameExecutable: "",
+                    isGameHooked: false,
+                    hookedExecutable: "");
+
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "Captail",
+                $"routing_{Environment.ProcessId}");
+            Directory.CreateDirectory(root);
+            var config = new Config
+            {
+                OrganizeReplaysByGame = true,
+                OutputDirectory = root,
+            };
+            string automaticSource = Path.Combine(root, "automatic.mkv");
+            string desktopSource = Path.Combine(root, "desktop.mkv");
+            string manualSource = Path.Combine(root, "manual.mkv");
+            File.WriteAllBytes(automaticSource, [1]);
+            File.WriteAllBytes(desktopSource, [2]);
+            File.WriteAllBytes(manualSource, [3]);
+            string automaticDestination = ReplayPaths.RouteSavedReplay(
+                config,
+                automaticSource,
+                automaticGame);
+            string desktopDestination = ReplayPaths.RouteSavedReplay(
+                config,
+                desktopSource,
+                automaticDesktop);
+            string manualDestination = ReplayPaths.RouteSavedReplay(
+                config,
+                manualSource,
+                manualGame);
+
+            bool passed =
+                string.Equals(
+                    Path.GetFileName(automaticGame),
+                    "cs2.exe",
+                    StringComparison.OrdinalIgnoreCase) &&
+                automaticDesktop is null &&
+                string.Equals(
+                    Path.GetFileName(manualGame),
+                    "cs2.exe",
+                    StringComparison.OrdinalIgnoreCase) &&
+                noHook is null &&
+                string.Equals(
+                    Path.GetFileName(Path.GetDirectoryName(
+                        automaticDestination)),
+                    "cs2",
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    Path.GetDirectoryName(desktopDestination),
+                    root,
+                    StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(
+                    Path.GetFileName(Path.GetDirectoryName(manualDestination)),
+                    "cs2",
+                    StringComparison.OrdinalIgnoreCase);
+            Log.Write(
+                $"REPLAY_ROUTING_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"autoGame={automaticGame}, autoDesktop={automaticDesktop}, " +
+                $"manual={manualGame}, noHook={noHook}, " +
+                $"autoFolder={Path.GetDirectoryName(automaticDestination)}, " +
+                $"desktopFolder={Path.GetDirectoryName(desktopDestination)}");
+            Directory.Delete(root, recursive: true);
+            Shutdown(passed ? 0 : 24);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"REPLAY_ROUTING_TEST FAIL: {exception}");
+            Shutdown(24);
+        }
+    }
+
     private async void RunReplaySegmentsTest()
     {
         try
@@ -2332,6 +2447,35 @@ public partial class App : Application
         Shutdown();
     }
 
+    private void OnStorePackageStopping(string reason)
+    {
+        if (Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished)
+            return;
+
+        Log.Write($"Stopping Captail for Store package {reason}.");
+        if (Dispatcher.CheckAccess())
+        {
+            _ = RequestShutdownAsync();
+            return;
+        }
+
+        try
+        {
+            Task shutdown = Dispatcher.Invoke(
+                RequestShutdownAsync,
+                DispatcherPriority.Send);
+            if (!shutdown.Wait(TimeSpan.FromSeconds(15)))
+            {
+                Log.Write(
+                    "Store package shutdown did not finish within 15 seconds.");
+            }
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Store package shutdown failed: {exception.Message}");
+        }
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         bool gracefulShutdownCompleted =
@@ -2342,6 +2486,8 @@ public partial class App : Application
         _updateShutdownTimer?.Stop();
         _activationServerCts?.Cancel();
         _activationServerCts?.Dispose();
+        _storePackageLifecycle?.Dispose();
+        _storePackageLifecycle = null;
         _settingsWindow?.Close();
         _hotkeys?.Dispose();
         _tray?.Dispose();

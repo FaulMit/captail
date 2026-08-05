@@ -88,6 +88,9 @@ Build an upload-ready package locally:
 .\tools\BuildStorePackage.ps1 -Version 0.1.7
 ```
 
+Store packaging uses self-contained FFmpeg tools and rejects package-root DLL
+collisions before creating the Partner Center upload archive.
+
 Upload `artifacts\store\0.1.7\Captail-0.1.7.0-x64.msixupload` in Partner
 Center. Full identity, validation, update-channel, and submission instructions
 are in [`packaging/msix/README.md`](../packaging/msix/README.md).

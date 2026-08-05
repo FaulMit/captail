@@ -138,6 +138,26 @@ public sealed class ObsReplayEngine : IDisposable
             Path.GetFileNameWithoutExtension(foregroundExecutable),
             StringComparison.OrdinalIgnoreCase);
 
+    internal static string? ResolveReplayGameExecutable(
+        bool isAutomaticCapture,
+        bool automaticGameActive,
+        string activeGameExecutable,
+        bool isGameHooked,
+        string hookedExecutable)
+    {
+        if (isAutomaticCapture)
+        {
+            return automaticGameActive &&
+                   !string.IsNullOrWhiteSpace(activeGameExecutable)
+                ? activeGameExecutable
+                : null;
+        }
+
+        return isGameHooked && !string.IsNullOrWhiteSpace(hookedExecutable)
+            ? hookedExecutable
+            : null;
+    }
+
     public bool IsHealthy
     {
         get
@@ -374,6 +394,9 @@ public sealed class ObsReplayEngine : IDisposable
     public ReplaySaveOperation BeginSaveReplay(
         CancellationToken cancellationToken = default)
     {
+        if (IsAutomaticCapture)
+            RefreshCaptureState();
+
         Task<string> completion;
         ulong initialMuxBytes;
         lock (_saveGate)
@@ -399,15 +422,34 @@ public sealed class ObsReplayEngine : IDisposable
             }
         }
 
+        bool isGameHooked = IsGameHooked;
+        string hookedExecutable = isGameHooked
+            ? ReadStringProcedure(
+                ObsNative.obs_source_get_proc_handler(_gameVideoSource),
+                "get_hooked",
+                "executable")
+            : "";
+        string? replayGameExecutable = ResolveReplayGameExecutable(
+            IsAutomaticCapture,
+            _automaticGameActive,
+            _activeGameExecutable,
+            isGameHooked,
+            hookedExecutable);
+        if (IsAutomaticCapture && isGameHooked &&
+            !string.Equals(
+                replayGameExecutable,
+                hookedExecutable,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Write(
+                "Replay routing ignored inactive Game Capture hook: " +
+                Path.GetFileName(hookedExecutable));
+        }
+
         return new ReplaySaveOperation(
             WaitForSaveCompletionAsync(completion, cancellationToken),
             initialMuxBytes,
-            IsGameHooked
-                ? ReadStringProcedure(
-                    ObsNative.obs_source_get_proc_handler(_gameVideoSource),
-                    "get_hooked",
-                    "executable")
-                : null);
+            replayGameExecutable);
     }
 
     public Task<string> SaveReplayAsync(
@@ -497,10 +539,7 @@ public sealed class ObsReplayEngine : IDisposable
             _obsLibrary = NativeLibrary.Load(obsPath);
         _logBridgeInstalled = ObsLogBridge.Install();
 
-        string configDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Captail",
-            "obs");
+        string configDirectory = AppDataPaths.ObsConfigDirectory;
         Directory.CreateDirectory(configDirectory);
         _obsStarted = ObsNative.obs_startup(
             Localization.IsRussian ? "ru-RU" : "en-US",

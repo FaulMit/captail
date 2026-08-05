@@ -44,6 +44,11 @@ but Windows will not allow direct sideloading until a trusted test certificate
 is applied. Store customers receive Microsoft's signed package after
 certification.
 
+Store packages use verified self-contained FFmpeg command-line tools. This
+prevents packaged-process DLL resolution from mixing FFmpeg with libobs media
+libraries that use the same file names. Package creation fails if duplicate
+libraries return or either command-line tool cannot start.
+
 ## Versioning
 
 MSIX requires four numeric components. Captail `0.1.7` becomes package version
@@ -61,7 +66,8 @@ Never reuse a version already submitted to Partner Center.
 
 1. Build package from clean `main` commit.
 2. Check `SHA256SUMS.txt` and inspect generated manifest identity.
-3. Test install, first launch, tray, capture, replay save, microphone permission,
-   startup toggle, uninstall, and Store update from previous package version.
+3. Test install, first launch, tray, capture, replay save, clip preview and trim,
+   microphone permission, startup toggle, uninstall, and Store update from the
+   previous package version.
 4. Complete Partner Center privacy, age rating, properties, screenshots, and
    certification notes.
