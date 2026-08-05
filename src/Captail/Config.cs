@@ -53,8 +53,7 @@ public sealed class Config
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Captail");
     public bool OrganizeReplaysByGame { get; set; }
     [JsonIgnore]
-    public static string ConfigPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Captail", "config.json");
+    public static string ConfigPath => AppDataPaths.ConfigFile;
     public static Config Load()
     {
         if (TryLoad(ConfigPath, out Config? config) && config is not null)

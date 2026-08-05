@@ -174,6 +174,16 @@ jobs:
           if (-not (Test-Path -LiteralPath $uninstaller)) {
             throw "Installer did not create an uninstaller."
           }
+
+          $app = Start-Process `
+            -FilePath (Join-Path $installDirectory "Captail.exe") `
+            -ArgumentList "--background" `
+            -PassThru
+          Start-Sleep -Seconds 2
+          if ($app.HasExited) {
+            throw "Installed Captail exited before uninstall QA."
+          }
+
           $uninstall = Start-Process -FilePath $uninstaller -Wait -PassThru -ArgumentList @(
             "/VERYSILENT",
             "/SUPPRESSMSGBOXES",
@@ -184,6 +194,17 @@ jobs:
           }
           if (Test-Path -LiteralPath (Join-Path $installDirectory "Captail.exe")) {
             throw "Captail.exe remains after uninstall."
+          }
+          $app.Refresh()
+          if (-not $app.HasExited) {
+            throw "Captail process remains after uninstall."
+          }
+          foreach ($dataDirectory in @(
+            (Join-Path $env:LOCALAPPDATA "Captail"),
+            (Join-Path $env:APPDATA "Captail"))) {
+            if (Test-Path -LiteralPath $dataDirectory) {
+              throw "Captail data remains after uninstall: $dataDirectory"
+            }
           }
 
       - name: Verify SHA-256 checksums

@@ -67,6 +67,16 @@ jobs:
             throw "Capability model QA failed: $($process.ExitCode)"
           }
 
+      - name: Validate replay folder routing
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path './src/Captail/bin/Debug/net9.0-windows10.0.22621.0/win-x64/Captail.exe'
+          $process = Start-Process -FilePath $exe -ArgumentList '--qa-replay-routing' `
+            -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Replay routing QA failed: $($process.ExitCode)"
+          }
+
       - name: Validate localization dictionaries
         shell: pwsh
         run: |

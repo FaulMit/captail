@@ -67,25 +67,46 @@ Name: "{autodesktop}\Captail"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktop
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Captail"; ValueData: """{app}\{#MyAppExeName}"" --background"; Flags: uninsdeletevalue; Tasks: startup
 
+[UninstallDelete]
+Type: filesandordirs; Name: "{localappdata}\Captail"
+Type: filesandordirs; Name: "{userappdata}\Captail"
+
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch Captail"; Flags: nowait postinstall skipifsilent
 
 [Code]
-function PrepareToInstall(var NeedsRestart: Boolean): String;
+function StopCaptail(): Boolean;
 var
   ResultCode: Integer;
   InstalledExe: String;
 begin
-  Result := '';
+  Result := True;
   InstalledExe := ExpandConstant('{app}\{#MyAppExeName}');
   if FileExists(InstalledExe) then
   begin
     if not Exec(InstalledExe, '--shutdown-existing', '', SW_HIDE,
       ewWaitUntilTerminated, ResultCode) then
-      Result := 'Could not ask Captail to stop before updating.'
+      Result := False
     else if ResultCode <> 0 then
-      Result := 'Captail is still busy. Wait for replay saving to finish, then retry.';
+      Result := False;
   end;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not StopCaptail() then
+    Result := 'Captail is still busy. Wait for replay saving to finish, then retry.';
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  Result := StopCaptail();
+  if not Result then
+    MsgBox(
+      'Captail could not stop safely. Close any active save operation and retry.',
+      mbError,
+      MB_OK);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
