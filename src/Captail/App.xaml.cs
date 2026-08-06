@@ -666,6 +666,12 @@ public partial class App : Application
             hotkeyOnlyChange.Hotkey = "Ctrl+Alt+F8";
             Config pipelineChange = invalidConfig.Clone();
             pipelineChange.FrameRate = 30;
+            long windows10CaptureMethod =
+                ObsReplayEngine.RecommendedMonitorCaptureMethod(
+                    new Version(10, 0, 19045));
+            long windows11CaptureMethod =
+                ObsReplayEngine.RecommendedMonitorCaptureMethod(
+                    new Version(10, 0, 22621));
 
             bool passed =
                 oldNvidia.Supports("h264") &&
@@ -684,13 +690,17 @@ public partial class App : Application
                 ObsReplayEngine.RecommendedNvencBFrames("hevc", true) == 0 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", true) == 2 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", false) == 0 &&
+                windows10CaptureMethod == 0 &&
+                windows11CaptureMethod == 2 &&
                 invalidConfig.PipelineEquals(hotkeyOnlyChange) &&
                 !invalidConfig.PipelineEquals(pipelineChange);
             Log.Write(
                 $"GPU_CAPABILITY_MODEL_TEST {(passed ? "PASS" : "FAIL")}: " +
                 $"oldNvidiaAv1={oldNvidia.Supports("av1")}, " +
                 $"amd={amd.Preferred("av1")?.Family}, " +
-                $"intel={intel.Preferred("av1")?.Family}");
+                $"intel={intel.Preferred("av1")?.Family}, " +
+                $"win10Capture={windows10CaptureMethod}, " +
+                $"win11Capture={windows11CaptureMethod}");
             Shutdown(passed ? 0 : 11);
         }
         catch (Exception exception)

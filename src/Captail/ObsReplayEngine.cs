@@ -13,6 +13,9 @@ public sealed class ObsReplayEngine : IDisposable
 {
     private const string RequiredObsVersion = "32.1.2";
     private const int AutomaticHookStableChecks = 2;
+    private const int Windows11InitialBuild = 22000;
+    private const long MonitorCaptureMethodAuto = 0;
+    private const long MonitorCaptureMethodWgc = 2;
     private static readonly string[] CapabilityCodecNames = ["h264", "hevc", "av1"];
     private static readonly HashSet<string> AutomaticCaptureRejectedProcesses = new(
         [
@@ -126,6 +129,12 @@ public sealed class ObsReplayEngine : IDisposable
         return processName.Length > 0 &&
                !AutomaticCaptureRejectedProcesses.Contains(processName);
     }
+
+    internal static long RecommendedMonitorCaptureMethod(Version osVersion) =>
+        osVersion.Major > 10 ||
+        (osVersion.Major == 10 && osVersion.Build >= Windows11InitialBuild)
+            ? MonitorCaptureMethodWgc
+            : MonitorCaptureMethodAuto;
 
     internal static bool ShouldUseAutomaticGameCapture(
         string hookedExecutable,
@@ -883,9 +892,20 @@ public sealed class ObsReplayEngine : IDisposable
         nint settings = ObsNative.obs_data_create();
         try
         {
-            // WGC handles secure/DRM surfaces and DXGI resets more reliably;
-            // protected regions become black without stopping the source.
-            ObsNative.obs_data_set_int(settings, "method", 2);
+            // Windows 10 shows an unavoidable system border around WGC display
+            // capture. OBS Auto prefers DXGI there and retains WGC fallback for
+            // displays DXGI cannot access. Windows 11 keeps forced WGC for its
+            // stronger recovery behavior and borderless modern capture path.
+            long captureMethod =
+                RecommendedMonitorCaptureMethod(Environment.OSVersion.Version);
+            ObsNative.obs_data_set_int(
+                settings,
+                "method",
+                captureMethod);
+            Log.Write(
+                $"Desktop capture backend: " +
+                $"{(captureMethod == MonitorCaptureMethodWgc ? "WGC" : "Auto (DXGI preferred)")}; " +
+                $"Windows {Environment.OSVersion.Version}");
             ObsNative.obs_data_set_string(settings, "monitor_id", monitor.DeviceId);
             ObsNative.obs_data_set_bool(settings, "capture_cursor", true);
             ObsNative.obs_data_set_bool(settings, "force_sdr", false);

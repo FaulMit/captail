@@ -4,6 +4,12 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-06
+
+### Fixed
+
+- Prevented the Windows Graphics Capture border from appearing around the desktop on Windows 10. Desktop capture now prefers DXGI there, with WGC retained as a fallback for displays DXGI cannot access; Windows 11 continues to use WGC directly.
+
 ## [0.1.8] - 2026-08-06
 
 ### Improved
