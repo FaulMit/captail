@@ -4,9 +4,18 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-08-06
+
+### Improved
+
+- **Reliable Microsoft Store updates:** Store installations now keep application state inside package-managed locations and stop capture cleanly during package updates or removal.
+- **Cleaner uninstallation:** The regular installer now closes Captail before removal and deletes its application data after uninstalling.
+- **Correct per-game replay folders:** Automatic capture now files replays under the game Captail actively selected, instead of an inactive application that still had an old capture hook.
+
 ### Fixed
 
 - Prevented Microsoft Store builds from loading libobs media DLLs into the bundled FFmpeg tools, which could stop replay metadata, waveform, and trim operations before FFmpeg started.
+- Added the Microsoft Visual C++ runtime dependency required by OBS and other native components on clean Windows installations.
 
 ## [0.1.7] - 2026-08-04
 
