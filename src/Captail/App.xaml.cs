@@ -38,6 +38,7 @@ public partial class App : Application
     private int _recoveryInProgress;
     private int _captureStateRefreshInProgress;
     private OverlayNotificationWindow? _overlayNotification;
+    private ReplayStatusIndicatorWindow? _recordingIndicator;
     private readonly UpdateService _updateService = new();
     private DispatcherTimer? _updateShutdownTimer;
     private int _saving;
@@ -91,6 +92,9 @@ public partial class App : Application
                 StringComparer.OrdinalIgnoreCase);
             bool updateCheckTest = e.Args.Contains(
                 "--qa-update-check",
+                StringComparer.OrdinalIgnoreCase);
+            bool recordingIndicatorTest = e.Args.Contains(
+                "--qa-recording-indicator",
                 StringComparer.OrdinalIgnoreCase);
             string? clipEditorTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
@@ -275,6 +279,14 @@ public partial class App : Application
                             Localization.Text("L.Notify.RecoveredDetail"),
                             OverlayTone.Success,
                             60_000));
+                }
+                if (recordingIndicatorTest)
+                {
+                    _recordingIndicator = new ReplayStatusIndicatorWindow
+                    {
+                        AllowCaptureForQa = true,
+                    };
+                    _recordingIndicator.SetState(ReplayIndicatorState.Active);
                 }
 #endif
                 return;
@@ -666,6 +678,12 @@ public partial class App : Application
             hotkeyOnlyChange.Hotkey = "Ctrl+Alt+F8";
             Config pipelineChange = invalidConfig.Clone();
             pipelineChange.FrameRate = 30;
+            long windows10CaptureMethod =
+                ObsReplayEngine.RecommendedMonitorCaptureMethod(
+                    new Version(10, 0, 19045));
+            long windows11CaptureMethod =
+                ObsReplayEngine.RecommendedMonitorCaptureMethod(
+                    new Version(10, 0, 22621));
 
             bool passed =
                 oldNvidia.Supports("h264") &&
@@ -684,13 +702,17 @@ public partial class App : Application
                 ObsReplayEngine.RecommendedNvencBFrames("hevc", true) == 0 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", true) == 2 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", false) == 0 &&
+                windows10CaptureMethod == 0 &&
+                windows11CaptureMethod == 2 &&
                 invalidConfig.PipelineEquals(hotkeyOnlyChange) &&
                 !invalidConfig.PipelineEquals(pipelineChange);
             Log.Write(
                 $"GPU_CAPABILITY_MODEL_TEST {(passed ? "PASS" : "FAIL")}: " +
                 $"oldNvidiaAv1={oldNvidia.Supports("av1")}, " +
                 $"amd={amd.Preferred("av1")?.Family}, " +
-                $"intel={intel.Preferred("av1")?.Family}");
+                $"intel={intel.Preferred("av1")?.Family}, " +
+                $"win10Capture={windows10CaptureMethod}, " +
+                $"win11Capture={windows11CaptureMethod}");
             Shutdown(passed ? 0 : 11);
         }
         catch (Exception exception)
@@ -1486,6 +1508,7 @@ public partial class App : Application
         bool gateHeld = false;
         try
         {
+            UpdateReplayIndicator();
             await _pipelineGate.WaitAsync();
             gateHeld = true;
             if (_config?.ReplayEnabled != true)
@@ -1541,6 +1564,7 @@ public partial class App : Application
             if (gateHeld)
                 _pipelineGate.Release();
             Interlocked.Exchange(ref _recoveryInProgress, 0);
+            UpdateReplayIndicator();
         }
     }
 
@@ -1934,6 +1958,22 @@ public partial class App : Application
             _config!.CopyFrom(candidate);
             _config.Save();
             UpdateUiState();
+#if DEBUG
+            if (_recordingIndicator is not null)
+            {
+                _recordingIndicator.SetPlacement(
+                    _config.RecordingIndicatorPosition);
+                if (_config.ShowRecordingIndicator)
+                {
+                    _recordingIndicator.SetState(
+                        ReplayIndicatorState.Active);
+                }
+                else
+                {
+                    _recordingIndicator.HideIndicator();
+                }
+            }
+#endif
             return true;
         }
 
@@ -2074,6 +2114,46 @@ public partial class App : Application
         if (_toggleMenuItem is not null)
             _toggleMenuItem.InputGestureText =
                 _config?.ToggleReplayHotkey ?? "";
+        UpdateReplayIndicator();
+    }
+
+    private void UpdateReplayIndicator()
+    {
+        if (_uiOnly || Volatile.Read(ref _exiting) != 0 ||
+            _config?.ShowRecordingIndicator != true ||
+            _config.ReplayEnabled != true)
+        {
+            _recordingIndicator?.HideIndicator();
+            return;
+        }
+
+        _recordingIndicator ??= new ReplayStatusIndicatorWindow();
+        _recordingIndicator.SetPlacement(
+            _config.RecordingIndicatorPosition);
+        ReplayIndicatorState state =
+            Interlocked.CompareExchange(ref _recoveryInProgress, 0, 0) != 0
+                ? ReplayIndicatorState.Recovering
+                : IsReplayRunning
+                    ? ReplayIndicatorState.Active
+                    : ReplayIndicatorState.Error;
+        _recordingIndicator.SetState(state);
+    }
+
+    private void ShowReplaySavedIndicator()
+    {
+        if (_uiOnly || _config?.ShowRecordingIndicator != true ||
+            !IsReplayRunning || Volatile.Read(ref _exiting) != 0)
+        {
+            return;
+        }
+
+        _recordingIndicator ??= new ReplayStatusIndicatorWindow();
+        _recordingIndicator.SetPlacement(
+            _config.RecordingIndicatorPosition);
+        _recordingIndicator.ShowTransient(
+            ReplayIndicatorState.Saved,
+            ReplayIndicatorState.Active,
+            1500);
     }
 
     private void SaveReplay()
@@ -2116,6 +2196,7 @@ public partial class App : Application
                 30_000);
             string path = await SaveReplayGuardedAsync(engine);
             _settingsWindow?.NotifyReplaySaved(path);
+            ShowReplaySavedIndicator();
             ShowOverlayNotification(
                 "✓",
                 Localization.Text("L.Notify.Saved"),
@@ -2513,6 +2594,7 @@ public partial class App : Application
         }
         _obsTaskScheduler.Dispose();
         _overlayNotification?.ClosePermanently();
+        _recordingIndicator?.ClosePermanently();
         if (_singleInstanceMutex is not null)
         {
             try

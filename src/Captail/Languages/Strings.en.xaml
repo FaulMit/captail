@@ -63,6 +63,9 @@
   <sys:String x:Key="L.Section.Hotkeys">HOTKEYS</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Instant Replay</sys:String>
+  <sys:String x:Key="L.Replay.RecordingIndicator">Recording indicator</sys:String>
+  <sys:String x:Key="L.Replay.RecordingIndicatorHint">Small status icon in the selected screen corner</sys:String>
+  <sys:String x:Key="L.Replay.IndicatorPosition">Indicator position</sys:String>
   <sys:String x:Key="L.Replay.BufferLength">Buffer length</sys:String>
   <sys:String x:Key="L.Duration.15s">15s</sys:String>
   <sys:String x:Key="L.Duration.30s">30s</sys:String>
@@ -76,6 +79,12 @@
   <sys:String x:Key="L.Replay.BufferLimitHint">Limits RAM use and duration</sys:String>
   <sys:String x:Key="L.Replay.DurationOnly">Duration only</sys:String>
   <sys:String x:Key="L.Help.BufferLength">How much recent footage Captail keeps ready. Longer buffers use more RAM. After a save, the next clip starts with new footage instead of repeating the previous clip.</sys:String>
+  <sys:String x:Key="L.Help.RecordingIndicator">Shows whether the replay buffer is active, recovering, unavailable, or has just saved a clip. The click-through indicator never takes focus and is hidden from Captail recordings when Windows supports capture exclusion.</sys:String>
+  <sys:String x:Key="L.Help.IndicatorPosition">Choose the screen corner that stays clear of your game HUD. Captail keeps the indicator 16 pixels from the edges.</sys:String>
+  <sys:String x:Key="L.Position.TopLeft">Top left</sys:String>
+  <sys:String x:Key="L.Position.TopRight">Top right</sys:String>
+  <sys:String x:Key="L.Position.BottomLeft">Bottom left</sys:String>
+  <sys:String x:Key="L.Position.BottomRight">Bottom right</sys:String>
   <sys:String x:Key="L.Help.BufferLimit">Hard limit for compressed replay data in RAM. If this limit is reached first, the available replay will be shorter. Leave “Duration only” unless you need predictable memory use.</sys:String>
   <sys:String x:Key="L.Size.250MB">250 MB</sys:String>
   <sys:String x:Key="L.Size.500MB">500 MB</sys:String>

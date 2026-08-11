@@ -337,6 +337,10 @@ public partial class SettingsWindow : Window
             SelectByTag(AudioTrackModeBox, _config.SeparateAudioTracks ? "separate" : "mixed");
 
             SettingsReplayToggle.IsChecked = _config.ReplayEnabled;
+            RecordingIndicatorBox.IsChecked = _config.ShowRecordingIndicator;
+            SelectRadioByTag(
+                RecordingIndicatorPositionOptions,
+                _config.RecordingIndicatorPosition);
             SystemAudioBox.IsChecked = _config.CaptureSystemAudio;
             MicBox.IsChecked = _config.CaptureMicrophone;
             SystemVolumeSlider.Value = Math.Clamp(_config.SystemAudioVolume, 0, 100);
@@ -1091,7 +1095,13 @@ public partial class SettingsWindow : Window
             GetSelectedTag(AudioTrackModeBox, "mixed") == "separate";
         Config candidate = _config.Clone();
         candidate.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
-        candidate.BufferSeconds = GetSelectedRadioInt(BufferOptions, _config.BufferSeconds);
+        candidate.ShowRecordingIndicator =
+            RecordingIndicatorBox.IsChecked == true;
+        candidate.RecordingIndicatorPosition = GetSelectedRadioTag(
+            RecordingIndicatorPositionOptions,
+            _config.RecordingIndicatorPosition);
+        candidate.BufferSeconds =
+            GetSelectedRadioInt(BufferOptions, _config.BufferSeconds);
         candidate.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
         candidate.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
         string selectedCodec = GetSelectedTag(CodecBox, _config.Codec);
@@ -1647,6 +1657,14 @@ public partial class SettingsWindow : Window
     {
         RadioButton? selected = panel.Children.OfType<RadioButton>().FirstOrDefault(button => button.IsChecked == true);
         return int.TryParse(selected?.Tag?.ToString(), out int value) ? value : fallback;
+    }
+
+    private static string GetSelectedRadioTag(Panel panel, string fallback)
+    {
+        RadioButton? selected = panel.Children
+            .OfType<RadioButton>()
+            .FirstOrDefault(button => button.IsChecked == true);
+        return selected?.Tag?.ToString() ?? fallback;
     }
 
     private static void SelectByTag(ComboBox box, string tag)
