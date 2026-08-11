@@ -21,6 +21,9 @@ public sealed class Config
     public string Hotkey { get; set; } = "Ctrl+Shift+F10";
     public string ToggleReplayHotkey { get; set; } = "Ctrl+Shift+F9";
     public bool ReplayEnabled { get; set; } = true;
+    public bool ShowRecordingIndicator { get; set; } = true;
+    /// <summary>"top-left", "top-right", "bottom-left", or "bottom-right".</summary>
+    public string RecordingIndicatorPosition { get; set; } = "top-right";
 
     /// <summary>"av1", "hevc", or "h264". OBS selects an available encoder for the requested format.</summary>
     public string Codec { get; set; } = "h264";
@@ -139,6 +142,8 @@ public sealed class Config
         Hotkey = source.Hotkey;
         ToggleReplayHotkey = source.ToggleReplayHotkey;
         ReplayEnabled = source.ReplayEnabled;
+        ShowRecordingIndicator = source.ShowRecordingIndicator;
+        RecordingIndicatorPosition = source.RecordingIndicatorPosition;
         Codec = source.Codec;
         MonitorIndex = source.MonitorIndex;
         RecordingResolution = source.RecordingResolution;
@@ -203,6 +208,10 @@ public sealed class Config
             ["source", "720p", "1080p", "1440p", "2160p"],
             "source");
         CaptureSource = AllowedText(CaptureSource, ["desktop", "game"], "desktop");
+        RecordingIndicatorPosition = AllowedText(
+            RecordingIndicatorPosition,
+            ["top-left", "top-right", "bottom-left", "bottom-right"],
+            "top-right");
         SystemAudioVolume = Math.Clamp(SystemAudioVolume, 0, 100);
         SystemAudioDeviceId = NormalizeIdentifier(SystemAudioDeviceId);
         MicrophoneVolume = Math.Clamp(MicrophoneVolume, 0, 100);

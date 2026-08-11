@@ -409,6 +409,77 @@
                                                   Style="{StaticResource ToggleSwitch}"/>
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{DynamicResource L.Replay.RecordingIndicator}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <Button Style="{StaticResource HelpIconButton}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Replay.RecordingIndicator}"
+                                                                       Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.RecordingIndicator}"
+                                                                       Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </StackPanel>
+                                        <TextBlock Text="{DynamicResource L.Replay.RecordingIndicatorHint}"
+                                                   Style="{StaticResource SecondaryText}"
+                                                   FontSize="10" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="RecordingIndicatorBox" Grid.Column="1"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  VerticalAlignment="Center"/>
+                                </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="190"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <TextBlock Text="{DynamicResource L.Replay.IndicatorPosition}"
+                                                   Style="{StaticResource RowLabelText}"/>
+                                        <Button Style="{StaticResource HelpIconButton}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Replay.IndicatorPosition}"
+                                                                   Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.IndicatorPosition}"
+                                                                   Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Style="{StaticResource SegmentStrip}"
+                                            IsEnabled="{Binding IsChecked, ElementName=RecordingIndicatorBox}">
+                                        <UniformGrid x:Name="RecordingIndicatorPositionOptions" Rows="1">
+                                            <RadioButton GroupName="RecordingIndicatorPosition" Tag="top-left"
+                                                         Content="↖" ToolTip="{DynamicResource L.Position.TopLeft}"
+                                                         Style="{StaticResource SegmentButton}"/>
+                                            <RadioButton GroupName="RecordingIndicatorPosition" Tag="top-right"
+                                                         Content="↗" ToolTip="{DynamicResource L.Position.TopRight}"
+                                                         Style="{StaticResource SegmentButton}"/>
+                                            <RadioButton GroupName="RecordingIndicatorPosition" Tag="bottom-left"
+                                                         Content="↙" ToolTip="{DynamicResource L.Position.BottomLeft}"
+                                                         Style="{StaticResource SegmentButton}"/>
+                                            <RadioButton GroupName="RecordingIndicatorPosition" Tag="bottom-right"
+                                                         Content="↘" ToolTip="{DynamicResource L.Position.BottomRight}"
+                                                         Style="{StaticResource SegmentButton}"/>
+                                        </UniformGrid>
+                                    </Border>
+                                </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
                                 <StackPanel Margin="13,11">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                         <TextBlock Text="{DynamicResource L.Replay.BufferLength}" Style="{StaticResource RowLabelText}"/>

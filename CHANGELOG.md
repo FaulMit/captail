@@ -4,7 +4,15 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
-## [0.1.9] - 2026-08-06
+## [0.1.9] - 2026-08-11
+
+### Added
+
+- **Replay status indicator:** An optional, click-through indicator now shows when Instant Replay is active, recovering, unavailable, or has just saved a replay. It is enabled by default and can be placed in any screen corner.
+
+### Improved
+
+- The indicator stays out of Captail recordings where Windows capture protection is available and keeps its animation stable instead of restarting on repeated status updates.
 
 ### Fixed
 

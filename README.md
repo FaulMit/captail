@@ -63,6 +63,10 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
   <img src="docs/captail-editor.png" alt="Captail clip editor with a video timeline, separate audio tracks, trim range, and media details" width="820">
 </p>
 
+<p align="center">
+  <img src="docs/captail-replay-status-indicator.png" alt="Captail replay status indicator showing active, recovering, error, and saved states with four corner placement options" width="920">
+</p>
+
 ## How do I install it?
 
 Install Captail from [Microsoft Store](https://apps.microsoft.com/detail/9PKVNVLKPTPS), or open [GitHub Releases](https://github.com/FaulMit/captail/releases) and choose a package:
@@ -99,6 +103,8 @@ Default hotkeys:
 | Enable or disable Instant Replay | `Ctrl+Shift+F9` |
 
 Both hotkeys are configurable. Double-click the tray icon to reopen Captail.
+
+The optional replay status indicator keeps recording state visible over games and desktop apps. It is enabled by default, can sit in any screen corner, ignores mouse input, and briefly confirms a successful save. Disable it or change its position in Replay settings.
 
 ## What does each capture mode record?
 
