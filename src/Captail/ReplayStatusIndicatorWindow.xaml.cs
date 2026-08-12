@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -29,19 +30,24 @@ public partial class ReplayStatusIndicatorWindow : Window
     private const int WsExTransparent = 0x00000020;
     private const int WsExToolWindow = 0x00000080;
     private const int WsExNoActivate = 0x08000000;
+    private const uint WdaNone = 0x00000000;
     private const uint WdaExcludeFromCapture = 0x00000011;
     private const uint MonitorDefaultToPrimary = 0x00000001;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
 
     private readonly DispatcherTimer _positionTimer;
+    private readonly DispatcherTimer _captureAffinityTimer;
     private readonly DispatcherTimer _transientTimer;
     private ReplayIndicatorState? _state;
     private ReplayIndicatorPlacement _placement = ReplayIndicatorPlacement.TopRight;
     private ReplayIndicatorState _resumeState = ReplayIndicatorState.Active;
     private bool _transientActive;
     private bool _allowClose;
-    private bool _captureExclusionFailureLogged;
+    private bool _captureAffinityFailureLogged;
+    private uint? _captureAffinity;
+    private uint _lastForegroundProcessId;
+    private bool _lastForegroundIsScreenCapture;
 #if DEBUG
     internal bool AllowCaptureForQa { get; set; }
 #endif
@@ -54,6 +60,11 @@ public partial class ReplayStatusIndicatorWindow : Window
             Interval = TimeSpan.FromMilliseconds(750),
         };
         _positionTimer.Tick += (_, _) => PositionOnForegroundMonitor();
+        _captureAffinityTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(100),
+        };
+        _captureAffinityTimer.Tick += (_, _) => UpdateCaptureAffinity();
         _transientTimer = new DispatcherTimer();
         _transientTimer.Tick += (_, _) => ResumeAfterTransient();
         SourceInitialized += (_, _) => ConfigureWindow();
@@ -113,6 +124,7 @@ public partial class ReplayStatusIndicatorWindow : Window
     {
         _transientTimer.Stop();
         _positionTimer.Stop();
+        _captureAffinityTimer.Stop();
         _transientActive = false;
         _state = null;
         StopAnimations();
@@ -124,6 +136,7 @@ public partial class ReplayStatusIndicatorWindow : Window
         _allowClose = true;
         _transientTimer.Stop();
         _positionTimer.Stop();
+        _captureAffinityTimer.Stop();
         Close();
     }
 
@@ -145,6 +158,7 @@ public partial class ReplayStatusIndicatorWindow : Window
         }
         PositionOnForegroundMonitor();
         _positionTimer.Start();
+        _captureAffinityTimer.Start();
     }
 
     private void ApplyState(ReplayIndicatorState state, bool force = false)
@@ -279,21 +293,88 @@ public partial class ReplayStatusIndicatorWindow : Window
 #if DEBUG
         if (!AllowCaptureForQa)
 #endif
-            TryExcludeFromCapture(hwnd);
+            SetCaptureAffinity(hwnd, WdaExcludeFromCapture);
         PositionOnForegroundMonitor();
     }
 
-    private void TryExcludeFromCapture(nint hwnd)
+    private void UpdateCaptureAffinity()
     {
-        if (SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture) ||
-            _captureExclusionFailureLogged)
-        {
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == 0)
             return;
+
+#if DEBUG
+        if (AllowCaptureForQa)
+            return;
+#endif
+
+        SetCaptureAffinity(
+            hwnd,
+            IsScreenCaptureForeground() ? WdaNone : WdaExcludeFromCapture);
+    }
+
+    private bool IsScreenCaptureForeground()
+    {
+        nint foreground = GetForegroundWindow();
+        if (foreground == 0)
+            return false;
+
+        _ = GetWindowThreadProcessId(foreground, out uint processId);
+        if (processId == 0)
+            return false;
+        if (processId == _lastForegroundProcessId)
+            return _lastForegroundIsScreenCapture;
+
+        _lastForegroundProcessId = processId;
+        try
+        {
+            using Process process = Process.GetProcessById((int)processId);
+            string processName = process.ProcessName;
+            _lastForegroundIsScreenCapture = processName.Equals(
+                    "SnippingTool",
+                    StringComparison.OrdinalIgnoreCase) ||
+                processName.Equals(
+                    "ScreenClippingHost",
+                    StringComparison.OrdinalIgnoreCase) ||
+                processName.Equals(
+                    "ScreenSketch",
+                    StringComparison.OrdinalIgnoreCase) ||
+                processName.Equals(
+                    "SnipAndSketch",
+                    StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            _lastForegroundIsScreenCapture = false;
+        }
+        catch (InvalidOperationException)
+        {
+            _lastForegroundIsScreenCapture = false;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            _lastForegroundIsScreenCapture = false;
         }
 
-        _captureExclusionFailureLogged = true;
+        return _lastForegroundIsScreenCapture;
+    }
+
+    private void SetCaptureAffinity(nint hwnd, uint affinity)
+    {
+        if (_captureAffinity == affinity)
+            return;
+
+        if (SetWindowDisplayAffinity(hwnd, affinity))
+        {
+            _captureAffinity = affinity;
+            return;
+        }
+        if (_captureAffinityFailureLogged)
+            return;
+
+        _captureAffinityFailureLogged = true;
         Log.Write(
-            $"Could not exclude recording indicator from capture: Win32 error " +
+            $"Could not update recording indicator capture affinity: Win32 error " +
             $"{Marshal.GetLastWin32Error()}.");
     }
 
@@ -365,6 +446,11 @@ public partial class ReplayStatusIndicatorWindow : Window
 
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(
+        nint hwnd,
+        out uint processId);
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint hwnd, uint flags);

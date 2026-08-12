@@ -101,6 +101,9 @@ public partial class App : Application
                     "--qa-recording-indicator-position=",
                     StringComparison.OrdinalIgnoreCase))
                 ?["--qa-recording-indicator-position=".Length..];
+            bool recordingIndicatorProtectedTest = e.Args.Contains(
+                "--qa-recording-indicator-protected",
+                StringComparer.OrdinalIgnoreCase);
             string? clipEditorTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-clip-editor=",
@@ -289,7 +292,7 @@ public partial class App : Application
                 {
                     _recordingIndicator = new ReplayStatusIndicatorWindow
                     {
-                        AllowCaptureForQa = true,
+                        AllowCaptureForQa = !recordingIndicatorProtectedTest,
                     };
                     _recordingIndicator.SetPlacement(
                         recordingIndicatorTestPosition ?? "top-right");
