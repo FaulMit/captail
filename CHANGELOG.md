@@ -4,6 +4,13 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-08-13
+
+### Added
+
+- **中文界面 (Simplified Chinese UI):** Captail now ships a complete Simplified Chinese localization (280 strings). The language button cycles English → Russian → Chinese and the choice persists across restarts.
+- **Chinese CI validation:** The localization dictionary check in CI now validates Chinese keys alongside English and Russian.
+
 ## [0.1.9] - 2026-08-11
 
 ### Added
