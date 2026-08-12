@@ -31,8 +31,8 @@ public partial class ReplayStatusIndicatorWindow : Window
     private const int WsExNoActivate = 0x08000000;
     private const uint WdaExcludeFromCapture = 0x00000011;
     private const uint MonitorDefaultToPrimary = 0x00000001;
+    private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
-    private static readonly nint HwndTopmost = new(-1);
 
     private readonly DispatcherTimer _positionTimer;
     private readonly DispatcherTimer _transientTimer;
@@ -322,19 +322,21 @@ public partial class ReplayStatusIndicatorWindow : Window
             ReplayIndicatorPlacement.BottomLeft or
             ReplayIndicatorPlacement.BottomRight;
         int left = placeRight
-            ? info.Monitor.Right - size - inset
-            : info.Monitor.Left + inset;
+            ? info.WorkArea.Right - size - inset
+            : info.WorkArea.Left + inset;
         int top = placeBottom
-            ? info.Monitor.Bottom - size - inset
-            : info.Monitor.Top + inset;
+            ? info.WorkArea.Bottom - size - inset
+            : info.WorkArea.Top + inset;
+        // Preserve current topmost-band order. Raising the window on every
+        // timer tick would cover newer system overlays such as Snipping Tool.
         SetWindowPos(
             hwnd,
-            HwndTopmost,
+            0,
             left,
             top,
             size,
             size,
-            SwpNoActivate);
+            SwpNoActivate | SwpNoZOrder);
     }
 
     [StructLayout(LayoutKind.Sequential)]

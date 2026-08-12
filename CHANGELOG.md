@@ -4,6 +4,11 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Kept bottom-corner replay indicators above the Windows taskbar and clock by positioning them inside each monitor's working area.
+- Prevented the indicator's position timer from repeatedly raising it above Snipping Tool and other newer topmost system overlays.
+
 ## [0.1.9] - 2026-08-11
 
 ### Added
