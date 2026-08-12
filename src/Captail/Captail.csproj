@@ -54,6 +54,9 @@
     <ObsBridgeBuild>$(ObsBridgeSource)\build</ObsBridgeBuild>
     <MpvWindowsX64Enabled>false</MpvWindowsX64Enabled>
     <MpvWindowsArm64Enabled>false</MpvWindowsArm64Enabled>
+    <!-- Allows managed-only builds on non-Windows hosts, e.g.
+         dotnet build -p:SkipObsBridgeBuild=true -->
+    <SkipObsBridgeBuild Condition="'$(SkipObsBridgeBuild)' == ''">false</SkipObsBridgeBuild>
   </PropertyGroup>
 
   <ItemGroup>
@@ -103,13 +106,18 @@
     <Delete Files="$(PublishDir)ffmpeg\ffplay.exe" />
   </Target>
 
-  <Target Name="BuildObsBridge" BeforeTargets="Build">
+  <Target Name="BuildObsBridge"
+          BeforeTargets="Build"
+          Condition="'$(SkipObsBridgeBuild)' != 'true'">
     <Exec Condition="!Exists('$(ObsBridgeBuild)\CaptailObsBridge.sln')"
           Command="cmake -S &quot;$(ObsBridgeSource)&quot; -B &quot;$(ObsBridgeBuild)&quot; -G &quot;Visual Studio 17 2022&quot; -A x64" />
     <Exec Command="cmake --build &quot;$(ObsBridgeBuild)&quot; --config Release --target CaptailObsBridge" />
   </Target>
 
-  <Target Name="CopyObsBridge" AfterTargets="Build" DependsOnTargets="BuildObsBridge">
+  <Target Name="CopyObsBridge"
+          AfterTargets="Build"
+          DependsOnTargets="BuildObsBridge"
+          Condition="'$(SkipObsBridgeBuild)' != 'true'">
     <Copy SourceFiles="$(ObsBridgeBuild)\Release\CaptailObsBridge.dll"
           DestinationFolder="$(OutDir)" />
   </Target>
@@ -117,7 +125,7 @@
   <Target Name="CopyObsBridgeToPublish"
           AfterTargets="Publish"
           DependsOnTargets="BuildObsBridge"
-          Condition="'$(PublishDir)' != ''">
+          Condition="'$(SkipObsBridgeBuild)' != 'true' and '$(PublishDir)' != ''">
     <Copy SourceFiles="$(ObsBridgeBuild)\Release\CaptailObsBridge.dll"
           DestinationFolder="$(PublishDir)" />
   </Target>

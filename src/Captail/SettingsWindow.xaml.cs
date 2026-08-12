@@ -462,7 +462,12 @@ public partial class SettingsWindow : Window
         string previousLanguage = _config.Language;
         try
         {
-            _config.Language = Localization.IsRussian ? "en" : "ru";
+            _config.Language = _config.Language switch
+            {
+                "en" => "ru",
+                "ru" => "zh",
+                _ => "en",
+            };
             _config.Save();
             Localization.SetLanguage(_config.Language);
             AnimatePress(LanguageButton);

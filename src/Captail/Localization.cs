@@ -12,6 +12,7 @@ public static class Localization
 
     public static string Language => _language;
     public static bool IsRussian => _language == "ru";
+    public static bool IsChinese => _language == "zh";
 
     public static void SetLanguage(string? language)
     {
@@ -20,11 +21,17 @@ public static class Localization
             "ru",
             StringComparison.OrdinalIgnoreCase)
             ? "ru"
-            : "en";
+            : string.Equals(language, "zh", StringComparison.OrdinalIgnoreCase)
+                ? "zh"
+                : "en";
 
         _language = normalized;
-        CultureInfo.CurrentUICulture =
-            CultureInfo.GetCultureInfo(normalized == "ru" ? "ru-RU" : "en-US");
+        CultureInfo.CurrentUICulture = normalized switch
+        {
+            "ru" => CultureInfo.GetCultureInfo("ru-RU"),
+            "zh" => CultureInfo.GetCultureInfo("zh-CN"),
+            _ => CultureInfo.GetCultureInfo("en-US"),
+        };
 
         var dictionary = new ResourceDictionary
         {

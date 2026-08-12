@@ -273,5 +273,7 @@ public sealed class Config
     private static string NormalizeLanguage(string? language) =>
         string.Equals(language, "ru", StringComparison.OrdinalIgnoreCase)
             ? "ru"
-            : "en";
+            : string.Equals(language, "zh", StringComparison.OrdinalIgnoreCase)
+                ? "zh"
+                : "en";
 }

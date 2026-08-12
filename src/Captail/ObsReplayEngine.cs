@@ -550,8 +550,11 @@ public sealed class ObsReplayEngine : IDisposable
 
         string configDirectory = AppDataPaths.ObsConfigDirectory;
         Directory.CreateDirectory(configDirectory);
+        string locale = Localization.IsRussian
+            ? "ru-RU"
+            : Localization.IsChinese ? "zh-CN" : "en-US";
         _obsStarted = ObsNative.obs_startup(
-            Localization.IsRussian ? "ru-RU" : "en-US",
+            locale,
             configDirectory,
             0);
         if (!_obsStarted)
