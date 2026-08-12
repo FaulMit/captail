@@ -82,17 +82,25 @@ jobs:
         run: |
           [xml]$en = Get-Content ./src/Captail/Languages/Strings.en.xaml
           [xml]$ru = Get-Content ./src/Captail/Languages/Strings.ru.xaml
+          [xml]$zh = Get-Content ./src/Captail/Languages/Strings.zh.xaml
           $enKeys = @($en.ResourceDictionary.String | ForEach-Object { $_.Key })
           $ruKeys = @($ru.ResourceDictionary.String | ForEach-Object { $_.Key })
-          $differences = @(Compare-Object $enKeys $ruKeys)
-          if ($differences.Count -ne 0) {
-            $differences | Format-Table | Out-String | Write-Error
-            throw "English and Russian localization keys differ."
+          $zhKeys = @($zh.ResourceDictionary.String | ForEach-Object { $_.Key })
+          foreach ($lang in @('Russian', 'Chinese')) {
+            $langKeys = if ($lang -eq 'Russian') { $ruKeys } else { $zhKeys }
+            $differences = @(Compare-Object $enKeys $langKeys)
+            if ($differences.Count -ne 0) {
+              $differences | Format-Table | Out-String | Write-Error
+              throw "English and $lang localization keys differ."
+            }
           }
           if ($enKeys.Count -ne ($enKeys | Sort-Object -Unique).Count) {
             throw "English localization contains duplicate keys."
           }
           if ($ruKeys.Count -ne ($ruKeys | Sort-Object -Unique).Count) {
             throw "Russian localization contains duplicate keys."
+          }
+          if ($zhKeys.Count -ne ($zhKeys | Sort-Object -Unique).Count) {
+            throw "Chinese localization contains duplicate keys."
           }
           Write-Host "Localization dictionaries match: $($enKeys.Count) keys."
