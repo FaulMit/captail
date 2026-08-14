@@ -27,7 +27,7 @@ expiration date and update `AZURE_AD_APPLICATION_SECRET` in GitHub.
 1. Merge the release-ready code into `main`.
 2. Open **Actions** and select **Microsoft Store release**.
 3. Select **Run workflow** from `main`.
-4. Enter the three-part version, for example `0.1.8`.
+4. Enter the three-part version, for example `0.2.0`.
 5. Select one mode:
    - `build-only`: build and validate the package without contacting Partner Center.
    - `draft`: upload the package but leave the submission as a draft.

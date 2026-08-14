@@ -90,11 +90,25 @@ public partial class App : Application
             bool replayRoutingTest = e.Args.Contains(
                 "--qa-replay-routing",
                 StringComparer.OrdinalIgnoreCase);
+            bool localizationTest = e.Args.Contains(
+                "--qa-localization",
+                StringComparer.OrdinalIgnoreCase);
             bool updateCheckTest = e.Args.Contains(
                 "--qa-update-check",
                 StringComparer.OrdinalIgnoreCase);
             bool recordingIndicatorTest = e.Args.Contains(
                 "--qa-recording-indicator",
+                StringComparer.OrdinalIgnoreCase);
+            string? recordingIndicatorTestPosition = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-recording-indicator-position=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-recording-indicator-position=".Length..];
+            bool recordingIndicatorProtectedTest = e.Args.Contains(
+                "--qa-recording-indicator-protected",
+                StringComparer.OrdinalIgnoreCase);
+            bool recordingIndicatorGameTest = e.Args.Contains(
+                "--qa-recording-indicator-game",
                 StringComparer.OrdinalIgnoreCase);
             string? clipEditorTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
@@ -134,6 +148,7 @@ public partial class App : Application
             const bool fileRetryTest = false;
             const bool automaticCapturePolicyTest = false;
             const bool replayRoutingTest = false;
+            const bool localizationTest = false;
             const bool updateCheckTest = false;
             const bool clipEditorTest = false;
             const bool audioMixTest = false;
@@ -154,7 +169,8 @@ public partial class App : Application
                     gameCaptureTest || replaySegmentsTest || updateCheckTest ||
                     clipEditorTest || audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
-                    automaticCapturePolicyTest || replayRoutingTest))
+                    automaticCapturePolicyTest || replayRoutingTest ||
+                    localizationTest))
             {
                 Shutdown();
                 return;
@@ -226,6 +242,11 @@ public partial class App : Application
                 RunReplayRoutingTest();
                 return;
             }
+            if (localizationTest)
+            {
+                RunLocalizationTest();
+                return;
+            }
             if (updateCheckTest)
             {
                 await _updateService.CheckAsync(
@@ -284,8 +305,11 @@ public partial class App : Application
                 {
                     _recordingIndicator = new ReplayStatusIndicatorWindow
                     {
-                        AllowCaptureForQa = true,
+                        AllowCaptureForQa = !recordingIndicatorProtectedTest,
                     };
+                    _recordingIndicator.SetPlacement(
+                        recordingIndicatorTestPosition ?? "top-right");
+                    _recordingIndicator.SetGameDetected(recordingIndicatorGameTest);
                     _recordingIndicator.SetState(ReplayIndicatorState.Active);
                 }
 #endif
@@ -324,6 +348,64 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private static void RunLocalizationTest()
+    {
+        var cases = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["uk-UA"] = "uk",
+            ["es-MX"] = "es",
+            ["pt-PT"] = "pt",
+            ["zh-CN"] = "zh",
+            ["ja-JP"] = "ja",
+            ["ko-KR"] = "ko",
+            ["pl-PL"] = "pl",
+            ["tr-TR"] = "en",
+            [""] = "en",
+        };
+        string[] failures = cases
+            .Where(item => !string.Equals(
+                Localization.DetectSystemLanguage(item.Key),
+                item.Value,
+                StringComparison.Ordinal))
+            .Select(item =>
+                $"{item.Key}->{Localization.DetectSystemLanguage(item.Key)} " +
+                $"(expected {item.Value})")
+            .ToArray();
+        bool cultureNormalizationPassed =
+            Localization.NormalizeLanguage("fr-CA") == "fr" &&
+            Localization.NormalizeLanguage("de-DE") == "de" &&
+            Localization.NormalizeLanguage("unsupported") == "en";
+        bool firstRunDetectionPassed =
+            Localization.ResolveInitialLanguage(null, "uk-UA") == "uk" &&
+            Localization.ResolveInitialLanguage("", "es-MX") == "es" &&
+            Localization.ResolveInitialLanguage("ru", "uk-UA") == "ru" &&
+            Localization.ResolveInitialLanguage(null, "tr-TR") == "en";
+        string originalLanguage = Localization.Language;
+        var dictionaryFailures = new List<string>();
+        foreach (LanguageDefinition language in Localization.SupportedLanguages)
+        {
+            Localization.SetLanguage(language.Code);
+            if (!string.Equals(
+                    Localization.Text("L.LanguageCode"),
+                    language.ShortCode,
+                    StringComparison.Ordinal) ||
+                Localization.Text("L.Brand") != "Captail")
+            {
+                dictionaryFailures.Add(language.Code);
+            }
+        }
+        Localization.SetLanguage(originalLanguage);
+        bool passed = failures.Length == 0 && cultureNormalizationPassed &&
+                      firstRunDetectionPassed && dictionaryFailures.Count == 0;
+        Log.Write(
+            $"LOCALIZATION_TEST {(passed ? "PASS" : "FAIL")}: " +
+            $"failures={string.Join(',', failures)}, " +
+            $"cultureNormalizationPassed={cultureNormalizationPassed}, " +
+            $"firstRunDetectionPassed={firstRunDetectionPassed}, " +
+            $"dictionaryFailures={string.Join(',', dictionaryFailures)}");
+        Current.Shutdown(passed ? 0 : 25);
+    }
+
     private void RunAutomaticCapturePolicyTest()
     {
         string[] rejected =
@@ -358,18 +440,45 @@ public partial class App : Application
             "cs2.exe",
             "cs2.exe",
             hasVideo: false);
+        bool blockedSteamGameAccepted =
+            ObsReplayEngine.ShouldUseAutomaticDesktopFallback(
+                "cs2.exe",
+                @"D:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe",
+                isFullscreen: true);
+        bool windowedSteamGameRejected =
+            !ObsReplayEngine.ShouldUseAutomaticDesktopFallback(
+                "cs2.exe",
+                @"D:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe",
+                isFullscreen: false);
+        bool fullscreenTelegramRejected =
+            !ObsReplayEngine.ShouldUseAutomaticDesktopFallback(
+                "Telegram.exe",
+                @"D:\SteamLibrary\steamapps\common\Telegram\Telegram.exe",
+                isFullscreen: true);
+        bool unknownFullscreenAppRejected =
+            !ObsReplayEngine.ShouldUseAutomaticDesktopFallback(
+                "RenderTool.exe",
+                @"C:\Tools\RenderTool.exe",
+                isFullscreen: true);
         bool passed = falsePositives.Length == 0 &&
                       falseNegatives.Length == 0 &&
                       !ObsReplayEngine.IsAutomaticCaptureCandidate("") &&
                       altTabRejected && focusedGameAccepted &&
-                      missingVideoRejected;
+                      missingVideoRejected && blockedSteamGameAccepted &&
+                      windowedSteamGameRejected &&
+                      fullscreenTelegramRejected &&
+                      unknownFullscreenAppRejected;
         Log.Write(
             $"AUTO_CAPTURE_POLICY_TEST {(passed ? "PASS" : "FAIL")}: " +
             $"falsePositives={string.Join(',', falsePositives)}, " +
             $"falseNegatives={string.Join(',', falseNegatives)}, " +
             $"altTabRejected={altTabRejected}, " +
             $"focusedGameAccepted={focusedGameAccepted}, " +
-            $"missingVideoRejected={missingVideoRejected}");
+            $"missingVideoRejected={missingVideoRejected}, " +
+            $"blockedSteamGameAccepted={blockedSteamGameAccepted}, " +
+            $"windowedSteamGameRejected={windowedSteamGameRejected}, " +
+            $"fullscreenTelegramRejected={fullscreenTelegramRejected}, " +
+            $"unknownFullscreenAppRejected={unknownFullscreenAppRejected}");
         Shutdown(passed ? 0 : 22);
     }
 
@@ -1963,6 +2072,7 @@ public partial class App : Application
             {
                 _recordingIndicator.SetPlacement(
                     _config.RecordingIndicatorPosition);
+                _recordingIndicator.SetGameDetected(false);
                 if (_config.ShowRecordingIndicator)
                 {
                     _recordingIndicator.SetState(
@@ -2130,6 +2240,9 @@ public partial class App : Application
         _recordingIndicator ??= new ReplayStatusIndicatorWindow();
         _recordingIndicator.SetPlacement(
             _config.RecordingIndicatorPosition);
+        _recordingIndicator.SetGameDetected(
+            IsReplayRunning &&
+            !string.IsNullOrWhiteSpace(_obs?.ActiveGameExecutable));
         ReplayIndicatorState state =
             Interlocked.CompareExchange(ref _recoveryInProgress, 0, 0) != 0
                 ? ReplayIndicatorState.Recovering
@@ -2150,6 +2263,8 @@ public partial class App : Application
         _recordingIndicator ??= new ReplayStatusIndicatorWindow();
         _recordingIndicator.SetPlacement(
             _config.RecordingIndicatorPosition);
+        _recordingIndicator.SetGameDetected(
+            !string.IsNullOrWhiteSpace(_obs?.ActiveGameExecutable));
         _recordingIndicator.ShowTransient(
             ReplayIndicatorState.Saved,
             ReplayIndicatorState.Active,
@@ -2278,28 +2393,28 @@ public partial class App : Application
             string? automaticGame =
                 ObsReplayEngine.ResolveReplayGameExecutable(
                     isAutomaticCapture: true,
-                    automaticGameActive: true,
+                    automaticGameIdentified: true,
                     activeGameExecutable: @"C:\Games\Counter-Strike 2\cs2.exe",
                     isGameHooked: true,
                     hookedExecutable: @"C:\Users\User\Telegram.exe");
             string? automaticDesktop =
                 ObsReplayEngine.ResolveReplayGameExecutable(
                     isAutomaticCapture: true,
-                    automaticGameActive: false,
+                    automaticGameIdentified: false,
                     activeGameExecutable: "",
                     isGameHooked: true,
                     hookedExecutable: @"C:\Users\User\Telegram.exe");
             string? manualGame =
                 ObsReplayEngine.ResolveReplayGameExecutable(
                     isAutomaticCapture: false,
-                    automaticGameActive: false,
+                    automaticGameIdentified: false,
                     activeGameExecutable: @"C:\Games\Counter-Strike 2\cs2.exe",
                     isGameHooked: true,
                     hookedExecutable: @"C:\Games\Counter-Strike 2\cs2.exe");
             string? noHook =
                 ObsReplayEngine.ResolveReplayGameExecutable(
                     isAutomaticCapture: false,
-                    automaticGameActive: false,
+                    automaticGameIdentified: false,
                     activeGameExecutable: "",
                     isGameHooked: false,
                     hookedExecutable: "");

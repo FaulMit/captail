@@ -13,6 +13,7 @@ public sealed class ObsReplayEngine : IDisposable
 {
     private const string RequiredObsVersion = "32.1.2";
     private const int AutomaticHookStableChecks = 2;
+    private const int AutomaticFallbackStableChecks = 3;
     private const int Windows11InitialBuild = 22000;
     private const long MonitorCaptureMethodAuto = 0;
     private const long MonitorCaptureMethodWgc = 2;
@@ -30,6 +31,14 @@ public sealed class ObsReplayEngine : IDisposable
             "wallpaper_engine", "webviewhost", "whatsapp", "wmplayer", "zoom",
         ],
         StringComparer.OrdinalIgnoreCase);
+    private static readonly string[] AutomaticGamePathMarkers =
+    [
+        @"\steamapps\common\",
+        @"\xboxgames\",
+        @"\epic games\",
+        @"\gog galaxy\games\",
+        @"\riot games\",
+    ];
     private static readonly string[] DiagnosticEffectNames =
     [
         "default.effect", "opaque.effect", "solid.effect",
@@ -66,6 +75,7 @@ public sealed class ObsReplayEngine : IDisposable
     private uint _baseWidth;
     private uint _baseHeight;
     private bool _automaticGameActive;
+    private bool _automaticDesktopFallbackActive;
     private bool _automaticGameSourceShowing;
     private string _activeGameExecutable = "";
     private string _pendingAutomaticGameExecutable = "";
@@ -104,6 +114,12 @@ public sealed class ObsReplayEngine : IDisposable
                         string.IsNullOrWhiteSpace(gameName)
                             ? Localization.Text("L.Video.Game")
                             : gameName)
+                    : _automaticDesktopFallbackActive
+                        ? Localization.Format(
+                            "L.Engine.AutoGameFallback",
+                            string.IsNullOrWhiteSpace(gameName)
+                                ? Localization.Text("L.Video.Game")
+                                : gameName)
                     : Localization.Text("L.Engine.AutoDesktop");
             }
             if (!IsGameCapture)
@@ -147,16 +163,33 @@ public sealed class ObsReplayEngine : IDisposable
             Path.GetFileNameWithoutExtension(foregroundExecutable),
             StringComparison.OrdinalIgnoreCase);
 
+    internal static bool ShouldUseAutomaticDesktopFallback(
+        string foregroundExecutable,
+        string foregroundPath,
+        bool isFullscreen)
+    {
+        if (!isFullscreen ||
+            !IsAutomaticCaptureCandidate(foregroundExecutable) ||
+            string.IsNullOrWhiteSpace(foregroundPath))
+        {
+            return false;
+        }
+
+        string normalizedPath = foregroundPath.Replace('/', '\\');
+        return AutomaticGamePathMarkers.Any(marker =>
+            normalizedPath.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
     internal static string? ResolveReplayGameExecutable(
         bool isAutomaticCapture,
-        bool automaticGameActive,
+        bool automaticGameIdentified,
         string activeGameExecutable,
         bool isGameHooked,
         string hookedExecutable)
     {
         if (isAutomaticCapture)
         {
-            return automaticGameActive &&
+            return automaticGameIdentified &&
                    !string.IsNullOrWhiteSpace(activeGameExecutable)
                 ? activeGameExecutable
                 : null;
@@ -242,54 +275,80 @@ public sealed class ObsReplayEngine : IDisposable
         bool hasVideo = hooked &&
                         ObsNative.obs_source_get_width(_gameVideoSource) > 0 &&
                         ObsNative.obs_source_get_height(_gameVideoSource) > 0;
-        string foregroundExecutable = CaptureInterop.ForegroundExecutable();
-        bool candidate = ShouldUseAutomaticGameCapture(
+        CaptureInterop.ForegroundAppInfo foreground =
+            CaptureInterop.ForegroundApplication();
+        bool hookCandidate = ShouldUseAutomaticGameCapture(
             executable,
-            foregroundExecutable,
+            foreground.Executable,
             hasVideo);
-        if (!candidate)
+        if (hookCandidate)
         {
-            ResetPendingAutomaticHook();
-            if (!hooked)
-                _lastRejectedAutomaticExecutable = "";
-            if (hooked && !processCandidate &&
-                !string.Equals(
-                    _lastRejectedAutomaticExecutable,
-                    executable,
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                _lastRejectedAutomaticExecutable = executable;
-                Log.Write(
-                    $"Automatic Game Capture ignored non-game process: " +
-                    $"{Path.GetFileName(executable)}");
-            }
+            _lastRejectedAutomaticExecutable = "";
+            bool changed = SetAutomaticDesktopFallback(false, "");
             if (_automaticGameActive)
-                return SwitchAutomaticCapture(useGame: false, executable: "");
-            return false;
+            {
+                _activeGameExecutable = executable;
+                return changed;
+            }
+
+            if (!AdvanceAutomaticCandidate(
+                    executable,
+                    AutomaticHookStableChecks))
+            {
+                return changed;
+            }
+
+            return SwitchAutomaticCapture(useGame: true, executable) || changed;
         }
 
-        _lastRejectedAutomaticExecutable = "";
-        if (_automaticGameActive)
-        {
-            _activeGameExecutable = executable;
-            return false;
-        }
-
-        if (!string.Equals(
-                _pendingAutomaticGameExecutable,
+        bool stateChanged = false;
+        if (!hooked)
+            _lastRejectedAutomaticExecutable = "";
+        if (hooked && !processCandidate &&
+            !string.Equals(
+                _lastRejectedAutomaticExecutable,
                 executable,
                 StringComparison.OrdinalIgnoreCase))
         {
-            _pendingAutomaticGameExecutable = executable;
-            _automaticHookStableChecks = 1;
-            return false;
+            _lastRejectedAutomaticExecutable = executable;
+            Log.Write(
+                $"Automatic Game Capture ignored non-game process: " +
+                $"{Path.GetFileName(executable)}");
         }
-        _automaticHookStableChecks++;
-        if (_automaticHookStableChecks < AutomaticHookStableChecks)
-            return false;
+        if (_automaticGameActive)
+            stateChanged = SwitchAutomaticCapture(false, "");
 
-        ResetPendingAutomaticHook();
-        return SwitchAutomaticCapture(useGame: true, executable);
+        bool fallbackCandidate = ShouldUseAutomaticDesktopFallback(
+            foreground.Executable,
+            foreground.FullPath,
+            foreground.IsFullscreen);
+        if (!fallbackCandidate)
+        {
+            ResetPendingAutomaticHook();
+            return SetAutomaticDesktopFallback(false, "") || stateChanged;
+        }
+
+        if (_automaticDesktopFallbackActive &&
+            string.Equals(
+                _activeGameExecutable,
+                foreground.Executable,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            ResetPendingAutomaticHook();
+            return stateChanged;
+        }
+
+        stateChanged |= SetAutomaticDesktopFallback(false, "");
+        if (!AdvanceAutomaticCandidate(
+                foreground.Executable,
+                AutomaticFallbackStableChecks))
+        {
+            return stateChanged;
+        }
+
+        return SetAutomaticDesktopFallback(
+                   true,
+                   foreground.Executable) || stateChanged;
     }
 
     private bool SwitchAutomaticCapture(bool useGame, string executable)
@@ -301,12 +360,57 @@ public sealed class ObsReplayEngine : IDisposable
         ObsNative.obs_set_output_source(0, target);
         _videoSource = target;
         _automaticGameActive = useGame;
-        _activeGameExecutable = useGame ? executable : "";
+        _activeGameExecutable = useGame
+            ? executable
+            : _automaticDesktopFallbackActive
+                ? _activeGameExecutable
+                : "";
         Log.Write(
             useGame
                 ? $"Automatic capture switched to Game Capture: " +
                   $"{Path.GetFileName(_activeGameExecutable)}"
                 : "Automatic capture returned to Desktop Capture.");
+        return true;
+    }
+
+    private bool SetAutomaticDesktopFallback(bool active, string executable)
+    {
+        if (active == _automaticDesktopFallbackActive &&
+            (!active || string.Equals(
+                _activeGameExecutable,
+                executable,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        _automaticDesktopFallbackActive = active;
+        _activeGameExecutable = active ? executable : "";
+        Log.Write(
+            active
+                ? $"Automatic capture identified game but kept Desktop Capture: " +
+                  $"{Path.GetFileName(executable)}"
+                : "Automatic Desktop fallback returned to normal Desktop Capture.");
+        return true;
+    }
+
+    private bool AdvanceAutomaticCandidate(string executable, int requiredChecks)
+    {
+        if (!string.Equals(
+                _pendingAutomaticGameExecutable,
+                executable,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _pendingAutomaticGameExecutable = executable;
+            _automaticHookStableChecks = 1;
+            return false;
+        }
+
+        _automaticHookStableChecks++;
+        if (_automaticHookStableChecks < requiredChecks)
+            return false;
+
+        ResetPendingAutomaticHook();
         return true;
     }
 
@@ -440,7 +544,7 @@ public sealed class ObsReplayEngine : IDisposable
             : "";
         string? replayGameExecutable = ResolveReplayGameExecutable(
             IsAutomaticCapture,
-            _automaticGameActive,
+            _automaticGameActive || _automaticDesktopFallbackActive,
             _activeGameExecutable,
             isGameHooked,
             hookedExecutable);
@@ -551,7 +655,7 @@ public sealed class ObsReplayEngine : IDisposable
         string configDirectory = AppDataPaths.ObsConfigDirectory;
         Directory.CreateDirectory(configDirectory);
         _obsStarted = ObsNative.obs_startup(
-            Localization.IsRussian ? "ru-RU" : "en-US",
+            Localization.CultureName,
             configDirectory,
             0);
         if (!_obsStarted)

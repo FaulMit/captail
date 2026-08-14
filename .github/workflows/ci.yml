@@ -80,19 +80,88 @@ jobs:
       - name: Validate localization dictionaries
         shell: pwsh
         run: |
+          $files = @(Get-ChildItem ./src/Captail/Languages/Strings.*.xaml)
           [xml]$en = Get-Content ./src/Captail/Languages/Strings.en.xaml
-          [xml]$ru = Get-Content ./src/Captail/Languages/Strings.ru.xaml
           $enKeys = @($en.ResourceDictionary.String | ForEach-Object { $_.Key })
-          $ruKeys = @($ru.ResourceDictionary.String | ForEach-Object { $_.Key })
-          $differences = @(Compare-Object $enKeys $ruKeys)
-          if ($differences.Count -ne 0) {
-            $differences | Format-Table | Out-String | Write-Error
-            throw "English and Russian localization keys differ."
-          }
+          $enValues = @{}
+            foreach ($entry in $en.ResourceDictionary.String) {
+              $enValues[$entry.Key] = [string]$entry.'#text'
+            }
+            $semanticExpectations = @{
+              de = @{ 'L.Storage.FreeOn' = '{0} frei auf {1}'; 'L.Storage.Free' = '{0} frei'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Replay-Ordner'; 'L.Audio.OneMixed' = 'Eine gemischte Spur' }
+              en = @{ 'L.Storage.FreeOn' = '{0} free on {1}'; 'L.Storage.Free' = '{0} free'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Replay folder'; 'L.Audio.OneMixed' = 'One mixed track' }
+              es = @{ 'L.Storage.FreeOn' = '{0} libres en {1}'; 'L.Storage.Free' = '{0} libres'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Carpeta de repeticiones'; 'L.Audio.OneMixed' = 'Una pista mixta' }
+              fr = @{ 'L.Storage.FreeOn' = '{0} libres sur {1}'; 'L.Storage.Free' = '{0} libres'; 'L.Video.Monitor' = 'Moniteur'; 'L.Storage.ReplayFolder' = 'Dossier des replays'; 'L.Audio.OneMixed' = 'Une piste mixée' }
+              ja = @{ 'L.Storage.FreeOn' = '{1} の空き容量: {0}'; 'L.Storage.Free' = '空き容量: {0}'; 'L.Video.Monitor' = 'モニター'; 'L.Storage.ReplayFolder' = 'リプレイフォルダー'; 'L.Audio.OneMixed' = 'ミックストラック 1 つ' }
+              ko = @{ 'L.Storage.FreeOn' = '{1} 여유 공간 {0}'; 'L.Storage.Free' = '여유 공간 {0}'; 'L.Video.Monitor' = '모니터'; 'L.Storage.ReplayFolder' = '리플레이 폴더'; 'L.Audio.OneMixed' = '혼합 트랙 1개' }
+              pl = @{ 'L.Storage.FreeOn' = '{0} wolnego miejsca na {1}'; 'L.Storage.Free' = '{0} wolnego miejsca'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Folder powtórek'; 'L.Audio.OneMixed' = 'Jedna ścieżka mieszana' }
+              pt = @{ 'L.Storage.FreeOn' = '{0} livres em {1}'; 'L.Storage.Free' = '{0} livres'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Pasta de replays'; 'L.Audio.OneMixed' = 'Uma faixa mista' }
+              ru = @{ 'L.Storage.FreeOn' = '{0} свободно на {1}'; 'L.Storage.Free' = '{0} свободно'; 'L.Video.Monitor' = 'Монитор'; 'L.Storage.ReplayFolder' = 'Папка повторов'; 'L.Audio.OneMixed' = 'Одна общая' }
+              uk = @{ 'L.Storage.FreeOn' = '{0} вільно на {1}'; 'L.Storage.Free' = '{0} вільно'; 'L.Video.Monitor' = 'Монітор'; 'L.Storage.ReplayFolder' = 'Папка повторів'; 'L.Audio.OneMixed' = 'Одна змішана доріжка' }
+              zh = @{ 'L.Storage.FreeOn' = '{1} 剩余 {0}'; 'L.Storage.Free' = '剩余 {0}'; 'L.Video.Monitor' = '显示器'; 'L.Storage.ReplayFolder' = '回放文件夹'; 'L.Audio.OneMixed' = '单条混音音轨' }
+            }
           if ($enKeys.Count -ne ($enKeys | Sort-Object -Unique).Count) {
             throw "English localization contains duplicate keys."
           }
-          if ($ruKeys.Count -ne ($ruKeys | Sort-Object -Unique).Count) {
-            throw "Russian localization contains duplicate keys."
+            foreach ($file in $files) {
+              [xml]$dictionary = Get-Content $file.FullName
+              $keys = @($dictionary.ResourceDictionary.String | ForEach-Object { $_.Key })
+              $values = @{}
+            $differences = @(Compare-Object $enKeys $keys)
+            if ($differences.Count -ne 0) {
+              $differences | Format-Table | Out-String | Write-Error
+              throw "Localization keys differ in $($file.Name)."
+            }
+            if ($keys.Count -ne ($keys | Sort-Object -Unique).Count) {
+              throw "$($file.Name) contains duplicate keys."
+            }
+              foreach ($entry in $dictionary.ResourceDictionary.String) {
+                $value = [string]$entry.'#text'
+                $values[$entry.Key] = $value
+              if ([string]::IsNullOrWhiteSpace($value)) {
+                throw "$($file.Name) contains an empty value for $($entry.Key)."
+              }
+              $expectedPlaceholders = @(
+                [regex]::Matches($enValues[$entry.Key], '\{\d+\}') |
+                  ForEach-Object Value |
+                  Sort-Object)
+              $actualPlaceholders = @(
+                [regex]::Matches($value, '\{\d+\}') |
+                  ForEach-Object Value |
+                  Sort-Object)
+              if (@(Compare-Object $expectedPlaceholders $actualPlaceholders).Count -ne 0) {
+                throw "$($file.Name) changed placeholders for $($entry.Key)."
+              }
+              if ($entry.Key -eq 'L.Brand' -and $value -ne 'Captail') {
+                throw "$($file.Name) changed the Captail brand."
+                }
+              }
+              $language = $file.BaseName.Split('.')[-1]
+              if (-not $semanticExpectations.ContainsKey($language)) {
+                throw "No semantic localization expectations for $($file.Name)."
+              }
+              foreach ($expectation in $semanticExpectations[$language].GetEnumerator()) {
+                if ($values[$expectation.Key] -cne $expectation.Value) {
+                  throw "$($file.Name) has an unsafe translation for $($expectation.Key): '$($values[$expectation.Key])'."
+                }
+              }
+            }
+          Write-Host "$($files.Count) localization dictionaries match: $($enKeys.Count) keys."
+
+      - name: Test localized dashboard layout
+        shell: pwsh
+        run: ./tools/TestLocalizedLayout.ps1
+
+      - name: Test sanitized diagnostic log export
+        shell: pwsh
+        run: ./tools/TestDiagnosticLogExporter.ps1
+
+      - name: Test localization policy
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path './src/Captail/bin/Debug/net9.0-windows10.0.22621.0/win-x64/Captail.exe'
+          $process = Start-Process -FilePath $exe -ArgumentList '--qa-localization' `
+            -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Localization policy QA failed: $($process.ExitCode)"
           }
-          Write-Host "Localization dictionaries match: $($enKeys.Count) keys."

@@ -45,6 +45,15 @@ public static class Log
         }
     }
 
+    internal static void Flush()
+    {
+        lock (_lock)
+        {
+            _writer?.Flush();
+            _pendingLines = 0;
+        }
+    }
+
     private static StreamWriter CreateWriter()
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);

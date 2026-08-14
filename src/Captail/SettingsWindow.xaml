@@ -44,14 +44,13 @@
                 <TextBlock Grid.Column="1" Text="{DynamicResource L.Brand}" FontSize="14.5" FontWeight="ExtraBold"
                            VerticalAlignment="Center"/>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="LanguageButton"
-                            Style="{StaticResource IconButton}"
-                            Width="30"
-                            Content="{DynamicResource L.LanguageCode}"
-                            FontSize="10.5"
-                            FontWeight="ExtraBold"
-                            Click="Language_Click"
-                            ToolTip="{DynamicResource L.LanguageTip}"/>
+                    <ToggleButton x:Name="LanguageButton"
+                                  Style="{StaticResource LanguageTriggerButton}"
+                                  Content="{DynamicResource L.LanguageCode}"
+                                  FontSize="10.5"
+                                  FontWeight="ExtraBold"
+                                  IsChecked="{Binding IsOpen, ElementName=LanguagePopup, Mode=TwoWay}"
+                                  ToolTip="{DynamicResource L.LanguageTip}"/>
                     <Button x:Name="SettingsButton" Style="{StaticResource IconButton}"
                             Click="Settings_Click" ToolTip="{DynamicResource L.Settings}">
                         <Path Data="{StaticResource IconGear}"
@@ -80,6 +79,52 @@
                 </StackPanel>
             </Grid>
 
+            <Popup x:Name="LanguagePopup"
+                   Grid.Row="0"
+                   PlacementTarget="{Binding ElementName=LanguageButton}"
+                   Placement="Bottom"
+                   HorizontalOffset="-220"
+                   VerticalOffset="6"
+                   AllowsTransparency="True"
+                   StaysOpen="False"
+                   PopupAnimation="None"
+                   Opened="LanguagePopup_Opened"
+                   Closed="LanguagePopup_Closed">
+                <Border x:Name="LanguagePopupPanel"
+                        Width="252"
+                        Padding="9"
+                        Background="#FF151A1D"
+                        BorderBrush="{StaticResource WindowBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12"
+                        Opacity="0"
+                        RenderTransformOrigin="0.5,0">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="30" ShadowDepth="8"
+                                          Direction="270" Opacity="0.55"/>
+                    </Border.Effect>
+                    <Border.RenderTransform>
+                        <TranslateTransform Y="-5"/>
+                    </Border.RenderTransform>
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource L.Language.Title}"
+                                   Margin="10,6,10,8"
+                                   FontSize="11.5"
+                                   FontWeight="Bold"
+                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                        <ListBox x:Name="LanguageList"
+                                 MaxHeight="430"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ItemContainerStyle="{StaticResource LanguageOption}"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 MouseLeftButtonUp="LanguageList_MouseLeftButtonUp"
+                                 PreviewKeyDown="LanguageList_PreviewKeyDown"/>
+                    </StackPanel>
+                </Border>
+            </Popup>
+
             <Grid x:Name="DashboardPanel" Grid.Row="1" Margin="16,4,10,10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -106,7 +151,8 @@
                         </Grid>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center">
                             <TextBlock x:Name="StatusTitleText" Text="{DynamicResource L.Status.Enabled}"
-                                       FontSize="14.5" FontWeight="Bold"/>
+                                       FontSize="14.5" FontWeight="Bold"
+                                       TextTrimming="CharacterEllipsis"/>
                             <TextBlock x:Name="StatusDetailText" Text="{DynamicResource L.Status.Idle}"
                                        Style="{StaticResource SecondaryText}" Margin="0,3,0,0"
                                        TextTrimming="CharacterEllipsis"/>
@@ -513,10 +559,16 @@
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
                                     <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{DynamicResource L.Replay.BufferLimit}"
-                                                       Style="{StaticResource RowLabelText}"/>
-                                            <Button Style="{StaticResource HelpIconButton}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="BufferLimitLabelText"
+                                                       Text="{DynamicResource L.Replay.BufferLimit}"
+                                                       Style="{StaticResource RowLabelText}"
+                                                       TextWrapping="Wrap"/>
+                                            <Button Grid.Column="1" Style="{StaticResource HelpIconButton}">
                                                 <Button.ToolTip>
                                                     <ToolTip Style="{StaticResource HelpToolTip}">
                                                         <StackPanel>
@@ -526,10 +578,12 @@
                                                     </ToolTip>
                                                 </Button.ToolTip>
                                             </Button>
-                                        </StackPanel>
-                                        <TextBlock Text="{DynamicResource L.Replay.BufferLimitHint}"
+                                        </Grid>
+                                        <TextBlock x:Name="BufferLimitHintText"
+                                                   Text="{DynamicResource L.Replay.BufferLimitHint}"
                                                    Style="{StaticResource SecondaryText}"
-                                                   FontSize="10" Margin="0,2,0,0"/>
+                                                   FontSize="10" Margin="0,2,0,0"
+                                                   TextWrapping="Wrap"/>
                                     </StackPanel>
                                     <ComboBox x:Name="ReplaySizeLimitBox" Grid.Column="1"
                                               Style="{StaticResource DarkCombo}">
@@ -651,7 +705,29 @@
                                         <ColumnDefinition Width="220"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Text="{DynamicResource L.Video.Monitor}" Style="{StaticResource RowLabelText}"/>
-                                    <ComboBox x:Name="MonitorBox" Grid.Column="1" Style="{StaticResource DarkCombo}"/>
+                                    <Grid Grid.Column="1">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="MonitorBox" Style="{StaticResource DarkCombo}"/>
+                                        <Button x:Name="IdentifyDisplaysButton"
+                                                Grid.Column="1"
+                                                Margin="6,0,0,0"
+                                                Style="{StaticResource IdentifyDisplayButton}"
+                                                Click="IdentifyDisplays_Click"
+                                                ToolTip="{DynamicResource L.Video.IdentifyDisplays}"
+                                                AutomationProperties.Name="{DynamicResource L.Video.IdentifyDisplays}">
+                                            <Path Data="{StaticResource IconDisplay}"
+                                                  Width="17" Height="17"
+                                                  Stretch="Uniform"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.7"
+                                                  StrokeStartLineCap="Round"
+                                                  StrokeEndLineCap="Round"
+                                                  StrokeLineJoin="Round"/>
+                                        </Button>
+                                    </Grid>
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <Grid Margin="13,11">
@@ -659,9 +735,16 @@
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="190"/>
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="{DynamicResource L.Video.Resolution}" Style="{StaticResource RowLabelText}"/>
-                                        <Button Style="{StaticResource HelpIconButton}">
+                                    <Grid VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="ResolutionLabelText"
+                                                   Text="{DynamicResource L.Video.Resolution}"
+                                                   Style="{StaticResource RowLabelText}"
+                                                   TextWrapping="Wrap"/>
+                                        <Button Grid.Column="1" Style="{StaticResource HelpIconButton}">
                                             <Button.ToolTip>
                                                 <ToolTip Style="{StaticResource HelpToolTip}">
                                                     <StackPanel>
@@ -671,7 +754,7 @@
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
-                                    </StackPanel>
+                                    </Grid>
                                     <ComboBox x:Name="ResolutionBox" Grid.Column="1"
                                               Style="{StaticResource DarkCombo}">
                                         <ComboBoxItem Tag="source" Content="{DynamicResource L.Video.SourceResolution}"/>
@@ -925,19 +1008,50 @@
             <Border Grid.Row="2" BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="0,1,0,0" Margin="16,0">
                 <Grid>
-                    <Button x:Name="GitHubButton"
-                            HorizontalAlignment="Left"
-                            Style="{StaticResource FooterLinkButton}"
-                            Click="GitHub_Click"
-                            ToolTip="{DynamicResource L.Footer.GitHubTip}">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Data="{StaticResource IconGitHub}"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  Width="13" Height="13" Stretch="Uniform"/>
-                            <TextBlock Text="GitHub" Margin="6,0,0,0"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button x:Name="GitHubButton"
+                                Style="{StaticResource FooterLinkButton}"
+                                Click="GitHub_Click"
+                                ToolTip="{DynamicResource L.Footer.GitHubTip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconGitHub}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Width="13" Height="13" Stretch="Uniform"/>
+                                <TextBlock Text="GitHub" Margin="6,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="ReportBugButton"
+                                Margin="3,0,0,0"
+                                Style="{StaticResource FooterLinkButton}"
+                                Click="ReportBug_Click"
+                                ToolTip="{DynamicResource L.Footer.ReportBugTip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconIssue}"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                      Width="13" Height="13" Stretch="Uniform"/>
+                                <TextBlock Text="{DynamicResource L.Footer.ReportBug}"
+                                           Margin="6,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="FeatureRequestButton"
+                                Margin="3,0,0,0"
+                                Style="{StaticResource FooterLinkButton}"
+                                Click="FeatureRequest_Click"
+                                ToolTip="{DynamicResource L.Footer.FeatureTip}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconFeature}"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                      Width="13" Height="13" Stretch="Uniform"/>
+                                <TextBlock Text="{DynamicResource L.Footer.Feature}"
+                                           Margin="6,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
                     <Button x:Name="UpdateVersionButton"
                             HorizontalAlignment="Right"
                             Style="{StaticResource UpdateVersionButton}"

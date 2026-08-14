@@ -6,11 +6,16 @@
   <sys:String x:Key="L.Brand">Captail</sys:String>
   <sys:String x:Key="L.LanguageCode">EN</sys:String>
   <sys:String x:Key="L.LanguageTip">Switch language</sys:String>
+  <sys:String x:Key="L.Language.Title">Language</sys:String>
   <sys:String x:Key="L.Settings">Settings</sys:String>
   <sys:String x:Key="L.Done">Done</sys:String>
   <sys:String x:Key="L.Minimize">Minimize</sys:String>
   <sys:String x:Key="L.Close">Close</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Open Captail on GitHub</sys:String>
+  <sys:String x:Key="L.Footer.ReportBug">Report bug</sys:String>
+  <sys:String x:Key="L.Footer.ReportBugTip">Open the GitHub form with system details prefilled</sys:String>
+  <sys:String x:Key="L.Footer.Feature">Feature</sys:String>
+  <sys:String x:Key="L.Footer.FeatureTip">Suggest a new Captail feature on GitHub</sys:String>
   <sys:String x:Key="L.Update.CurrentTip">Version {0} · click to check for updates</sys:String>
   <sys:String x:Key="L.Update.Checking">Checking…</sys:String>
   <sys:String x:Key="L.Update.CheckingTip">Checking GitHub Releases</sys:String>
@@ -106,6 +111,8 @@
   <sys:String x:Key="L.Video.Mbps50">50 Mbps</sys:String>
   <sys:String x:Key="L.Video.Mbps80">80 Mbps</sys:String>
   <sys:String x:Key="L.Video.Monitor">Monitor</sys:String>
+  <sys:String x:Key="L.Video.IdentifyDisplays">Identify displays</sys:String>
+  <sys:String x:Key="L.Video.DisplayLabel">DISPLAY</sys:String>
   <sys:String x:Key="L.Video.Resolution">Recording resolution</sys:String>
   <sys:String x:Key="L.Video.SourceResolution">Same as source</sys:String>
   <sys:String x:Key="L.Video.FrameRate">Frame rate</sys:String>
@@ -272,6 +279,7 @@
   <sys:String x:Key="L.Engine.GameWaiting">Game · waiting for capture</sys:String>
   <sys:String x:Key="L.Engine.AutoDesktop">Desktop</sys:String>
   <sys:String x:Key="L.Engine.AutoGameCaptured">Game · {0}</sys:String>
+  <sys:String x:Key="L.Engine.AutoGameFallback">Game · {0} · Desktop fallback</sys:String>
   <sys:String x:Key="L.Engine.InUse">Recording module is already in use.</sys:String>
   <sys:String x:Key="L.Engine.BufferStopped">Replay buffer is not running.</sys:String>
   <sys:String x:Key="L.Engine.SavePending">Previous replay is still being saved.</sys:String>

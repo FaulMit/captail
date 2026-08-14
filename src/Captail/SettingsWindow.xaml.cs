@@ -49,6 +49,8 @@ public partial class SettingsWindow : Window
     private bool _updateInstallInProgress;
     private int _libraryRefreshInProgress;
     private ReplayClip? _pendingDeleteClip;
+    private IReadOnlyList<CaptureInterop.MonitorInfo> _monitors = [];
+    private readonly List<DisplayIdentifierWindow> _displayIdentifierWindows = [];
 
     public bool Applied { get; private set; }
 
@@ -81,6 +83,8 @@ public partial class SettingsWindow : Window
         _runtimeActive = runtimeActive;
 
         InitializeComponent();
+        LanguageList.ItemsSource = Localization.SupportedLanguages;
+        UpdateLanguageMenuSelection();
         _replayLibrary = new ReplayLibrary(new FfmpegAdapter());
         ApplyHardwareCapabilities();
         _diskTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
@@ -91,6 +95,7 @@ public partial class SettingsWindow : Window
             Localization.Changed -= OnLanguageChanged;
             _diskTimer.Stop();
             _lifetimeCts.Cancel();
+            CloseDisplayIdentifiers();
             _lifetimeCts.Dispose();
         };
 
@@ -196,6 +201,8 @@ public partial class SettingsWindow : Window
         AudioDeviceBox.Items.Clear();
         MicDeviceBox.Items.Clear();
         MonitorBox.Items.Clear();
+        _monitors = [];
+        IdentifyDisplaysButton.IsEnabled = false;
         AudioDeviceBox.Items.Add(new ComboBoxItem
         {
             Tag = "",
@@ -248,6 +255,7 @@ public partial class SettingsWindow : Window
             MicDeviceBox.Items.Add(new ComboBoxItem { Tag = id, Content = name });
         if (snapshot.Monitors.Count > 0)
         {
+            _monitors = snapshot.Monitors;
             MonitorBox.Items.Clear();
             foreach (var monitor in snapshot.Monitors)
             {
@@ -262,11 +270,40 @@ public partial class SettingsWindow : Window
                 });
             }
         }
+        IdentifyDisplaysButton.IsEnabled = _monitors.Count > 0;
 
         SelectByTag(AudioDeviceBox, systemDevice);
         SelectByTag(MicDeviceBox, microphoneDevice);
         SelectByTag(MonitorBox, monitorId);
         UpdateAudioDeviceState();
+    }
+
+    private void IdentifyDisplays_Click(object sender, RoutedEventArgs e)
+    {
+        CloseDisplayIdentifiers();
+        foreach (CaptureInterop.MonitorInfo monitor in _monitors)
+        {
+            var identifier = new DisplayIdentifierWindow(
+                monitor,
+                monitor.Index + 1);
+            identifier.Owner = this;
+            identifier.Closed += (_, _) =>
+                _displayIdentifierWindows.Remove(identifier);
+            _displayIdentifierWindows.Add(identifier);
+            identifier.Show();
+        }
+    }
+
+    private void CloseDisplayIdentifiers()
+    {
+        DisplayIdentifierWindow[] identifiers =
+            _displayIdentifierWindows.ToArray();
+        _displayIdentifierWindows.Clear();
+        foreach (DisplayIdentifierWindow identifier in identifiers)
+        {
+            if (identifier.IsLoaded)
+                identifier.Close();
+        }
     }
 
     private static DeviceListsSnapshot CollectDeviceLists()
@@ -457,14 +494,94 @@ public partial class SettingsWindow : Window
         SettingsScrollViewer.ScrollToTop();
     }
 
-    private void Language_Click(object sender, RoutedEventArgs e)
+    private void LanguagePopup_Opened(object? sender, EventArgs e)
     {
+        UpdateLanguageMenuSelection();
+        LanguagePopupPanel.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120)));
+        if (LanguagePopupPanel.RenderTransform is TranslateTransform translate)
+        {
+            translate.BeginAnimation(
+                TranslateTransform.YProperty,
+                new DoubleAnimation(-5, 0, TimeSpan.FromMilliseconds(150))
+                {
+                    EasingFunction = new CubicEase
+                    {
+                        EasingMode = EasingMode.EaseOut,
+                    },
+                });
+        }
+
+        Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
+        {
+            LanguageList.Focus();
+            if (LanguageList.ItemContainerGenerator.ContainerFromItem(
+                    LanguageList.SelectedItem) is ListBoxItem selected)
+            {
+                selected.Focus();
+            }
+        });
+    }
+
+    private void LanguagePopup_Closed(object? sender, EventArgs e)
+    {
+        LanguagePopupPanel.BeginAnimation(OpacityProperty, null);
+        LanguagePopupPanel.Opacity = 0;
+        if (LanguagePopupPanel.RenderTransform is TranslateTransform translate)
+        {
+            translate.BeginAnimation(TranslateTransform.YProperty, null);
+            translate.Y = -5;
+        }
+        UpdateLanguageMenuSelection();
+    }
+
+    private void LanguageList_MouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (ItemsControl.ContainerFromElement(
+                LanguageList,
+                e.OriginalSource as DependencyObject) is not ListBoxItem item)
+        {
+            return;
+        }
+
+        LanguageList.SelectedItem = item.DataContext;
+        ApplySelectedLanguage();
+    }
+
+    private void LanguageList_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        ApplySelectedLanguage();
+        e.Handled = true;
+    }
+
+    private void ApplySelectedLanguage()
+    {
+        if (LanguageList.SelectedItem is not LanguageDefinition selected)
+            return;
+
         string previousLanguage = _config.Language;
         try
         {
-            _config.Language = Localization.IsRussian ? "en" : "ru";
+            if (string.Equals(
+                    selected.Code,
+                    previousLanguage,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                LanguagePopup.IsOpen = false;
+                return;
+            }
+
+            _config.Language = selected.Code;
             _config.Save();
             Localization.SetLanguage(_config.Language);
+            UpdateLanguageMenuSelection();
+            LanguagePopup.IsOpen = false;
             AnimatePress(LanguageButton);
         }
         catch (Exception exception)
@@ -483,6 +600,15 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private void UpdateLanguageMenuSelection()
+    {
+        LanguageList.SelectedItem = Localization.SupportedLanguages.FirstOrDefault(
+            language => string.Equals(
+                language.Code,
+                _config.Language,
+                StringComparison.OrdinalIgnoreCase));
+    }
+
     private void OnLanguageChanged()
     {
         if (!Dispatcher.CheckAccess())
@@ -491,6 +617,7 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        UpdateLanguageMenuSelection();
         _ = RunUiActionAsync(LoadDeviceListsAsync);
         ApplyHardwareCapabilities();
         UpdateCaptureSourceState();
@@ -514,6 +641,40 @@ public partial class SettingsWindow : Window
         catch (Exception exception)
         {
             HandleUiActionError("Open GitHub repository", exception);
+        }
+    }
+
+    private void ReportBug_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = BugReportInfo.BuildUrl(_config, _capabilities),
+                UseShellExecute = true,
+            });
+            AnimatePress(ReportBugButton);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Open GitHub bug report form", exception);
+        }
+    }
+
+    private void FeatureRequest_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = UpdateService.FeatureRequestUrl,
+                UseShellExecute = true,
+            });
+            AnimatePress(FeatureRequestButton);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Open GitHub feature request form", exception);
         }
     }
 
@@ -997,6 +1158,13 @@ public partial class SettingsWindow : Window
     {
         if (_capturingHotkeyButton is null)
         {
+            if (e.Key == Key.Escape && LanguagePopup.IsOpen)
+            {
+                LanguagePopup.IsOpen = false;
+                LanguageButton.Focus();
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Escape && DeleteConfirmOverlay.Visibility == Visibility.Visible)
             {
                 CancelDeleteReplay();
