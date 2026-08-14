@@ -61,7 +61,6 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 
 ## What does it look like?
 
-Every image in this gallery is captured from a real Captail build. Mockups and concept art are not used as product screenshots. Maintainers can reproduce the baseline with the [screenshot capture workflow](docs/SCREENSHOTS.md).
 
 <p align="center">
   <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and recent replays" width="420">
