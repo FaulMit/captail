@@ -61,21 +61,19 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 
 ## What does it look like?
 
+Every image in this gallery is captured from a real Captail build. Mockups and concept art are not used as product screenshots. Maintainers can reproduce the baseline with the [screenshot capture workflow](docs/SCREENSHOTS.md).
+
 <p align="center">
   <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and recent replays" width="420">
 </p>
 
 <p align="center">
-  <img src="docs/captail-settings-video.jpg" alt="Captail video settings: source, codec, bitrate, monitor, resolution, and frame rate" width="390">
-  <img src="docs/captail-settings-audio.jpg" alt="Captail audio, storage, and hotkey settings" width="390">
+  <img src="docs/captail-settings-video.png" alt="Captail video settings with hardware AV1, 80 Mbps, 3840 by 2160 resolution, and 240 FPS selected" width="390">
+  <img src="docs/captail-settings-audio.png" alt="Captail audio settings with system audio, microphone, volume controls, microphone boost, and separate tracks" width="390">
 </p>
 
 <p align="center">
-  <img src="docs/captail-editor.png" alt="Captail clip editor with a video timeline, separate audio tracks, trim range, and media details" width="820">
-</p>
-
-<p align="center">
-  <img src="docs/captail-replay-status-indicator.png" alt="Captail replay status indicator showing active, recovering, error, and saved states with four corner placement options" width="920">
+  <img src="docs/captail-editor.png" alt="Captail clip editor showing AV1 3840 by 2160 video at 240 FPS, trim timeline, and separate system and microphone audio tracks" width="820">
 </p>
 
 ## How do I install it?
@@ -291,7 +289,7 @@ dotnet build .\Captail.sln -c Debug --no-restore
 
 The first build acquires the pinned OBS and FFmpeg runtimes when they are missing.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Release maintainers should use [docs/RELEASING.md](docs/RELEASING.md); published binaries are built and verified by GitHub Actions.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Release maintainers should use [docs/RELEASING.md](docs/RELEASING.md) and the [README screenshot plan](docs/SCREENSHOTS.md); published binaries are built and verified by GitHub Actions.
 
 ## License and attribution
 
