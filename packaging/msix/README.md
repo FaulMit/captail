@@ -24,15 +24,15 @@ manifest identity does not match the reserved product.
 From repository root:
 
 ```powershell
-.\tools\BuildStorePackage.ps1 -Version 0.1.7
+.\tools\BuildStorePackage.ps1 -Version 0.2.0
 ```
 
 Output:
 
 ```text
-artifacts\store\0.1.7\Captail-0.1.7.0-x64.msix
-artifacts\store\0.1.7\Captail-0.1.7.0-x64.msixupload
-artifacts\store\0.1.7\SHA256SUMS.txt
+artifacts\store\0.2.0\Captail-0.2.0.0-x64.msix
+artifacts\store\0.2.0\Captail-0.2.0.0-x64.msixupload
+artifacts\store\0.2.0\SHA256SUMS.txt
 ```
 
 Upload `.msixupload` on Partner Center's **Packages** page. Do not publish this
@@ -51,8 +51,8 @@ libraries return or either command-line tool cannot start.
 
 ## Versioning
 
-MSIX requires four numeric components. Captail `0.1.7` becomes package version
-`0.1.7.0`. Every Store submission must use a strictly higher package version.
+MSIX requires four numeric components. Captail `0.2.0` becomes package version
+`0.2.0.0`. Every Store submission must use a strictly higher package version.
 Never reuse a version already submitted to Partner Center.
 
 ## Store-specific behavior

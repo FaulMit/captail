@@ -20,6 +20,15 @@
   <Resources>
     <Resource Language="en-us" />
     <Resource Language="ru-ru" />
+    <Resource Language="uk-ua" />
+    <Resource Language="zh-cn" />
+    <Resource Language="es-es" />
+    <Resource Language="pt-br" />
+    <Resource Language="de-de" />
+    <Resource Language="fr-fr" />
+    <Resource Language="ja-jp" />
+    <Resource Language="ko-kr" />
+    <Resource Language="pl-pl" />
   </Resources>
   <Dependencies>
     <TargetDeviceFamily

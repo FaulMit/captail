@@ -33,6 +33,12 @@ internal static class CaptureInterop
         nint window,
         out uint processId);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(nint window, out Rect rect);
+
+    [DllImport("user32.dll")]
+    private static extern nint MonitorFromWindow(nint window, uint flags);
+
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
     {
@@ -69,13 +75,21 @@ internal static class CaptureInterop
     }
 
     private const uint EddGetDeviceInterfaceName = 1;
+    private const uint MonitorDefaultToNearest = 2;
 
     public sealed record MonitorInfo(
         nint Handle,
         int Width,
         int Height,
         int Index,
-        string DeviceId);
+        string DeviceId,
+        int Left,
+        int Top);
+
+    public sealed record ForegroundAppInfo(
+        string Executable,
+        string FullPath,
+        bool IsFullscreen);
 
     public static List<MonitorInfo> EnumerateMonitors()
     {
@@ -113,27 +127,69 @@ internal static class CaptureInterop
                 rect.Right - rect.Left,
                 rect.Bottom - rect.Top,
                 monitors.Count,
-                deviceId));
+                deviceId,
+                rect.Left,
+                rect.Top));
             return true;
         }, 0);
         return monitors;
     }
 
     public static string ForegroundExecutable()
+        => ForegroundApplication().Executable;
+
+    public static ForegroundAppInfo ForegroundApplication()
     {
         nint window = GetForegroundWindow();
         if (window == 0 || GetWindowThreadProcessId(window, out uint processId) == 0)
-            return "";
+            return new ForegroundAppInfo("", "", false);
         try
         {
             using Process process = Process.GetProcessById((int)processId);
-            return process.ProcessName + ".exe";
+            string executable = process.ProcessName + ".exe";
+            string fullPath = "";
+            try
+            {
+                fullPath = process.MainModule?.FileName ?? "";
+            }
+            catch (Exception exception) when (
+                exception is InvalidOperationException or Win32Exception or
+                NotSupportedException)
+            {
+                // Process name still allows normal hook/foreground matching.
+            }
+
+            return new ForegroundAppInfo(
+                executable,
+                fullPath,
+                CoversMonitor(window));
         }
         catch (Exception exception) when (
             exception is ArgumentException or InvalidOperationException or Win32Exception)
         {
-            return "";
+            return new ForegroundAppInfo("", "", false);
         }
+    }
+
+    private static bool CoversMonitor(nint window)
+    {
+        if (!GetWindowRect(window, out Rect windowRect))
+            return false;
+
+        nint monitor = MonitorFromWindow(window, MonitorDefaultToNearest);
+        var monitorInfo = new MonitorInfoNative
+        {
+            Size = (uint)Marshal.SizeOf<MonitorInfoNative>(),
+            Device = "",
+        };
+        if (monitor == 0 || !GetMonitorInfo(monitor, ref monitorInfo))
+            return false;
+
+        const int tolerance = 2;
+        return windowRect.Left <= monitorInfo.Monitor.Left + tolerance &&
+               windowRect.Top <= monitorInfo.Monitor.Top + tolerance &&
+               windowRect.Right >= monitorInfo.Monitor.Right - tolerance &&
+               windowRect.Bottom >= monitorInfo.Monitor.Bottom - tolerance;
     }
 
 }

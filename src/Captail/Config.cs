@@ -76,7 +76,10 @@ public sealed class Config
             return config;
         }
 
-        var defaultConfig = new Config();
+        var defaultConfig = new Config
+        {
+            Language = Localization.ResolveInitialLanguage(null),
+        };
         defaultConfig.Save();
         return defaultConfig;
     }
@@ -88,7 +91,21 @@ public sealed class Config
             return false;
         try
         {
-            config = JsonSerializer.Deserialize<Config>(File.ReadAllText(path));
+            string json = File.ReadAllText(path);
+            using JsonDocument document = JsonDocument.Parse(json);
+            bool hasConfiguredLanguage = document.RootElement.ValueKind ==
+                                         JsonValueKind.Object &&
+                                         document.RootElement.EnumerateObject().Any(property =>
+                                             string.Equals(
+                                                 property.Name,
+                                                 nameof(Language),
+                                                 StringComparison.OrdinalIgnoreCase) &&
+                                             property.Value.ValueKind == JsonValueKind.String &&
+                                             !string.IsNullOrWhiteSpace(
+                                                 property.Value.GetString()));
+            config = JsonSerializer.Deserialize<Config>(json);
+            if (config is not null && !hasConfiguredLanguage)
+                config.Language = Localization.ResolveInitialLanguage(null);
             config?.Normalize();
             return config is not null;
         }
@@ -271,7 +288,5 @@ public sealed class Config
     }
 
     private static string NormalizeLanguage(string? language) =>
-        string.Equals(language, "ru", StringComparison.OrdinalIgnoreCase)
-            ? "ru"
-            : "en";
+        Localization.NormalizeLanguage(language);
 }

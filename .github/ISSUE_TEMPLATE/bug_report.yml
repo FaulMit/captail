@@ -23,6 +23,7 @@ body:
     attributes:
       label: Package
       options:
+        - Microsoft Store
         - Installer
         - Portable
         - Built from source
@@ -84,7 +85,7 @@ body:
     id: logs
     attributes:
       label: Relevant log output
-      description: Logs are in %APPDATA%\Captail\log.txt. Remove personal paths and sensitive information first.
+      description: Captail prefills a short sanitized excerpt. Review it before submitting; the complete local log is never attached.
       render: text
 
   - type: checkboxes

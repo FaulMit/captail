@@ -30,7 +30,18 @@
 Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It keeps the latest seconds or minutes in a rolling buffer, then saves them when you press a hotkey. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
 
 > [!WARNING]
-> Captail `v0.1.x` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+> Captail `v0.2.0` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+
+## What's new in Captail 0.2.0?
+
+- Use Captail in 11 languages through a compact native-name language menu. First launch follows the Windows language when supported.
+- Identify matching physical displays directly from the monitor selector.
+- Keep Desktop capture active when a fullscreen game is recognized but cannot provide usable Game Capture frames.
+- Send a useful bug report with system and recording details plus a short sanitized log excerpt already filled in.
+- Suggest focused improvements through the new Feature link beside Report bug.
+- Keep the replay indicator in the correct game or desktop corner without covering the taskbar or newer system overlays.
+
+Simplified Chinese support was contributed by [@zhuyouyi](https://github.com/zhuyouyi) through [PR #24](https://github.com/FaulMit/captail/pull/24).
 
 ## Is Captail for me?
 
@@ -106,14 +117,18 @@ Both hotkeys are configurable. Double-click the tray icon to reopen Captail.
 
 The optional replay status indicator keeps recording state visible over games and desktop apps. It is enabled by default, can sit in any screen corner, ignores mouse input, and briefly confirms a successful save. Disable it or change its position in Replay settings.
 
+On first launch, Captail follows your Windows language when it supports it; otherwise it starts in English. Use the compact language control in the title bar to switch between English, Russian, Ukrainian, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Japanese, Korean, and Polish.
+
+If similarly sized monitors are hard to distinguish, open Video settings and select **Identify displays** beside the monitor list. Captail briefly places a large number on each matching screen.
+
 ## What does each capture mode record?
 
 | Mode | When no game is detected | When a fullscreen game appears | Audio source |
 | --- | --- | --- | --- |
-| **Desktop** | Records the selected monitor | Automatically switches to direct Game Capture | Selected Windows output device |
+| **Desktop** | Records the selected monitor | Uses direct Game Capture when usable; otherwise keeps desktop video active while recognizing supported fullscreen games | Selected Windows output device |
 | **Game Capture** | Waits without recording the desktop | Captures the detected game directly | Detected game audio |
 
-The replay buffer stays armed in both modes. Use **Desktop** when you want continuous coverage; use **Game Capture** when privacy outside games matters more.
+The replay buffer stays armed in both modes. Use **Desktop** when you want continuous coverage; use **Game Capture** when privacy outside games matters more. When a fullscreen game cannot be hooked, Desktop mode favors uninterrupted video over pretending direct Game Capture is working.
 
 ## What happens when capture breaks?
 
@@ -244,7 +259,9 @@ Codec options are based on detected encoder support. Captail falls back to anoth
 
 ## What information should I include in a bug report?
 
-First check [existing issues](https://github.com/FaulMit/captail/issues), then open the [bug report form](https://github.com/FaulMit/captail/issues/new/choose).
+First check [existing issues](https://github.com/FaulMit/captail/issues), then click **Report bug** in Captail or open the [bug report form](https://github.com/FaulMit/captail/issues/new/choose).
+
+The in-app button prefills Captail version, package channel, Windows build, GPU and driver when available, recording configuration, and a short recent diagnostic excerpt. Captail removes personal paths, network addresses, identifiers, window titles, device names, secrets, and uncontrolled third-party output before opening GitHub. Review the form before submitting it; the complete local log and recorded files are never attached automatically.
 
 Include:
 
@@ -253,11 +270,13 @@ Include:
 - GPU model and graphics-driver version;
 - capture mode, codec, resolution, FPS, and audio configuration;
 - exact reproduction steps and expected/actual behavior;
-- `%LOCALAPPDATA%\Captail\log.txt`, when relevant.
+- additional log context only when the sanitized excerpt does not cover the problem.
 
 Review logs before attaching them and remove personal paths or other sensitive information. Report security vulnerabilities privately through the process in [SECURITY.md](SECURITY.md).
 
 Compatibility reports for older NVIDIA, AMD, and Intel GPUs are useful even when everything works.
+
+Have an improvement rather than a bug? Use the **Feature** footer action to open Captail's focused feature-request template.
 
 ## How do I build or contribute?
 

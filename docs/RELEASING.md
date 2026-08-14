@@ -20,8 +20,8 @@ Before running the workflow:
 
 ```powershell
 .\tools\New-ReleaseNotes.ps1 `
-  -Version 0.1.7 `
-  -PreviousTag v0.1.6 `
+  -Version 0.2.0 `
+  -PreviousTag v0.1.9 `
   -OutputPath "$env:TEMP\captail-release-notes.md"
 ```
 
@@ -34,7 +34,7 @@ From GitHub:
 1. Open **Actions**.
 2. Select **Build release**.
 3. Click **Run workflow**.
-4. Enter a semantic version without `v`, for example `0.1.1`.
+4. Enter a semantic version without `v`, for example `0.2.0`.
 5. Keep **Pre-release** enabled while Captail is in preview.
 
 From GitHub CLI:
@@ -43,7 +43,7 @@ From GitHub CLI:
 gh workflow run release.yml `
   --repo FaulMit/captail `
   --ref main `
-  -f version=0.1.1 `
+  -f version=0.2.0 `
   -f prerelease=true
 ```
 
@@ -63,11 +63,11 @@ Install Inno Setup, then run:
 ```powershell
 .\tools\AcquireObsRuntime.ps1
 .\tools\BuildRelease.ps1 `
-  -Version 0.1.1 `
+  -Version 0.2.0 `
   -InnoSetupCompiler "C:\Program Files\Inno Setup 7\ISCC.exe"
 ```
 
-Output is written to `artifacts\release\0.1.1`.
+Output is written to `artifacts\release\0.2.0`.
 
 ## Version rules
 
@@ -85,12 +85,12 @@ GitHub Release because Store installs, signs, and updates the package.
 Build an upload-ready package locally:
 
 ```powershell
-.\tools\BuildStorePackage.ps1 -Version 0.1.7
+.\tools\BuildStorePackage.ps1 -Version 0.2.0
 ```
 
 Store packaging uses self-contained FFmpeg tools and rejects package-root DLL
 collisions before creating the Partner Center upload archive.
 
-Upload `artifacts\store\0.1.7\Captail-0.1.7.0-x64.msixupload` in Partner
+Upload `artifacts\store\0.2.0\Captail-0.2.0.0-x64.msixupload` in Partner
 Center. Full identity, validation, update-channel, and submission instructions
 are in [`packaging/msix/README.md`](../packaging/msix/README.md).

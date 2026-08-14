@@ -4,11 +4,28 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-14
+
+### Added
+
+- **Eleven interface languages:** Captail now supports English, Russian, Ukrainian, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Japanese, Korean, and Polish. First launch follows Windows when its language is supported, otherwise it uses English. Simplified Chinese was contributed by [@zhuyouyi](https://github.com/zhuyouyi).
+- **Compact language menu:** The title-bar language control now opens a focused native-name selector instead of cycling through languages.
+- **Display identification:** A button beside the monitor selector briefly shows each display number on the matching screen.
+- **Built-in feedback links:** The footer now opens dedicated GitHub forms for sanitized bug reports and focused feature requests.
+
+### Improved
+
+- **Safer automatic game detection:** Desktop mode recognizes common fullscreen game installations even when Game Capture cannot produce usable frames. Captail keeps desktop video active and associates the replay with the detected game instead of losing coverage or filing it under an unrelated application.
+- **More useful bug reports:** Captail can prefill version, package channel, Windows, GPU, driver, recording settings, and a short sanitized diagnostic excerpt. The complete local log, personal paths, identifiers, device names, and recorded content are not attached.
+- **Localized layout checks:** Release validation now checks all language dictionaries, formatting placeholders, critical translations, and compact UI regions.
+
 ### Fixed
 
 - Kept bottom-corner replay indicators above the Windows taskbar and clock by positioning them inside each monitor's working area.
 - Prevented the indicator's position timer from repeatedly raising it above Snipping Tool and other newer topmost system overlays.
 - Made the indicator visible in Windows screenshots while keeping it excluded from Captail replay recordings.
+- Returned the indicator to the chosen physical screen corner after a game is detected, while retaining taskbar-safe placement on the desktop.
+- Fixed clipped long labels and incorrect free-space wording in supported translations.
 
 ## [0.1.9] - 2026-08-11
 

@@ -48,6 +48,7 @@ public partial class ReplayStatusIndicatorWindow : Window
     private uint? _captureAffinity;
     private uint _lastForegroundProcessId;
     private bool _lastForegroundIsScreenCapture;
+    private bool _gameDetected;
 #if DEBUG
     internal bool AllowCaptureForQa { get; set; }
 #endif
@@ -102,6 +103,16 @@ public partial class ReplayStatusIndicatorWindow : Window
             return;
 
         _placement = normalized;
+        if (IsVisible)
+            PositionOnForegroundMonitor();
+    }
+
+    internal void SetGameDetected(bool gameDetected)
+    {
+        if (_gameDetected == gameDetected)
+            return;
+
+        _gameDetected = gameDetected;
         if (IsVisible)
             PositionOnForegroundMonitor();
     }
@@ -402,12 +413,16 @@ public partial class ReplayStatusIndicatorWindow : Window
         bool placeBottom = _placement is
             ReplayIndicatorPlacement.BottomLeft or
             ReplayIndicatorPlacement.BottomRight;
+        // Desktop mode respects taskbar/date. Once Captail has a real game
+        // hook, use full monitor bounds so the indicator returns to the
+        // selected in-game corner.
+        Rect bounds = _gameDetected ? info.Monitor : info.WorkArea;
         int left = placeRight
-            ? info.WorkArea.Right - size - inset
-            : info.WorkArea.Left + inset;
+            ? bounds.Right - size - inset
+            : bounds.Left + inset;
         int top = placeBottom
-            ? info.WorkArea.Bottom - size - inset
-            : info.WorkArea.Top + inset;
+            ? bounds.Bottom - size - inset
+            : bounds.Top + inset;
         // Preserve current topmost-band order. Raising the window on every
         // timer tick would cover newer system overlays such as Snipping Tool.
         SetWindowPos(

@@ -6,11 +6,16 @@
   <sys:String x:Key="L.Brand">Captail</sys:String>
   <sys:String x:Key="L.LanguageCode">RU</sys:String>
   <sys:String x:Key="L.LanguageTip">Сменить язык</sys:String>
+  <sys:String x:Key="L.Language.Title">Язык</sys:String>
   <sys:String x:Key="L.Settings">Настройки</sys:String>
   <sys:String x:Key="L.Done">Готово</sys:String>
   <sys:String x:Key="L.Minimize">Свернуть</sys:String>
   <sys:String x:Key="L.Close">Закрыть</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Открыть Captail на GitHub</sys:String>
+  <sys:String x:Key="L.Footer.ReportBug">Сообщить об ошибке</sys:String>
+  <sys:String x:Key="L.Footer.ReportBugTip">Открыть форму GitHub с заполненной информацией о системе</sys:String>
+  <sys:String x:Key="L.Footer.Feature">Идея</sys:String>
+  <sys:String x:Key="L.Footer.FeatureTip">Предложить новую функцию Captail на GitHub</sys:String>
   <sys:String x:Key="L.Update.CurrentTip">Версия {0} · нажмите, чтобы проверить обновления</sys:String>
   <sys:String x:Key="L.Update.Checking">Проверка…</sys:String>
   <sys:String x:Key="L.Update.CheckingTip">Проверяем GitHub Releases</sys:String>
@@ -106,6 +111,8 @@
   <sys:String x:Key="L.Video.Mbps50">50 Мбит/с</sys:String>
   <sys:String x:Key="L.Video.Mbps80">80 Мбит/с</sys:String>
   <sys:String x:Key="L.Video.Monitor">Монитор</sys:String>
+  <sys:String x:Key="L.Video.IdentifyDisplays">Определить мониторы</sys:String>
+  <sys:String x:Key="L.Video.DisplayLabel">МОНИТОР</sys:String>
   <sys:String x:Key="L.Video.Resolution">Разрешение записи</sys:String>
   <sys:String x:Key="L.Video.SourceResolution">Как у источника</sys:String>
   <sys:String x:Key="L.Video.FrameRate">Частота кадров</sys:String>
@@ -272,6 +279,7 @@
   <sys:String x:Key="L.Engine.GameWaiting">Игра · ожидание захвата</sys:String>
   <sys:String x:Key="L.Engine.AutoDesktop">Рабочий стол</sys:String>
   <sys:String x:Key="L.Engine.AutoGameCaptured">Игра · {0}</sys:String>
+  <sys:String x:Key="L.Engine.AutoGameFallback">Игра · {0} · захват экрана</sys:String>
   <sys:String x:Key="L.Engine.InUse">Модуль записи уже используется.</sys:String>
   <sys:String x:Key="L.Engine.BufferStopped">Буфер не запущен.</sys:String>
   <sys:String x:Key="L.Engine.SavePending">Предыдущий повтор ещё сохраняется.</sys:String>

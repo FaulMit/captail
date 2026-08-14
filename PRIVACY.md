@@ -70,6 +70,16 @@ Opening a GitHub, support, or repository link from Captail launches your
 default web browser. The destination website then applies its own privacy
 policy.
 
+When you click **Report bug**, Captail adds its version, distribution channel,
+Windows version and build, GPU and driver version when available, and current
+recording configuration to the GitHub URL so the bug form opens prefilled. It
+also includes a short recent diagnostic excerpt after removing paths, network
+addresses, identifiers, window titles, device names, secrets, and uncontrolled
+third-party library output. Captail does not include the complete log,
+usernames, recorded content, or files. Opening the link sends those prefilled
+values to GitHub; nothing is published until you review the form and submit the
+issue yourself.
+
 ## Permissions
 
 Captail uses only permissions needed for its recording workflow, including:
