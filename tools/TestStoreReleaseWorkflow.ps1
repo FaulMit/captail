@@ -4,6 +4,19 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $workflowPath = Join-Path $repoRoot ".github\workflows\store-release.yml"
 $workflow = Get-Content -LiteralPath $workflowPath -Raw
 
+if ($workflow -match '(?m)^\s*package_revision:') {
+    throw "Store workflow must not expose the reserved MSIX revision field."
+}
+if ($workflow -match 'STORE_PACKAGE_REVISION|PackageRevision') {
+    throw "Store workflow must keep the reserved MSIX revision field at zero."
+}
+if ($workflow -notmatch "STORE_IDENTITY_VERSION -notmatch '\^\\d\+\\\.\\d\+\\\.\\d\+\\\.0\$'") {
+    throw "Store workflow must reject an MSIX identity whose fourth part is not zero."
+}
+if ($workflow -notmatch [regex]::Escape('MSIX identity version: ``$identityVersion``')) {
+    throw "Store workflow must report the validated MSIX identity version."
+}
+
 function Get-RequiredIndex {
     param(
         [Parameter(Mandatory)]
