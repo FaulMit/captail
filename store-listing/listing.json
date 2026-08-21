@@ -1,0 +1,96 @@
+{
+  "SchemaVersion": 1,
+  "ReleaseVersion": "0.2.1",
+  "Screenshots": [
+    {
+      "Source": "images/captail-main.png",
+      "FileName": "captail-main.png"
+    },
+    {
+      "Source": "images/captail-settings-video.png",
+      "FileName": "captail-settings-video.png"
+    },
+    {
+      "Source": "images/captail-settings-audio.png",
+      "FileName": "captail-settings-audio.png"
+    },
+    {
+      "Source": "images/captail-player.png",
+      "FileName": "captail-player.png"
+    },
+    {
+      "Source": "images/captail-editor.png",
+      "FileName": "captail-editor.png"
+    }
+  ],
+  "Listings": {
+    "en-us": {
+      "ShortDescription": "Lightweight instant replay for Windows that stays ready, automatically recovers capture, and saves recent gameplay or desktop activity on demand.",
+      "Description": "Captail is a lightweight, open-source instant replay recorder for Windows. It continuously keeps the latest seconds or minutes in a rolling buffer and saves them when you press a global hotkey.\n\nCaptail focuses on one job: keeping instant replay ready without a large streaming interface. Desktop mode automatically switches to a detected game while it is active and returns to desktop capture after you Alt+Tab. Game Capture mode records games without recording the desktop.\n\nCapture interruptions do not silently disable the buffer. Captail monitors the recording pipeline and attempts automatic recovery after game exits, source loss, encoder problems, and graphics-driver interruptions. Protected content may appear black, but the replay service is designed to remain active and recover normal capture afterward.\n\nChoose AV1, HEVC, or H.264 according to the hardware encoders available on your GPU. Captail supports 30 to 240 FPS, resolutions up to 4K, system or game audio, microphone capture, separate audio tracks, volume controls, microphone boost, replay duration and size limits, per-game folders, and configurable global hotkeys.\n\nRecent clips appear inside Captail. Use the built-in player for quick review, then open the focused editor to trim a clip, select audio tracks, save a copy, or overwrite the original.\n\nCaptail starts in the Windows notification area, can launch with Windows, and includes an optional replay-status indicator. Recording and diagnostics stay local. Captail does not upload recorded video or personal data.",
+      "Features": [
+        "Rolling instant replay buffer up to 15 minutes",
+        "Global hotkeys for saving and toggling Instant Replay",
+        "Automatic desktop and active-game capture switching",
+        "Game Capture mode without desktop recording",
+        "AV1, HEVC, and H.264 hardware encoder detection",
+        "30–240 FPS and output resolutions up to 4K",
+        "System or game audio plus microphone capture",
+        "Optional separate audio tracks, volume controls, and microphone boost",
+        "Replay duration and file-size limits",
+        "Recent replay library with fast built-in player",
+        "Focused clip editor with trimming and audio-track selection",
+        "Automatic recording recovery after capture failures",
+        "Optional replay-status indicator and game reminder",
+        "Per-game replay folders",
+        "Eleven interface languages"
+      ],
+      "ReleaseNotes": "Captail 0.2.1 adds a fast replay player with seeking, fullscreen controls, keyboard shortcuts, and playback-speed adjustment. Recent replays can now be previewed before trimming. New replay-off game reminders and an unsaved-settings guard prevent missed recording and accidental settings loss. Game Capture uses fewer resources while no game is running. This update also cleans up secondary actions, improves replay-indicator contrast, prevents unrelated fullscreen apps from being treated as games, and fixes Microsoft Store taskbar icon assets.",
+      "Keywords": [
+        "instant replay",
+        "game recorder",
+        "screen recorder",
+        "clip editor",
+        "gameplay capture",
+        "replay buffer",
+        "AV1 recorder"
+      ],
+      "LicenseTerms": "GNU General Public License v2.0 or later. Source and license: https://github.com/FaulMit/captail",
+      "CopyrightAndTrademarkInfo": "Copyright © 2026 faulmit and Captail contributors.",
+      "DevStudio": "faulmit"
+    },
+    "ru-ru": {
+      "ShortDescription": "Лёгкая программа мгновенных повторов для Windows: автоматически восстанавливает захват и сохраняет недавнюю игру или рабочий стол по команде.",
+      "Description": "Captail — лёгкая программа с открытым исходным кодом для записи мгновенных повторов в Windows. Она постоянно хранит последние секунды или минуты в циклическом буфере и сохраняет их по глобальной горячей клавише.\n\nCaptail сосредоточен на одной задаче: мгновенный повтор всегда должен быть готов без громоздкого интерфейса для стриминга. Режим рабочего стола автоматически переключается на обнаруженную игру, пока она активна, и возвращается к рабочему столу после Alt+Tab. Режим Game Capture записывает игры, но не записывает рабочий стол.\n\nСбой захвата не должен незаметно отключать буфер. Captail следит за записью и пытается автоматически восстановить её после закрытия игры, потери источника, ошибки кодировщика или сбоя видеодрайвера. Защищённый контент может отображаться чёрным, но сервис повтора продолжает работать и восстанавливает обычный захват после него.\n\nМожно выбрать AV1, HEVC или H.264 в зависимости от аппаратных кодировщиков видеокарты. Поддерживаются частота от 30 до 240 FPS, разрешение до 4K, системный звук или звук игры, микрофон, раздельные аудиодорожки, регулировка громкости, усиление микрофона, ограничения длительности и размера повтора, папки по играм и настраиваемые глобальные горячие клавиши.\n\nПоследние клипы отображаются прямо в Captail. Встроенный плеер позволяет быстро просмотреть запись, а компактный редактор — обрезать её, выбрать аудиодорожки, сохранить копию или перезаписать оригинал.\n\nCaptail запускается в области уведомлений Windows, может стартовать вместе с системой и показывает необязательный индикатор состояния повтора. Записи и диагностика остаются на компьютере. Captail не загружает видео или личные данные.",
+      "Features": [
+        "Циклический буфер мгновенного повтора до 15 минут",
+        "Глобальные горячие клавиши сохранения и включения повтора",
+        "Автоматическое переключение между рабочим столом и активной игрой",
+        "Режим Game Capture без записи рабочего стола",
+        "Определение аппаратных кодировщиков AV1, HEVC и H.264",
+        "30–240 FPS и разрешение записи до 4K",
+        "Системный звук или звук игры вместе с микрофоном",
+        "Раздельные аудиодорожки, громкость и усиление микрофона",
+        "Ограничения длительности и размера повтора",
+        "Библиотека повторов с быстрым встроенным плеером",
+        "Компактный редактор с обрезкой и выбором аудиодорожек",
+        "Автоматическое восстановление после сбоев захвата",
+        "Индикатор состояния повтора и напоминание в игре",
+        "Раздельные папки для разных игр",
+        "Одиннадцать языков интерфейса"
+      ],
+      "ReleaseNotes": "В Captail 0.2.1 появился быстрый плеер повторов с перемоткой, полноэкранным режимом, управлением с клавиатуры и изменением скорости. Теперь недавний повтор можно посмотреть перед обрезкой. Новое напоминание сообщает о выключенном повторе при запуске игры, а защита несохранённых настроек предотвращает случайную потерю изменений. Game Capture потребляет меньше ресурсов, когда игра не запущена. Также упорядочены дополнительные действия, улучшена контрастность индикатора, исключено ошибочное определение обычных полноэкранных приложений как игр и исправлены значки панели задач для Microsoft Store.",
+      "Keywords": [
+        "мгновенный повтор",
+        "запись игр",
+        "запись экрана",
+        "редактор клипов",
+        "захват игры",
+        "буфер повтора",
+        "запись AV1"
+      ],
+      "LicenseTerms": "GNU General Public License v2.0 или новее. Исходный код и лицензия: https://github.com/FaulMit/captail",
+      "CopyrightAndTrademarkInfo": "Copyright © 2026 faulmit и участники проекта Captail.",
+      "DevStudio": "faulmit"
+    }
+  }
+}
