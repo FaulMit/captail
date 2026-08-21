@@ -21,6 +21,7 @@ public sealed class Config
     public string Hotkey { get; set; } = "Ctrl+Shift+F10";
     public string ToggleReplayHotkey { get; set; } = "Ctrl+Shift+F9";
     public bool ReplayEnabled { get; set; } = true;
+    public bool WarnWhenGameStartsWithReplayOff { get; set; } = true;
     public bool ShowRecordingIndicator { get; set; } = true;
     /// <summary>"top-left", "top-right", "bottom-left", or "bottom-right".</summary>
     public string RecordingIndicatorPosition { get; set; } = "top-right";
@@ -159,6 +160,7 @@ public sealed class Config
         Hotkey = source.Hotkey;
         ToggleReplayHotkey = source.ToggleReplayHotkey;
         ReplayEnabled = source.ReplayEnabled;
+        WarnWhenGameStartsWithReplayOff = source.WarnWhenGameStartsWithReplayOff;
         ShowRecordingIndicator = source.ShowRecordingIndicator;
         RecordingIndicatorPosition = source.RecordingIndicatorPosition;
         Codec = source.Codec;

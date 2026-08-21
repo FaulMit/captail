@@ -9,6 +9,7 @@
   <sys:String x:Key="L.Minimize">Minimizar</sys:String>
   <sys:String x:Key="L.Close">Fechar</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Abra o Captail no GitHub</sys:String>
+  <sys:String x:Key="L.Footer.About">Sobre</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">Relatar erro</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">Abrir o formulário do GitHub com os dados do sistema preenchidos</sys:String>
   <sys:String x:Key="L.Footer.Feature">Ideia</sys:String>
@@ -65,6 +66,9 @@
   <sys:String x:Key="L.Section.Hotkeys">TECLAS DE ATALHO</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Replay instantâneo</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">Avisar ao iniciar um jogo</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">Notifica se o replay estiver desativado</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">Exibe uma única notificação discreta ao detectar um jogo com o replay instantâneo desativado. Não ativa a gravação automaticamente.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">Indicador de gravação</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">Pequeno ícone de status no canto da tela selecionada</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">Posição do indicador</sys:String>
@@ -157,6 +161,8 @@
   <sys:String x:Key="L.Library.LoadFailed">Não foi possível carregar os replays.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Atualizar replays</sys:String>
   <sys:String x:Key="L.Library.Open">Mostrar na pasta</sys:String>
+  <sys:String x:Key="L.Library.Preview">Reproduzir replay</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">Reprodutor de replay</sys:String>
   <sys:String x:Key="L.Library.Trim">Aparar</sys:String>
   <sys:String x:Key="L.Library.Delete">Excluir</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">Excluir este replay?</sys:String>
@@ -191,6 +197,14 @@
   <sys:String x:Key="L.Library.RangeSummary">Selecionado · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Voltar 5 segundos</sys:String>
   <sys:String x:Key="L.Library.Forward5">Avançar 5 segundos</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">Reproduzir / pausar</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">Alternar reprodução</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">Navegar</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">Voltar ou avançar 5 segundos</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">Velocidade de reprodução</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">Baixo mais lento · cima mais rápido</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">Alternar visualização do player</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">Sair da tela cheia ou fechar</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Substituir</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Substituir o replay original?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">O intervalo selecionado e as faixas de áudio ativadas substituirão o arquivo original. Isto não pode ser desfeito.</sys:String>
@@ -201,6 +215,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">Ativar/desativar</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">Ativa ou desativa o replay instantâneo</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">Pressione “Concluído” para aplicar as alterações.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">Alterações não salvas</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">Use Cancelar ou Concluído.</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">Cancelar</sys:String>
   <sys:String x:Key="L.Hotkey.Press">Pressione as teclas…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Adicionar Ctrl/Alt/Shift</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">Tecla de atalho já em uso</sys:String>
@@ -251,6 +268,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">A captura não começou</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">Configurações aplicadas</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Replay instantâneo desativado</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">O replay instantâneo está desativado</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} está em execução. Os replays não estão sendo gravados.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Ative o Instant Replay antes de salvar.</sys:String>
   <sys:String x:Key="L.Notify.Saving">Salvando replay…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">Gravando o último {0} no disco.</sys:String>

@@ -4,6 +4,26 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-21
+
+### Added
+
+- **Replay player:** Open a recent replay for immediate playback without entering edit mode, then continue into Trim when needed. The player supports seeking, fullscreen playback, keyboard controls, and temporary speed feedback from `0.25×` to `2×`.
+- **Replay-off game reminder:** An optional notification warns once when Captail detects a game while Instant Replay is disabled. It never starts recording without user action.
+- **Unsaved-settings guard:** Editing settings reveals a compact notice with Cancel and Done actions in the title bar. Close, `Alt+F4`, and `Esc` attempts keep the settings open and use a short shake to draw attention to pending changes.
+
+### Improved
+
+- **Lower Game Capture idle load:** When no plausible game is running, Captail releases the replay output and keeps only a low-rate detector active. The normal replay pipeline resumes automatically after a game is detected.
+- **Cleaner secondary actions:** GitHub, bug reports, feature requests, and privacy information now live in one compact About menu while the version and update state remain directly visible.
+- **Replay status indicator:** Removed the dark halo and made the indicator fully opaque for consistent contrast on bright backgrounds.
+
+### Fixed
+
+- Prevented Game Capture from treating unrelated fullscreen applications as games while waiting for a real game candidate.
+- Generated unplated Microsoft Store taskbar icons at every required target size and added package validation so placeholder-sized icons cannot ship unnoticed.
+- Prevented changed settings from being lost when the settings window is dismissed accidentally.
+
 ## [0.2.0] - 2026-08-14
 
 ### Added

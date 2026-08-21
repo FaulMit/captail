@@ -9,6 +9,7 @@
   <sys:String x:Key="L.Minimize">Згорнути</sys:String>
   <sys:String x:Key="L.Close">Закрити</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Відкрийте Captail на GitHub</sys:String>
+  <sys:String x:Key="L.Footer.About">Про застосунок</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">Повідомити про помилку</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">Відкрити форму GitHub із заповненими даними про систему</sys:String>
   <sys:String x:Key="L.Footer.Feature">Ідея</sys:String>
@@ -65,6 +66,9 @@
   <sys:String x:Key="L.Section.Hotkeys">ГАРЯЧІ КЛАВІШІ</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Миттєвий повтор</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">Попереджати під час запуску гри</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">Нагадає, якщо повтор вимкнено</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">Показує одне ненав’язливе сповіщення, коли гру запущено, а миттєвий повтор вимкнено. Запис автоматично не вмикається.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">Індикатор запису</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">Маленький значок стану у вибраному куті екрана</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">Положення індикатора</sys:String>
@@ -157,6 +161,8 @@
   <sys:String x:Key="L.Library.LoadFailed">Не вдалося завантажити повтори.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Оновити повтори</sys:String>
   <sys:String x:Key="L.Library.Open">Показати в папці</sys:String>
+  <sys:String x:Key="L.Library.Preview">Відтворити повтор</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">Перегляд повтору</sys:String>
   <sys:String x:Key="L.Library.Trim">Обрізати</sys:String>
   <sys:String x:Key="L.Library.Delete">Видалити</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">Видалити цей повтор?</sys:String>
@@ -191,6 +197,14 @@
   <sys:String x:Key="L.Library.RangeSummary">Вибрано · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Назад 5 секунд</sys:String>
   <sys:String x:Key="L.Library.Forward5">Уперед на 5 секунд</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">Відтворення / пауза</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">Керування відтворенням</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">Перемотування</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">Назад або вперед на 5 секунд</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">Швидкість відтворення</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">Вниз повільніше · вгору швидше</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">Перемкнути вигляд плеєра</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">Вийти з повного екрана або закрити</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Перезаписати</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Перезаписати оригінальний повтор?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">Вибраний діапазон і ввімкнені звукові доріжки замінять оригінальний файл. Це неможливо скасувати.</sys:String>
@@ -201,6 +215,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">Увімкнути/вимкнути</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">Перемикає миттєвий повтор</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">Натисніть «Готово», щоб застосувати зміни.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">Є незбережені зміни</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">Використайте «Скасувати» або «Готово».</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">Скасувати</sys:String>
   <sys:String x:Key="L.Hotkey.Press">Натисніть клавіші…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Додайте Ctrl / Alt / Shift</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">Гаряча клавіша вже використовується</sys:String>
@@ -251,6 +268,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">Захоплення не почалося</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">Налаштування застосовано</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Миттєвий повтор вимкнено</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">Миттєвий повтор вимкнено</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} запущено. Повтори не записуються.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Увімкніть миттєвий повтор перед збереженням.</sys:String>
   <sys:String x:Key="L.Notify.Saving">Збереження повтору…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">Запис останніх {0} на диск.</sys:String>

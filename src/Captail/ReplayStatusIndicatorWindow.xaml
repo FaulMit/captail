@@ -13,12 +13,8 @@
             <ScaleTransform x:Name="IndicatorScale" ScaleX="1" ScaleY="1"/>
         </Grid.RenderTransform>
 
-        <Ellipse Fill="#D911171A" Stroke="#7A344047" StrokeThickness="1">
-            <Ellipse.Effect>
-                <DropShadowEffect Color="#D9000000" BlurRadius="10"
-                                  ShadowDepth="2" Direction="270" Opacity="0.7"/>
-            </Ellipse.Effect>
-        </Ellipse>
+        <Ellipse Width="22" Height="22"
+                 Fill="#FF11171A" Stroke="#FF344047" StrokeThickness="1"/>
 
         <Grid Width="18" Height="18">
             <Ellipse Stroke="#4A506067" StrokeThickness="1.5"/>

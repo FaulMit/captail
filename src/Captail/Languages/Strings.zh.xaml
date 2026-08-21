@@ -12,6 +12,7 @@
   <sys:String x:Key="L.Minimize">最小化</sys:String>
   <sys:String x:Key="L.Close">关闭</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">在 GitHub 上打开 Captail</sys:String>
+  <sys:String x:Key="L.Footer.About">关于</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">报告问题</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">打开已预填系统信息的 GitHub 表单</sys:String>
   <sys:String x:Key="L.Footer.Feature">建议</sys:String>
@@ -68,6 +69,9 @@
   <sys:String x:Key="L.Section.Hotkeys">快捷键</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">即时回放</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">游戏启动时提醒</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">即时回放关闭时通知</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">检测到游戏启动且即时回放已关闭时显示一次安静通知。不会自动开启录制。</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">录制指示器</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">在所选屏幕角落显示的小状态图标</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">指示器位置</sys:String>
@@ -160,6 +164,8 @@
   <sys:String x:Key="L.Library.LoadFailed">无法加载回放。</sys:String>
   <sys:String x:Key="L.Library.Refresh">刷新回放</sys:String>
   <sys:String x:Key="L.Library.Open">在文件夹中显示</sys:String>
+  <sys:String x:Key="L.Library.Preview">播放回放</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">回放播放器</sys:String>
   <sys:String x:Key="L.Library.Trim">剪辑</sys:String>
   <sys:String x:Key="L.Library.Delete">删除</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">删除这段回放？</sys:String>
@@ -194,6 +200,14 @@
   <sys:String x:Key="L.Library.RangeSummary">已选 · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">后退 5 秒</sys:String>
   <sys:String x:Key="L.Library.Forward5">快进 5 秒</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">播放 / 暂停</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">切换播放状态</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">跳转</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">后退或前进 5 秒</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">播放速度</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">向下减速 · 向上加速</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">切换播放器视图</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">退出全屏或关闭播放器</sys:String>
   <sys:String x:Key="L.Library.Overwrite">覆盖</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">覆盖原始回放？</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">所选范围和启用的音轨将替换原文件。此操作无法撤销。</sys:String>
@@ -204,6 +218,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">启用 / 禁用</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">切换即时回放</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">按“完成”以应用更改。</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">更改尚未保存</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">使用“取消”或“完成”。</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">取消</sys:String>
   <sys:String x:Key="L.Hotkey.Press">按下按键…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">添加 Ctrl / Alt / Shift</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">快捷键已被占用</sys:String>
@@ -254,6 +271,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">捕获未能启动</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">设置已应用</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">即时回放已关闭</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">即时回放已关闭</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} 正在运行，回放不会被录制。</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">保存前请先启用即时回放。</sys:String>
   <sys:String x:Key="L.Notify.Saving">正在保存回放…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">正在将最近 {0} 写入磁盘。</sys:String>

@@ -270,6 +270,20 @@ internal static class ObsNative
     internal static extern bool obs_output_active(nint output);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool obs_output_can_pause(nint output);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool obs_output_pause(
+        nint output,
+        [MarshalAs(UnmanagedType.I1)] bool pause);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool obs_output_paused(nint output);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern int obs_output_get_total_frames(nint output);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]

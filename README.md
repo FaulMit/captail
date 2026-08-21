@@ -30,18 +30,16 @@
 Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It keeps the latest seconds or minutes in a rolling buffer, then saves them when you press a hotkey. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
 
 > [!WARNING]
-> Captail `v0.2.0` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+> Captail `v0.2.1` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
 
-## What's new in Captail 0.2.0?
+## What's new in Captail 0.2.1?
 
-- Use Captail in 11 languages through a compact native-name language menu. First launch follows the Windows language when supported.
-- Identify matching physical displays directly from the monitor selector.
-- Keep Desktop capture active when a fullscreen game is recognized but cannot provide usable Game Capture frames.
-- Send a useful bug report with system and recording details plus a short sanitized log excerpt already filled in.
-- Suggest focused improvements through the new Feature link beside Report bug.
-- Keep the replay indicator in the correct game or desktop corner without covering the taskbar or newer system overlays.
-
-Simplified Chinese support was contributed by [@zhuyouyi](https://github.com/zhuyouyi) through [PR #24](https://github.com/FaulMit/captail/pull/24).
+- Open any recent replay in a fast built-in player, seek through it, change playback speed with the arrow keys, switch to fullscreen, or continue directly into Trim.
+- Let Game Capture sleep when no plausible game is running, reducing idle GPU and memory use while keeping a lightweight detector ready.
+- Receive an optional reminder when a game starts while Instant Replay is disabled.
+- Keep accidental settings changes under control with clear Cancel and Done actions. Closing settings with pending edits now shakes the window instead of silently losing them.
+- Access GitHub, bug reports, feature requests, and privacy information from one compact About menu.
+- Get a cleaner replay indicator and correctly sized Microsoft Store taskbar icons.
 
 ## Is Captail for me?
 
@@ -69,6 +67,10 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 <p align="center">
   <img src="docs/captail-settings-video.png" alt="Captail video settings with hardware AV1, 80 Mbps, 3840 by 2160 resolution, and 240 FPS selected" width="390">
   <img src="docs/captail-settings-audio.png" alt="Captail audio settings with system audio, microphone, volume controls, microphone boost, and separate tracks" width="390">
+</p>
+
+<p align="center">
+  <img src="docs/captail-player.png" alt="Captail replay player showing a real AV1 4K 240 FPS replay with seek, playback, trim, and fullscreen controls" width="820">
 </p>
 
 <p align="center">
@@ -114,6 +116,8 @@ Both hotkeys are configurable. Double-click the tray icon to reopen Captail.
 
 The optional replay status indicator keeps recording state visible over games and desktop apps. It is enabled by default, can sit in any screen corner, ignores mouse input, and briefly confirms a successful save. Disable it or change its position in Replay settings.
 
+Enable **Warn when a game starts** if you want one quiet reminder when Captail detects a game while Instant Replay is disabled. The reminder never enables recording automatically.
+
 On first launch, Captail follows your Windows language when it supports it; otherwise it starts in English. Use the compact language control in the title bar to switch between English, Russian, Ukrainian, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Japanese, Korean, and Polish.
 
 If similarly sized monitors are hard to distinguish, open Video settings and select **Identify displays** beside the monitor list. Captail briefly places a large number on each matching screen.
@@ -123,9 +127,9 @@ If similarly sized monitors are hard to distinguish, open Video settings and sel
 | Mode | When no game is detected | When a fullscreen game appears | Audio source |
 | --- | --- | --- | --- |
 | **Desktop** | Records the selected monitor | Uses direct Game Capture when usable; otherwise keeps desktop video active while recognizing supported fullscreen games | Selected Windows output device |
-| **Game Capture** | Waits without recording the desktop | Captures the detected game directly | Detected game audio |
+| **Game Capture** | Keeps a lightweight game detector ready while the replay buffer sleeps | Wakes the replay buffer and captures the detected game directly | Detected game audio |
 
-The replay buffer stays armed in both modes. Use **Desktop** when you want continuous coverage; use **Game Capture** when privacy outside games matters more. When a fullscreen game cannot be hooked, Desktop mode favors uninterrupted video over pretending direct Game Capture is working.
+Use **Desktop** when you want continuous coverage; use **Game Capture** when privacy and low idle resource use outside games matter more. In Game Capture mode, Captail wakes the replay buffer only after a plausible game appears. When a fullscreen game cannot be hooked, Desktop mode favors uninterrupted video over pretending direct Game Capture is working.
 
 ## What happens when capture breaks?
 
@@ -193,6 +197,8 @@ Yes. The main window lists supported files from the selected replay folder in a 
 
 - Open a replay in File Explorer.
 - Move it to the Recycle Bin after confirmation.
+- Play it immediately without entering edit mode.
+- Seek, pause, use fullscreen, and change playback speed from `0.25×` to `2×` with the keyboard.
 - Scrub through a responsive preview.
 - Select one trim range with draggable handles.
 - Keep or remove each audio track.
@@ -273,7 +279,7 @@ Review logs before attaching them and remove personal paths or other sensitive i
 
 Compatibility reports for older NVIDIA, AMD, and Intel GPUs are useful even when everything works.
 
-Have an improvement rather than a bug? Use the **Feature** footer action to open Captail's focused feature-request template.
+Have an improvement rather than a bug? Open **About → Feature** to use Captail's focused feature-request template.
 
 ## How do I build or contribute?
 

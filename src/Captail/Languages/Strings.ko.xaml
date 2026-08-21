@@ -9,6 +9,7 @@
   <sys:String x:Key="L.Minimize">최소화</sys:String>
   <sys:String x:Key="L.Close">닫기</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">GitHub에서 Captail 열기</sys:String>
+  <sys:String x:Key="L.Footer.About">정보</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">버그 신고</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">시스템 정보가 미리 입력된 GitHub 양식 열기</sys:String>
   <sys:String x:Key="L.Footer.Feature">기능 제안</sys:String>
@@ -65,6 +66,9 @@
   <sys:String x:Key="L.Section.Hotkeys">단축키</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">인스턴트 리플레이</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">게임 시작 시 알림</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">인스턴트 리플레이가 꺼져 있으면 알림</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">인스턴트 리플레이가 꺼진 상태에서 게임을 감지하면 알림을 한 번 표시합니다. 녹화는 자동으로 켜지지 않습니다.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">녹화 표시</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">선택한 화면 모서리에 있는 작은 상태 아이콘</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">표시기 위치</sys:String>
@@ -157,6 +161,8 @@
   <sys:String x:Key="L.Library.LoadFailed">리플레이를 로드할 수 없습니다.</sys:String>
   <sys:String x:Key="L.Library.Refresh">리플레이 새로고침</sys:String>
   <sys:String x:Key="L.Library.Open">폴더에 표시</sys:String>
+  <sys:String x:Key="L.Library.Preview">리플레이 재생</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">리플레이 플레이어</sys:String>
   <sys:String x:Key="L.Library.Trim">트림</sys:String>
   <sys:String x:Key="L.Library.Delete">삭제</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">이 리플레이를 삭제하시겠습니까?</sys:String>
@@ -191,6 +197,14 @@
   <sys:String x:Key="L.Library.RangeSummary">선택됨 · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">5초 뒤로</sys:String>
   <sys:String x:Key="L.Library.Forward5">5초 앞으로</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">재생 / 일시정지</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">재생 전환</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">탐색</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">5초 뒤로 / 앞으로</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">재생 속도</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">아래로 느리게 · 위로 빠르게</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">플레이어 보기 전환</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">전체 화면 종료 또는 닫기</sys:String>
   <sys:String x:Key="L.Library.Overwrite">덮어쓰기</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">원본 리플레이를 덮어쓰시겠습니까?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">선택한 범위와 활성화된 오디오 트랙이 원본 파일을 대체합니다. 이 작업은 취소할 수 없습니다.</sys:String>
@@ -201,6 +215,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">활성화 / 비활성화</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">인스턴트 리플레이를 켜거나 끕니다.</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">변경 사항을 적용하려면 "완료"를 누르세요.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">저장되지 않은 변경 사항</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">취소 또는 완료를 사용하세요.</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">취소</sys:String>
   <sys:String x:Key="L.Hotkey.Press">키를 누르세요…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Ctrl/Alt/Shift 추가</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">이미 사용 중인 단축키</sys:String>
@@ -251,6 +268,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">캡처가 시작되지 않았습니다.</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">설정이 적용되었습니다.</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">인스턴트 리플레이 꺼짐</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">인스턴트 리플레이가 꺼져 있습니다</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} 실행 중입니다. 리플레이가 녹화되지 않습니다.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">저장하기 전에 인스턴트 리플레이를 활성화하세요.</sys:String>
   <sys:String x:Key="L.Notify.Saving">리플레이 저장 중…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">마지막 {0}를 디스크에 씁니다.</sys:String>

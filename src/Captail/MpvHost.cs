@@ -230,6 +230,16 @@ public sealed class MpvHost : HwndHost
         SetProperty("pause", "yes");
     }
 
+    public void SetPlaybackSpeed(double speed)
+    {
+        if (!IsReady)
+            return;
+        double normalized = Math.Clamp(speed, 0.25, 2.0);
+        SetProperty(
+            "speed",
+            normalized.ToString("0.##", CultureInfo.InvariantCulture));
+    }
+
     public void Seek(double positionSeconds, bool exact)
     {
         if (!IsReady)

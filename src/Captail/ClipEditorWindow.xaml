@@ -67,6 +67,38 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="PlayerShortcutCell" TargetType="Border">
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="BorderBrush" Value="{StaticResource DividerBrush}"/>
+        </Style>
+        <Style x:Key="PlayerShortcutBadge" TargetType="Border">
+            <Setter Property="MinWidth" Value="82"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Background" Value="{StaticResource BgControlBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderControlBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="PlayerShortcutBadgeText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="PlaybackSpeedFeedbackBadge" TargetType="Border">
+            <Setter Property="Padding" Value="9,4"/>
+            <Setter Property="Margin" Value="10,0,0,0"/>
+            <Setter Property="Background" Value="{StaticResource AccentChipBgBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentChipBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
     </Window.Resources>
     <Border x:Name="WindowChrome" Background="{StaticResource BgWindowGradient}"
             BorderBrush="{StaticResource WindowBorderBrush}" BorderThickness="1"
@@ -85,9 +117,14 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Path Data="{StaticResource IconScissors}" Stroke="{StaticResource AccentBrush}"
-                          StrokeThickness="1.8" Width="15" Height="15" Stretch="Uniform"/>
-                    <TextBlock Text="{DynamicResource L.Library.TrimTitle}"
+                    <Path x:Name="HeaderTrimIcon" Data="{StaticResource IconScissors}"
+                          Stroke="{StaticResource AccentBrush}" StrokeThickness="1.8"
+                          Width="15" Height="15" Stretch="Uniform"/>
+                    <Path x:Name="HeaderPreviewIcon" Data="{StaticResource IconPlay}"
+                          Fill="{StaticResource AccentBrush}" Width="15" Height="15"
+                          Stretch="Uniform" Visibility="Collapsed"/>
+                    <TextBlock x:Name="HeaderTitleText"
+                               Text="{DynamicResource L.Library.TrimTitle}"
                                FontSize="14.5" FontWeight="ExtraBold" Margin="9,0,0,0"/>
                 </StackPanel>
                 <TextBlock x:Name="ClipNameText" Grid.Column="1" Margin="14,0,14,0"
@@ -188,10 +225,20 @@
                                           StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
                                 </Button>
                             </StackPanel>
-                            <TextBlock x:Name="FullscreenPlaybackTimeText" Grid.Column="1"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                       FontFamily="{StaticResource FontMono}" FontSize="12"
-                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock x:Name="FullscreenPlaybackTimeText"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{StaticResource FontMono}" FontSize="12"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <Border x:Name="FullscreenSpeedFeedback"
+                                        Style="{StaticResource PlaybackSpeedFeedbackBadge}"
+                                        Visibility="Collapsed" Opacity="0">
+                                    <TextBlock x:Name="FullscreenSpeedFeedbackText"
+                                               Style="{StaticResource PlayerShortcutBadgeText}"
+                                               Foreground="{StaticResource AccentBrush}"/>
+                                </Border>
+                            </StackPanel>
                             <Button Grid.Column="2" Style="{StaticResource ClipActionButton}"
                                     Click="ExitFullscreen_Click"
                                     ToolTip="{DynamicResource L.Library.ExitFullscreen}">
@@ -204,7 +251,7 @@
                     </Grid>
                 </Border>
 
-                <StackPanel Grid.Row="2">
+                <StackPanel x:Name="TimelineEditorPanel" Grid.Row="2">
                     <TextBlock Text="{DynamicResource L.Library.VideoTrack}"
                                FontSize="11" FontWeight="Bold"
                                Foreground="{StaticResource TextMutedBrush}" Margin="2,0,0,6"/>
@@ -327,7 +374,7 @@
                                Visibility="Collapsed"/>
                 </StackPanel>
 
-                <Grid Grid.Row="3" Margin="0,9,0,0">
+                <Grid x:Name="EditorActionsPanel" Grid.Row="3" Margin="0,9,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
@@ -385,6 +432,192 @@
                                 Content="{DynamicResource L.Library.SaveTrim}"
                                 Style="{StaticResource AccentButton}" Padding="18,9"
                                 Click="SaveTrim_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid x:Name="PreviewModePanel" Grid.Row="2" Grid.RowSpan="2"
+                      Margin="1,5,1,0" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="20"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Slider x:Name="PreviewProgressSlider"
+                            Style="{StaticResource FullscreenProgressSlider}"
+                            VerticalAlignment="Center"
+                            PreviewMouseLeftButtonDown="PreviewProgress_MouseLeftButtonDown"
+                            ValueChanged="PreviewProgress_ValueChanged"
+                            Thumb.DragStarted="PreviewProgress_DragStarted"
+                            Thumb.DragCompleted="PreviewProgress_DragCompleted"/>
+                    <Grid Grid.Row="1" Margin="0,7,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource ClipActionButton}" Click="Back_Click"
+                                    ToolTip="{DynamicResource L.Library.Back5}">
+                                <Path Data="M15 5L8 12l7 7 M8 12h10"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                            </Button>
+                            <Button x:Name="PreviewPlayButton"
+                                    Style="{StaticResource ClipActionButton}"
+                                    Click="PlayPause_Click" ToolTip="{DynamicResource L.Library.Play}"
+                                    Margin="7,0,0,0" IsEnabled="False">
+                                <Path x:Name="PreviewPlayIcon" Data="{StaticResource IconPlay}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stretch="Uniform"/>
+                            </Button>
+                            <Button Style="{StaticResource ClipActionButton}" Click="Forward_Click"
+                                    ToolTip="{DynamicResource L.Library.Forward5}" Margin="7,0,0,0">
+                                <Path Data="M9 5l7 7-7 7 M6 12h10"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                            </Button>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock x:Name="PreviewPlaybackTimeText"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{StaticResource FontMono}" FontSize="11.5"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                            <Border x:Name="PreviewSpeedFeedback"
+                                    Style="{StaticResource PlaybackSpeedFeedbackBadge}"
+                                    Visibility="Collapsed" Opacity="0">
+                                <TextBlock x:Name="PreviewSpeedFeedbackText"
+                                           Style="{StaticResource PlayerShortcutBadgeText}"
+                                           Foreground="{StaticResource AccentBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button Content="{DynamicResource L.Library.Trim}"
+                                    Style="{StaticResource AccentButton}" Padding="16,8"
+                                    Click="EnterTrimMode_Click"/>
+                            <Button Style="{StaticResource ClipActionButton}"
+                                    Margin="8,0,0,0" Click="EnterFullscreen_Click"
+                                    ToolTip="{DynamicResource L.Library.Fullscreen}">
+                                <Path Data="{StaticResource IconFullscreen}"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round" Stretch="Uniform"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <StackPanel Grid.Row="2" Margin="0,4,0,0">
+                        <TextBlock Text="{DynamicResource L.Section.Hotkeys}"
+                                   Style="{StaticResource SectionHeaderText}"
+                                   Margin="2,10,2,7"/>
+                        <Border Style="{StaticResource SettingsGroup}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Border Style="{StaticResource PlayerShortcutCell}"
+                                        BorderThickness="0,0,1,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutPlayback}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutPlaybackHint}"
+                                                       Style="{StaticResource SecondaryText}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
+                                            <TextBlock Text="Space" Style="{StaticResource PlayerShortcutBadgeText}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Column="1" Style="{StaticResource PlayerShortcutCell}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutSeek}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutSeekHint}"
+                                                       Style="{StaticResource SecondaryText}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
+                                            <TextBlock Text="← / →" Style="{StaticResource PlayerShortcutBadgeText}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="1" Grid.ColumnSpan="2"
+                                        Style="{StaticResource PlayerShortcutCell}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutSpeed}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutSpeedHint}"
+                                                       Style="{StaticResource SecondaryText}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
+                                            <TextBlock Text="↓ / ↑" Style="{StaticResource PlayerShortcutBadgeText}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="2" Style="{StaticResource PlayerShortcutCell}"
+                                        BorderThickness="0,0,1,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource L.Library.Fullscreen}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutFullscreenHint}"
+                                                       Style="{StaticResource SecondaryText}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
+                                            <TextBlock Text="F" Style="{StaticResource PlayerShortcutBadgeText}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="2" Grid.Column="1"
+                                        Style="{StaticResource PlayerShortcutCell}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource L.Close}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutCloseHint}"
+                                                       Style="{StaticResource SecondaryText}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
+                                            <TextBlock Text="Esc" Style="{StaticResource PlayerShortcutBadgeText}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Grid>
             </Grid>

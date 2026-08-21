@@ -254,10 +254,12 @@ function Assert-ShowcaseReplay {
     }
 }
 
-function Open-FirstReplayEditor {
+function Open-FirstReplayAction {
     param(
         [System.Windows.Automation.AutomationElement]$Root,
-        [string]$ReplayPath
+        [string]$ReplayPath,
+        [ValidateSet("Preview", "Trim")]
+        [string]$Action
     )
 
     $list = Find-AutomationElement -Root $Root -AutomationId "RecentReplaysList" -TimeoutSeconds 30
@@ -324,8 +326,64 @@ function Open-FirstReplayEditor {
         throw "Replay action buttons did not appear after hover."
     }
 
-    Invoke-AutomationElement -Element $rowButtons[1]
+    $actionButton = if ($Action -eq "Preview") {
+        $rowButtons[0]
+    }
+    else {
+        # Replay cards end with Trim and Delete. Pick Trim by position so
+        # adding leading actions such as Play or Show in folder stays safe.
+        $rowButtons[$rowButtons.Count - 2]
+    }
+    Invoke-AutomationElement -Element $actionButton
     [NativeMethods]::SetCursorPos(0, 0) | Out-Null
+}
+
+function Find-CaptailChildWindow {
+    param(
+        [System.Diagnostics.Process]$Process,
+        [string]$AutomationId,
+        [string]$FailureMessage
+    )
+
+    return Wait-Until -TimeoutSeconds 30 -FailureMessage $FailureMessage -Condition {
+        $processCondition = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
+            $Process.Id)
+        $windowCondition = New-Object System.Windows.Automation.PropertyCondition(
+            [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+            [System.Windows.Automation.ControlType]::Window)
+        $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
+            [System.Windows.Automation.TreeScope]::Descendants,
+            (New-Object System.Windows.Automation.AndCondition(
+                $processCondition,
+                $windowCondition)))
+        $matches = @()
+        for ($index = 0; $index -lt $windows.Count; $index++) {
+            $candidate = $windows.Item($index)
+            $control = $candidate.FindFirst(
+                [System.Windows.Automation.TreeScope]::Descendants,
+                (New-Object System.Windows.Automation.PropertyCondition(
+                    [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
+                    $AutomationId)))
+            if ($null -ne $control) { $matches += $candidate }
+        }
+        if ($matches.Count -gt 0) {
+            return $matches |
+                Sort-Object {
+                    $bounds = $_.Current.BoundingRectangle
+                    -($bounds.Width * $bounds.Height)
+                } |
+                Select-Object -First 1
+        }
+    }
+}
+
+function Close-AutomationWindow {
+    param([System.Windows.Automation.AutomationElement]$Window)
+
+    $pattern = $Window.GetCurrentPattern(
+        [System.Windows.Automation.WindowPattern]::Pattern)
+    ([System.Windows.Automation.WindowPattern]$pattern).Close()
 }
 
 Add-Type @"
@@ -442,42 +500,20 @@ try {
             Invoke-AutomationElement -Element $doneButton
             Start-Sleep -Seconds 3
         }
-        Open-FirstReplayEditor -Root $root -ReplayPath $resolvedReplay
-
         $editorProcess = Get-Process -Id $automationProcess.Id
-        $editorRoot = Wait-Until -TimeoutSeconds 30 `
-            -FailureMessage "Clip editor window did not open." `
-            -Condition {
-                $processCondition = New-Object System.Windows.Automation.PropertyCondition(
-                    [System.Windows.Automation.AutomationElement]::ProcessIdProperty,
-                    $editorProcess.Id)
-                $windowCondition = New-Object System.Windows.Automation.PropertyCondition(
-                    [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
-                    [System.Windows.Automation.ControlType]::Window)
-                $windows = [System.Windows.Automation.AutomationElement]::RootElement.FindAll(
-                    [System.Windows.Automation.TreeScope]::Descendants,
-                    (New-Object System.Windows.Automation.AndCondition(
-                        $processCondition,
-                        $windowCondition)))
-                $matches = @()
-                for ($index = 0; $index -lt $windows.Count; $index++) {
-                    $candidate = $windows.Item($index)
-                    $play = $candidate.FindFirst(
-                        [System.Windows.Automation.TreeScope]::Descendants,
-                        (New-Object System.Windows.Automation.PropertyCondition(
-                            [System.Windows.Automation.AutomationElement]::AutomationIdProperty,
-                            "PlayButton")))
-                    if ($null -ne $play) { $matches += $candidate }
-                }
-                if ($matches.Count -gt 0) {
-                    return $matches |
-                        Sort-Object {
-                            $bounds = $_.Current.BoundingRectangle
-                            -($bounds.Width * $bounds.Height)
-                        } |
-                        Select-Object -First 1
-                }
-            }
+        Open-FirstReplayAction -Root $root -ReplayPath $resolvedReplay -Action Preview
+        $playerRoot = Find-CaptailChildWindow -Process $editorProcess `
+            -AutomationId "PreviewPlayButton" `
+            -FailureMessage "Replay player window did not open."
+        Start-Sleep -Seconds 4
+        Capture-Window -Root $playerRoot -Path (Join-Path $OutputDirectory "captail-player.png")
+        Close-AutomationWindow -Window $playerRoot
+        Start-Sleep -Seconds 1
+
+        Open-FirstReplayAction -Root $root -ReplayPath $resolvedReplay -Action Trim
+        $editorRoot = Find-CaptailChildWindow -Process $editorProcess `
+            -AutomationId "PlayButton" `
+            -FailureMessage "Clip editor window did not open."
         Start-Sleep -Seconds 4
         Capture-Window -Root $editorRoot -Path (Join-Path $OutputDirectory "captail-editor.png")
     }

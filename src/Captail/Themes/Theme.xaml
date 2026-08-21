@@ -88,6 +88,7 @@
   <Geometry x:Key="IconExitFullscreen">M3 8h5V3 M21 8h-5V3 M3 16h5v5 M21 16h-5v5</Geometry>
 
   <Geometry x:Key="IconGitHub">M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.35 1.09 2.92.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.58 9.58 0 0 1 12 7.7a9.6 9.6 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.86V21c0 .27.18.58.69.48A10 10 0 0 0 12 2z</Geometry>
+  <Geometry x:Key="IconInfo">M12 10v7 M12 7h.01 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z</Geometry>
   <Geometry x:Key="IconIssue">M12 8v5 M12 17h.01 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z</Geometry>
   <Geometry x:Key="IconFeature">M12 7v10 M7 12h10 M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z</Geometry>
 
@@ -434,6 +435,73 @@
             </Trigger>
             <Trigger Property="IsPressed" Value="True">
               <Setter Property="Opacity" Value="0.7"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="FooterAboutButton" TargetType="ToggleButton">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="5,4"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="FontSize" Value="10.5"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="AboutBadge" Background="Transparent"
+                  Padding="{TemplateBinding Padding}" CornerRadius="7">
+            <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+              <Setter TargetName="AboutBadge" Property="Background"
+                      Value="{StaticResource AccentChipBgBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter Property="Opacity" Value="0.7"/>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="AboutMenuButton" TargetType="Button">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Padding" Value="10,9"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="FontSize" Value="11.5"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="MenuSurface"
+                  Background="{TemplateBinding Background}"
+                  Padding="{TemplateBinding Padding}"
+                  CornerRadius="8">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="MenuSurface" Property="Background" Value="#FF20272A"/>
+              <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter Property="Opacity" Value="0.72"/>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -51,6 +53,11 @@ public partial class SettingsWindow : Window
     private ReplayClip? _pendingDeleteClip;
     private IReadOnlyList<CaptureInterop.MonitorInfo> _monitors = [];
     private readonly List<DisplayIdentifierWindow> _displayIdentifierWindows = [];
+    private bool _settingsDirty;
+    private bool _savedAutostartEnabled;
+    private bool _allowClose;
+    private bool _closeAfterUnsavedResolution;
+    private bool _dirtyRefreshQueued;
 
     public bool Applied { get; private set; }
 
@@ -83,6 +90,7 @@ public partial class SettingsWindow : Window
         _runtimeActive = runtimeActive;
 
         InitializeComponent();
+        AttachSettingsChangeTracking();
         LanguageList.ItemsSource = Localization.SupportedLanguages;
         UpdateLanguageMenuSelection();
         _replayLibrary = new ReplayLibrary(new FfmpegAdapter());
@@ -374,6 +382,7 @@ public partial class SettingsWindow : Window
             SelectByTag(AudioTrackModeBox, _config.SeparateAudioTracks ? "separate" : "mixed");
 
             SettingsReplayToggle.IsChecked = _config.ReplayEnabled;
+            WarnGameOffBox.IsChecked = _config.WarnWhenGameStartsWithReplayOff;
             RecordingIndicatorBox.IsChecked = _config.ShowRecordingIndicator;
             SelectRadioByTag(
                 RecordingIndicatorPositionOptions,
@@ -444,7 +453,7 @@ public partial class SettingsWindow : Window
             : Localization.Text("L.Status.Idle");
         StatusRing.Stroke = FindBrush(active ? "AccentBrush" : "RingIdleBrush");
         StatusDot.Fill = FindBrush(active ? "AccentBrush" : "RingIdleBrush");
-        SaveReplayButton.IsEnabled = active;
+        SaveReplayButton.IsEnabled = active && _availableReplaySeconds > 0;
         AnimateRecordingState(active);
 
         SystemSourceChip.IsChecked = _config.CaptureSystemAudio;
@@ -465,7 +474,7 @@ public partial class SettingsWindow : Window
         SaveButtonText.Text = Localization.Format(
             "L.Save.Duration",
             FormatDuration(
-                active
+                active && _availableReplaySeconds > 0
                     ? Math.Max(1, _availableReplaySeconds)
                     : _config.BufferSeconds));
         HotkeySummaryText.Text = _config.Hotkey;
@@ -534,6 +543,327 @@ public partial class SettingsWindow : Window
             translate.Y = -5;
         }
         UpdateLanguageMenuSelection();
+    }
+
+    private CustomPopupPlacement[] AboutPopup_Placement(
+        Size popupSize,
+        Size targetSize,
+        Point offset)
+    {
+        const double gap = 7;
+        return
+        [
+            new CustomPopupPlacement(
+                new Point(
+                    targetSize.Width - popupSize.Width,
+                    -popupSize.Height - gap),
+                PopupPrimaryAxis.Horizontal)
+        ];
+    }
+
+    private void AboutPopup_Opened(object? sender, EventArgs e)
+    {
+        AboutPopupPanel.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(110)));
+        if (AboutPopupPanel.RenderTransform is TranslateTransform translate)
+        {
+            translate.BeginAnimation(
+                TranslateTransform.YProperty,
+                new DoubleAnimation(5, 0, TimeSpan.FromMilliseconds(145))
+                {
+                    EasingFunction = new CubicEase
+                    {
+                        EasingMode = EasingMode.EaseOut,
+                    },
+                });
+        }
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            () => GitHubButton.Focus());
+    }
+
+    private void AboutPopup_Closed(object? sender, EventArgs e)
+    {
+        AboutPopupPanel.BeginAnimation(OpacityProperty, null);
+        AboutPopupPanel.Opacity = 0;
+        if (AboutPopupPanel.RenderTransform is TranslateTransform translate)
+        {
+            translate.BeginAnimation(TranslateTransform.YProperty, null);
+            translate.Y = 5;
+        }
+    }
+
+    private void AttachSettingsChangeTracking()
+    {
+        SettingsPanel.AddHandler(
+            ToggleButton.CheckedEvent,
+            new RoutedEventHandler(SettingsControl_Changed),
+            handledEventsToo: true);
+        SettingsPanel.AddHandler(
+            ToggleButton.UncheckedEvent,
+            new RoutedEventHandler(SettingsControl_Changed),
+            handledEventsToo: true);
+        SettingsPanel.AddHandler(
+            Selector.SelectionChangedEvent,
+            new SelectionChangedEventHandler(SettingsSelection_Changed),
+            handledEventsToo: true);
+        SettingsPanel.AddHandler(
+            RangeBase.ValueChangedEvent,
+            new RoutedPropertyChangedEventHandler<double>(SettingsValue_Changed),
+            handledEventsToo: true);
+    }
+
+    private void SettingsControl_Changed(object sender, RoutedEventArgs e) =>
+        QueueSettingsDirtyRefresh();
+
+    private void SettingsSelection_Changed(
+        object sender,
+        SelectionChangedEventArgs e) =>
+        QueueSettingsDirtyRefresh();
+
+    private void SettingsValue_Changed(
+        object sender,
+        RoutedPropertyChangedEventArgs<double> e) =>
+        QueueSettingsDirtyRefresh();
+
+    private void QueueSettingsDirtyRefresh()
+    {
+        if (_updatingUi ||
+            SettingsPanel.Visibility != Visibility.Visible ||
+            _dirtyRefreshQueued)
+        {
+            return;
+        }
+
+        _dirtyRefreshQueued = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _dirtyRefreshQueued = false;
+            RefreshSettingsDirtyState();
+        }, DispatcherPriority.DataBind);
+    }
+
+    private void RefreshSettingsDirtyState()
+    {
+        if (_updatingUi || SettingsPanel.Visibility != Visibility.Visible)
+            return;
+
+        Config pending = CreatePendingConfig();
+        bool dirty = !SettingsValuesEqual(pending, _config) ||
+                     (AutostartBox.IsChecked == true) != _savedAutostartEnabled;
+        SetSettingsDirty(dirty);
+    }
+
+    private Config CreatePendingConfig()
+    {
+        Config candidate = _config.Clone();
+        candidate.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
+        candidate.WarnWhenGameStartsWithReplayOff = WarnGameOffBox.IsChecked == true;
+        candidate.ShowRecordingIndicator = RecordingIndicatorBox.IsChecked == true;
+        candidate.RecordingIndicatorPosition = GetSelectedRadioTag(
+            RecordingIndicatorPositionOptions,
+            _config.RecordingIndicatorPosition);
+        candidate.BufferSeconds = GetSelectedRadioInt(
+            BufferOptions,
+            _config.BufferSeconds);
+        candidate.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
+        candidate.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
+        candidate.Codec = GetSelectedTag(CodecBox, _config.Codec);
+        candidate.BitrateMbps = GetSelectedInt(BitrateBox, _config.BitrateMbps);
+        candidate.FrameRate = GetSelectedRadioInt(FpsOptions, _config.FrameRate);
+        candidate.MonitorIndex = GetSelectedInt(MonitorBox, _config.MonitorIndex);
+        candidate.RecordingResolution = GetSelectedTag(ResolutionBox, "source");
+        candidate.CaptureSystemAudio = SystemAudioBox.IsChecked == true;
+        candidate.SystemAudioVolume = (int)Math.Round(SystemVolumeSlider.Value);
+        candidate.SystemAudioDeviceId = GetSelectedTag(AudioDeviceBox, "");
+        candidate.CaptureMicrophone = MicBox.IsChecked == true;
+        candidate.MicrophoneVolume = (int)Math.Round(MicVolumeSlider.Value);
+        candidate.MicrophoneBoostDb = (int)Math.Round(MicBoostSlider.Value);
+        candidate.MicrophoneDeviceId = GetSelectedTag(MicDeviceBox, "");
+        candidate.AudioCodec = GetSelectedTag(AudioCodecBox, "aac");
+        candidate.SeparateAudioTracks =
+            GetSelectedTag(AudioTrackModeBox, "mixed") == "separate";
+        candidate.OutputDirectory = _outputDirectory;
+        candidate.OrganizeReplaysByGame = OrganizeByGameBox.IsChecked == true;
+        candidate.Hotkey = _pendingSaveHotkey;
+        candidate.ToggleReplayHotkey = _pendingToggleHotkey;
+        return candidate;
+    }
+
+    private static bool SettingsValuesEqual(Config left, Config right) =>
+        left.ReplayEnabled == right.ReplayEnabled &&
+        left.WarnWhenGameStartsWithReplayOff == right.WarnWhenGameStartsWithReplayOff &&
+        left.ShowRecordingIndicator == right.ShowRecordingIndicator &&
+        string.Equals(
+            left.RecordingIndicatorPosition,
+            right.RecordingIndicatorPosition,
+            StringComparison.Ordinal) &&
+        left.BufferSeconds == right.BufferSeconds &&
+        left.MaxReplaySizeMb == right.MaxReplaySizeMb &&
+        string.Equals(left.CaptureSource, right.CaptureSource, StringComparison.Ordinal) &&
+        string.Equals(left.Codec, right.Codec, StringComparison.Ordinal) &&
+        left.BitrateMbps == right.BitrateMbps &&
+        left.FrameRate == right.FrameRate &&
+        left.MonitorIndex == right.MonitorIndex &&
+        string.Equals(
+            left.RecordingResolution,
+            right.RecordingResolution,
+            StringComparison.Ordinal) &&
+        left.CaptureSystemAudio == right.CaptureSystemAudio &&
+        left.SystemAudioVolume == right.SystemAudioVolume &&
+        string.Equals(
+            left.SystemAudioDeviceId,
+            right.SystemAudioDeviceId,
+            StringComparison.Ordinal) &&
+        left.CaptureMicrophone == right.CaptureMicrophone &&
+        left.MicrophoneVolume == right.MicrophoneVolume &&
+        left.MicrophoneBoostDb == right.MicrophoneBoostDb &&
+        string.Equals(
+            left.MicrophoneDeviceId,
+            right.MicrophoneDeviceId,
+            StringComparison.Ordinal) &&
+        string.Equals(left.AudioCodec, right.AudioCodec, StringComparison.Ordinal) &&
+        left.SeparateAudioTracks == right.SeparateAudioTracks &&
+        string.Equals(
+            left.OutputDirectory,
+            right.OutputDirectory,
+            StringComparison.OrdinalIgnoreCase) &&
+        left.OrganizeReplaysByGame == right.OrganizeReplaysByGame &&
+        string.Equals(left.Hotkey, right.Hotkey, StringComparison.Ordinal) &&
+        string.Equals(
+            left.ToggleReplayHotkey,
+            right.ToggleReplayHotkey,
+            StringComparison.Ordinal);
+
+    private void SetSettingsDirty(bool dirty, bool animate = true)
+    {
+        _settingsDirty = dirty;
+        if (dirty)
+        {
+            UnsavedChangesBar.BeginAnimation(OpacityProperty, null);
+            UnsavedChangesTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+            if (UnsavedChangesBar.Visibility != Visibility.Visible)
+            {
+                UnsavedChangesBar.Visibility = Visibility.Visible;
+                UnsavedChangesBar.Opacity = animate ? 0 : 1;
+                UnsavedChangesTranslate.Y = animate ? -6 : 0;
+                if (animate)
+                {
+                    UnsavedChangesBar.BeginAnimation(
+                        OpacityProperty,
+                        new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(150))
+                        {
+                            EasingFunction = new CubicEase
+                            {
+                                EasingMode = EasingMode.EaseOut,
+                            },
+                        });
+                    UnsavedChangesTranslate.BeginAnimation(
+                        TranslateTransform.YProperty,
+                        new DoubleAnimation(-6, 0, TimeSpan.FromMilliseconds(190))
+                        {
+                            EasingFunction = new CubicEase
+                            {
+                                EasingMode = EasingMode.EaseOut,
+                            },
+                        });
+                }
+            }
+            else
+            {
+                UnsavedChangesBar.Opacity = 1;
+                UnsavedChangesTranslate.Y = 0;
+            }
+            return;
+        }
+
+        if (UnsavedChangesBar.Visibility != Visibility.Visible)
+            return;
+        UnsavedChangesBar.BeginAnimation(OpacityProperty, null);
+        UnsavedChangesTranslate.BeginAnimation(TranslateTransform.YProperty, null);
+        if (!animate)
+        {
+            UnsavedChangesBar.Visibility = Visibility.Collapsed;
+            UnsavedChangesBar.Opacity = 0;
+            UnsavedChangesTranslate.Y = -6;
+            return;
+        }
+
+        var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(120));
+        fade.Completed += (_, _) =>
+        {
+            if (_settingsDirty)
+                return;
+            UnsavedChangesBar.Visibility = Visibility.Collapsed;
+            UnsavedChangesBar.Opacity = 0;
+            UnsavedChangesTranslate.Y = -6;
+        };
+        UnsavedChangesBar.BeginAnimation(OpacityProperty, fade);
+    }
+
+    private void PromptForUnsavedChanges(bool closeAfterResolution)
+    {
+        _closeAfterUnsavedResolution = closeAfterResolution;
+        SetSettingsDirty(true, animate: false);
+        AnimateUnsavedPrompt();
+    }
+
+    private void AnimateUnsavedPrompt()
+    {
+        WindowShakeTransform.BeginAnimation(TranslateTransform.XProperty, null);
+        var shake = new DoubleAnimationUsingKeyFrames
+        {
+            Duration = TimeSpan.FromMilliseconds(360),
+            FillBehavior = FillBehavior.Stop,
+        };
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(-8, KeyTime.FromPercent(0.12)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(7, KeyTime.FromPercent(0.26)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(-6, KeyTime.FromPercent(0.40)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(5, KeyTime.FromPercent(0.54)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(-3, KeyTime.FromPercent(0.68)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(3, KeyTime.FromPercent(0.82)));
+        shake.KeyFrames.Add(new LinearDoubleKeyFrame(0, KeyTime.FromPercent(1)));
+        WindowShakeTransform.BeginAnimation(TranslateTransform.XProperty, shake);
+
+        UnsavedChangesBar.BeginAnimation(
+            OpacityProperty,
+            new DoubleAnimation(0.58, 1, TimeSpan.FromMilliseconds(190))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+            });
+    }
+
+    private void DiscardSettings_Click(object sender, RoutedEventArgs e)
+    {
+        bool closeWindow = _closeAfterUnsavedResolution;
+        CancelHotkeyCapture();
+        LoadSettingsControls();
+        SetSettingsDirty(false, animate: false);
+        _closeAfterUnsavedResolution = false;
+        if (closeWindow)
+        {
+            _allowClose = true;
+            Close();
+        }
+        else
+        {
+            ShowDashboard();
+        }
+    }
+
+    private void Window_Closing(object? sender, CancelEventArgs e)
+    {
+        if (_allowClose ||
+            Application.Current.Dispatcher.HasShutdownStarted ||
+            SettingsPanel.Visibility != Visibility.Visible ||
+            !_settingsDirty)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        PromptForUnsavedChanges(closeAfterResolution: true);
     }
 
     private void LanguageList_MouseLeftButtonUp(
@@ -637,6 +967,7 @@ public partial class SettingsWindow : Window
                 UseShellExecute = true,
             });
             AnimatePress(GitHubButton);
+            AboutPopup.IsOpen = false;
         }
         catch (Exception exception)
         {
@@ -654,6 +985,7 @@ public partial class SettingsWindow : Window
                 UseShellExecute = true,
             });
             AnimatePress(ReportBugButton);
+            AboutPopup.IsOpen = false;
         }
         catch (Exception exception)
         {
@@ -671,6 +1003,7 @@ public partial class SettingsWindow : Window
                 UseShellExecute = true,
             });
             AnimatePress(FeatureRequestButton);
+            AboutPopup.IsOpen = false;
         }
         catch (Exception exception)
         {
@@ -882,19 +1215,24 @@ public partial class SettingsWindow : Window
         try
         {
             AutostartBox.IsChecked = enabled;
+            _savedAutostartEnabled = enabled;
         }
         finally
         {
             _updatingUi = false;
         }
+        RefreshSettingsDirtyState();
     }
 
     private void ShowSettings()
     {
         LoadSettingsControls();
+        _closeAfterUnsavedResolution = false;
+        SetSettingsDirty(false, animate: false);
         DashboardPanel.Visibility = Visibility.Collapsed;
         SettingsPanel.Visibility = Visibility.Visible;
         SettingsButton.Visibility = Visibility.Collapsed;
+        CancelSettingsButton.Visibility = Visibility.Visible;
         DoneButton.Visibility = Visibility.Visible;
         SetWindowHeight(Math.Min(720, SystemParameters.WorkArea.Height - 64));
         AnimateView(SettingsPanel);
@@ -931,9 +1269,12 @@ public partial class SettingsWindow : Window
     private void ShowDashboard()
     {
         CancelHotkeyCapture();
+        _closeAfterUnsavedResolution = false;
+        SetSettingsDirty(false, animate: false);
         SettingsPanel.Visibility = Visibility.Collapsed;
         DashboardPanel.Visibility = Visibility.Visible;
         SettingsButton.Visibility = Visibility.Visible;
+        CancelSettingsButton.Visibility = Visibility.Collapsed;
         DoneButton.Visibility = Visibility.Collapsed;
         SetWindowHeight(DashboardHeight);
         UpdateRuntimeState(_runtimeActive);
@@ -1144,6 +1485,7 @@ public partial class SettingsWindow : Window
         _outputDirectory = dialog.FolderName;
         OutputDirText.Text = _outputDirectory;
         _ = RefreshDiskAsync();
+        RefreshSettingsDirtyState();
     }
 
     private void HotkeyCapture_Click(object sender, RoutedEventArgs e)
@@ -1158,6 +1500,13 @@ public partial class SettingsWindow : Window
     {
         if (_capturingHotkeyButton is null)
         {
+            if (e.Key == Key.Escape && AboutPopup.IsOpen)
+            {
+                AboutPopup.IsOpen = false;
+                AboutButton.Focus();
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Escape && LanguagePopup.IsOpen)
             {
                 LanguagePopup.IsOpen = false;
@@ -1173,8 +1522,10 @@ public partial class SettingsWindow : Window
             }
             if (e.Key == Key.Escape && SettingsPanel.Visibility == Visibility.Visible)
             {
-                LoadSettingsControls();
-                ShowDashboard();
+                if (_settingsDirty)
+                    PromptForUnsavedChanges(closeAfterResolution: false);
+                else
+                    ShowDashboard();
                 e.Handled = true;
             }
             return;
@@ -1214,6 +1565,7 @@ public partial class SettingsWindow : Window
             _pendingToggleHotkey = hotkey;
         _capturingHotkeyButton.Content = hotkey;
         _capturingHotkeyButton = null;
+        RefreshSettingsDirtyState();
     }
 
     private void CancelHotkeyCapture()
@@ -1263,6 +1615,7 @@ public partial class SettingsWindow : Window
             GetSelectedTag(AudioTrackModeBox, "mixed") == "separate";
         Config candidate = _config.Clone();
         candidate.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
+        candidate.WarnWhenGameStartsWithReplayOff = WarnGameOffBox.IsChecked == true;
         candidate.ShowRecordingIndicator =
             RecordingIndicatorBox.IsChecked == true;
         candidate.RecordingIndicatorPosition = GetSelectedRadioTag(
@@ -1312,8 +1665,18 @@ public partial class SettingsWindow : Window
                 return;
 
             Applied = true;
+            _savedAutostartEnabled = AutostartBox.IsChecked == true;
+            SetSettingsDirty(false, animate: false);
             _ = RefreshDiskAsync();
-            ShowDashboard();
+            if (_closeAfterUnsavedResolution)
+            {
+                _allowClose = true;
+                Close();
+            }
+            else
+            {
+                ShowDashboard();
+            }
         }
         catch (Exception exception)
         {
@@ -1338,6 +1701,7 @@ public partial class SettingsWindow : Window
         MicSourceChip.IsEnabled = false;
         SettingsReplayToggle.IsEnabled = false;
         DoneButton.IsEnabled = false;
+        CancelSettingsButton.IsEnabled = false;
         return true;
     }
 
@@ -1349,6 +1713,7 @@ public partial class SettingsWindow : Window
         MicSourceChip.IsEnabled = true;
         SettingsReplayToggle.IsEnabled = true;
         DoneButton.IsEnabled = true;
+        CancelSettingsButton.IsEnabled = true;
     }
 
     private async Task RunUiActionAsync(Func<Task> action)
@@ -1557,6 +1922,26 @@ public partial class SettingsWindow : Window
             Owner = this,
         };
         editor.ShowDialog();
+    }
+
+    private void PlayReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (((FrameworkElement)sender).DataContext is not ReplayClipItem item || !item.CanTrim)
+            return;
+        var player = new ClipEditorWindow(
+            _replayLibrary,
+            _outputDirectory,
+            item.Clip,
+            savedPath =>
+            {
+                Log.Write($"Trimmed replay saved: {savedPath}");
+                _ = RefreshReplayLibraryAsync();
+            },
+            ClipWindowMode.Preview)
+        {
+            Owner = this,
+        };
+        player.ShowDialog();
     }
 
     private void RequestDeleteReplay_Click(object sender, RoutedEventArgs e)

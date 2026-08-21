@@ -9,6 +9,7 @@
   <sys:String x:Key="L.Minimize">minimizar</sys:String>
   <sys:String x:Key="L.Close">Cerrar</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Abrir Captail en GitHub</sys:String>
+  <sys:String x:Key="L.Footer.About">Acerca de</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">Informar de un error</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">Abrir el formulario de GitHub con los datos del sistema rellenados</sys:String>
   <sys:String x:Key="L.Footer.Feature">Idea</sys:String>
@@ -65,6 +66,9 @@
   <sys:String x:Key="L.Section.Hotkeys">TECLAS RÁPIDAS</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Repetición instantánea</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">Avisar al iniciar un juego</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">Te avisa si la repetición está desactivada</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">Muestra una sola notificación discreta al detectar un juego con la repetición instantánea desactivada. No activa la grabación automáticamente.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">Indicador de grabación</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">Pequeño icono de estado en la esquina de la pantalla seleccionada</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">Posición del indicador</sys:String>
@@ -157,6 +161,8 @@
   <sys:String x:Key="L.Library.LoadFailed">No se pudieron cargar las repeticiones.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Actualizar repeticiones</sys:String>
   <sys:String x:Key="L.Library.Open">Mostrar en carpeta</sys:String>
+  <sys:String x:Key="L.Library.Preview">Reproducir repetición</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">Reproductor de repeticiones</sys:String>
   <sys:String x:Key="L.Library.Trim">Recortar</sys:String>
   <sys:String x:Key="L.Library.Delete">Eliminar</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">¿Eliminar esta repetición?</sys:String>
@@ -191,6 +197,14 @@
   <sys:String x:Key="L.Library.RangeSummary">Seleccionado · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Atrás 5 segundos</sys:String>
   <sys:String x:Key="L.Library.Forward5">Adelante 5 segundos</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">Reproducir / pausar</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">Alternar reproducción</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">Buscar</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">Atrás o adelante 5 segundos</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">Velocidad de reproducción</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">Abajo más lento · arriba más rápido</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">Cambiar vista del reproductor</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">Salir de pantalla completa o cerrar</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Sobrescribir</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">¿Sobrescribir la repetición original?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">El rango seleccionado y las pistas de audio habilitadas reemplazarán el archivo original. Esto no se puede deshacer.</sys:String>
@@ -201,6 +215,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">Activar/desactivar</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">Activa o desactiva la repetición instantánea</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">Presione "Listo" para aplicar los cambios.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">Cambios sin guardar</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">Usa Cancelar o Hecho.</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">Cancelar</sys:String>
   <sys:String x:Key="L.Hotkey.Press">Presione las teclas…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Agregar Ctrl/Alt/Mayús</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">Tecla de acceso rápido ya en uso</sys:String>
@@ -251,6 +268,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">La captura no comenzó</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">Configuración aplicada</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Repetición instantánea desactivada</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">La repetición instantánea está desactivada</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} está en ejecución. No se están grabando repeticiones.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Activa la repetición instantánea antes de guardar.</sys:String>
   <sys:String x:Key="L.Notify.Saving">Guardando repetición…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">Escribiendo el último {0} en el disco.</sys:String>

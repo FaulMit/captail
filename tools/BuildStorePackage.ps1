@@ -40,6 +40,8 @@ $testNativeDependencies =
     Join-Path $repoRoot "tools\TestStoreNativeDependencies.ps1"
 $testStoreLifecycle =
     Join-Path $repoRoot "tools\TestStoreLifecycleIsolation.ps1"
+$testStoreIconAssets =
+    Join-Path $repoRoot "tools\TestStoreIconAssets.ps1"
 $manifestTemplate = Join-Path $repoRoot "packaging\msix\AppxManifest.xml.template"
 $iconPath = Join-Path $repoRoot "src\Captail\Assets\Captail.ico"
 
@@ -159,6 +161,79 @@ finally {
     $sourceIcon.Dispose()
 }
 
+$taskbarIconSizes = @(16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256)
+foreach ($size in $taskbarIconSizes) {
+    $bitmap = [Drawing.Bitmap]::new(
+        $size,
+        $size,
+        [Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    try {
+        $graphics = [Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.Clear([Drawing.Color]::Transparent)
+            $graphics.CompositingMode =
+                [Drawing.Drawing2D.CompositingMode]::SourceOver
+            $graphics.CompositingQuality =
+                [Drawing.Drawing2D.CompositingQuality]::HighQuality
+            $graphics.InterpolationMode =
+                [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+            $graphics.PixelOffsetMode =
+                [Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+            $graphics.SmoothingMode =
+                [Drawing.Drawing2D.SmoothingMode]::AntiAlias
+
+            $markInset = [single]($size * 0.105)
+            $markBounds = [Drawing.RectangleF]::new(
+                $markInset,
+                $markInset,
+                [single]($size - 2 * $markInset),
+                [single]($size - 2 * $markInset))
+            $ringWidth = [single]($markBounds.Width * 0.108)
+            $ringInset = [single]($markBounds.Width * 0.135)
+            $ringBounds = [Drawing.RectangleF]::new(
+                [single]($markBounds.Left + $ringInset),
+                [single]($markBounds.Top + $ringInset),
+                [single]($markBounds.Width - 2 * $ringInset),
+                [single]($markBounds.Height - 2 * $ringInset))
+            $mint = [Drawing.Color]::FromArgb(255, 99, 224, 189)
+            $pen = [Drawing.Pen]::new($mint, $ringWidth)
+            $pen.StartCap = [Drawing.Drawing2D.LineCap]::Round
+            $pen.EndCap = [Drawing.Drawing2D.LineCap]::Round
+            try {
+                $graphics.DrawArc($pen, $ringBounds, -72, 304)
+            }
+            finally {
+                $pen.Dispose()
+            }
+
+            $dotSize = [single]($markBounds.Width * 0.145)
+            $dotBrush = [Drawing.SolidBrush]::new($mint)
+            try {
+                $graphics.FillEllipse(
+                    $dotBrush,
+                    [single]($markBounds.Left + ($markBounds.Width - $dotSize) / 2),
+                    [single]($markBounds.Top + ($markBounds.Height - $dotSize) / 2),
+                    $dotSize,
+                    $dotSize)
+            }
+            finally {
+                $dotBrush.Dispose()
+            }
+        }
+        finally {
+            $graphics.Dispose()
+        }
+
+        $name = "Square44x44Logo.targetsize-${size}_altform-unplated.png"
+        $bitmap.Save(
+            (Join-Path $assetsDirectory $name),
+            [Drawing.Imaging.ImageFormat]::Png)
+    }
+    finally {
+        $bitmap.Dispose()
+    }
+}
+
 $manifest = [IO.File]::ReadAllText($manifestTemplate)
 $manifest = $manifest.Replace("__PACKAGE_VERSION__", $packageVersion)
 $manifestPath = Join-Path $packageRoot "AppxManifest.xml"
@@ -189,6 +264,7 @@ if ($identity.Name -ne "faulmit.Captail" -or
 }
 & $testFfmpegIsolation -PackageRoot $validationRoot
 & $testNativeDependencies -PackageRoot $validationRoot
+& $testStoreIconAssets -PackageRoot $validationRoot
 
 Write-Host "Creating Partner Center upload archive..."
 Compress-Archive -LiteralPath $msixPath `

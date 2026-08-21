@@ -12,6 +12,7 @@
   <sys:String x:Key="L.Minimize">Minimize</sys:String>
   <sys:String x:Key="L.Close">Close</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Open Captail on GitHub</sys:String>
+  <sys:String x:Key="L.Footer.About">About</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">Report bug</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">Open the GitHub form with system details prefilled</sys:String>
   <sys:String x:Key="L.Footer.Feature">Feature</sys:String>
@@ -68,6 +69,9 @@
   <sys:String x:Key="L.Section.Hotkeys">HOTKEYS</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Instant Replay</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">Warn when a game starts</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">Notifies you if replay is off</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">Shows one quiet notification when a game is detected while Instant Replay is disabled. It does not turn recording on automatically.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">Recording indicator</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">Small status icon in the selected screen corner</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">Indicator position</sys:String>
@@ -160,6 +164,8 @@
   <sys:String x:Key="L.Library.LoadFailed">Could not load replays.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Refresh replays</sys:String>
   <sys:String x:Key="L.Library.Open">Show in folder</sys:String>
+  <sys:String x:Key="L.Library.Preview">Play replay</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">Replay player</sys:String>
   <sys:String x:Key="L.Library.Trim">Trim</sys:String>
   <sys:String x:Key="L.Library.Delete">Delete</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">Delete this replay?</sys:String>
@@ -194,6 +200,14 @@
   <sys:String x:Key="L.Library.RangeSummary">Selected · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Back 5 seconds</sys:String>
   <sys:String x:Key="L.Library.Forward5">Forward 5 seconds</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">Play / pause</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">Toggle playback</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">Seek</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">Back or forward 5 seconds</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">Playback speed</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">Down slower · Up faster</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">Toggle player view</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">Exit full screen or close player</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Overwrite</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Overwrite original replay?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">Selected range and enabled audio tracks will replace original file. This cannot be undone.</sys:String>
@@ -204,6 +218,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">Enable / disable</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">Toggles Instant Replay</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">Press “Done” to apply changes.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">Unsaved changes</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">Use Cancel or Done.</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">Cancel</sys:String>
   <sys:String x:Key="L.Hotkey.Press">Press keys…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Add Ctrl / Alt / Shift</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">Hotkey already in use</sys:String>
@@ -254,6 +271,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">Capture did not start</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">Settings applied</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Instant Replay off</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">Instant Replay is off</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} is running. Replays are not being recorded.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Enable Instant Replay before saving.</sys:String>
   <sys:String x:Key="L.Notify.Saving">Saving replay…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">Writing the last {0} to disk.</sys:String>
