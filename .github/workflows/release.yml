@@ -125,6 +125,8 @@ jobs:
 
       - name: Build release packages
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           dotnet restore ./src/Captail/Captail.csproj --locked-mode
           ./tools/BuildRelease.ps1 `

@@ -63,6 +63,8 @@ jobs:
 
       - name: Build Microsoft Store package
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           ./tools/BuildStorePackage.ps1 `
             -Version $env:RELEASE_VERSION `
