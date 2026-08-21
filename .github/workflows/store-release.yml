@@ -254,6 +254,16 @@ jobs:
             throw "Partner Center submission commit failed: $LASTEXITCODE"
           }
 
+      - name: Verify certification handoff
+        if: ${{ inputs.mode == 'submit' }}
+        timeout-minutes: 15
+        shell: pwsh
+        run: |
+          & msstore submission poll $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) {
+            throw "Partner Center rejected or could not finish the submission commit: $LASTEXITCODE"
+          }
+
       - name: Report submission status
         shell: pwsh
         run: |
