@@ -17,10 +17,16 @@ else {
     "ffmpeg-$version-win64-lgpl-shared-8.1.zip"
 }
 $releaseApiUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/tags/latest"
-$release = Invoke-RestMethod -UseBasicParsing -Uri $releaseApiUrl -Headers @{
+$githubHeaders = @{
     Accept = "application/vnd.github+json"
     "User-Agent" = "Captail-build"
 }
+$githubToken = [Environment]::GetEnvironmentVariable("GITHUB_TOKEN")
+if (-not [string]::IsNullOrWhiteSpace($githubToken)) {
+    $githubHeaders.Authorization = "Bearer $githubToken"
+}
+$release = Invoke-RestMethod -UseBasicParsing -Uri $releaseApiUrl `
+    -Headers $githubHeaders
 $asset = $release.assets | Where-Object { $_.name -eq $archiveName } |
     Select-Object -First 1
 if (-not $asset) {

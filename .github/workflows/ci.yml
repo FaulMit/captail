@@ -43,6 +43,8 @@ jobs:
 
       - name: Build Release
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           dotnet restore ./src/Captail/Captail.csproj --locked-mode
           dotnet build ./Captail.sln -c Release --no-restore `
