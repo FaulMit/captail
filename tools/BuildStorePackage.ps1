@@ -4,8 +4,8 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
 
-    [ValidateRange(0, 65535)]
-    [int]$PackageRevision = 0,
+    [ValidatePattern('^\d+\.\d+\.\d+\.0$')]
+    [string]$IdentityVersion = "",
 
     [string]$OutputDirectory = "",
 
@@ -25,7 +25,7 @@ if (-not $outputRoot.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCa
     throw "Store output must stay inside repository: $outputRoot"
 }
 
-$packageVersion = "$Version.$PackageRevision"
+$packageVersion = if ($IdentityVersion) { $IdentityVersion } else { "$Version.0" }
 $packageName = "Captail-$packageVersion-x64"
 $stagingRoot = Join-Path $outputRoot "staging"
 $dotnetArtifacts = Join-Path $stagingRoot "dotnet"

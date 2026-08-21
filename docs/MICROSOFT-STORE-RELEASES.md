@@ -27,11 +27,11 @@ expiration date and update `AZURE_AD_APPLICATION_SECRET` in GitHub.
 1. Merge the release-ready code into `main`.
 2. Open **Actions** and select **Microsoft Store release**.
 3. Select **Run workflow** from `main`.
-4. Enter the three-part version, for example `0.2.0`.
-5. Keep package revision `0` for a new visible version. Increase it when
-   republishing the same visible version, for example `0.2.1` revision `1`
-   produces MSIX identity version `0.2.1.1` while Captail still displays
-   `0.2.1`.
+4. Enter the three-part Captail version, for example `0.2.1`.
+5. Leave **Internal MSIX identity** empty for a normal release. The workflow
+   then uses `0.2.1.0`. For a Store-only republish of the same visible version,
+   enter a higher four-part identity ending in `.0`, for example `0.2.2.0`.
+   Microsoft reserves the fourth field and rejects packages such as `0.2.1.1`.
 6. Select one mode:
    - `build-only`: build and validate the package without contacting Partner Center.
    - `draft`: upload the package but leave the submission as a draft.
@@ -83,6 +83,8 @@ If synchronization fails, the submission stays an uncommitted draft.
 - A submitted package is not reported as successful while Partner Center still
   returns `CommitStarted`; the workflow polls the certification handoff and
   fails on commit errors or timeout.
+- Store package identity always ends in `.0`; CI rejects workflows that expose
+  Microsoft's reserved fourth version field as a revision counter.
 - EN/RU listing synchronization is enabled by default and never commits a
   partially updated submission.
 - `build-only` is the default mode.
