@@ -11,15 +11,17 @@
         Background="Transparent"
         Foreground="{StaticResource TextPrimaryBrush}"
         FontFamily="{StaticResource FontUi}"
+        Closing="Window_Closing"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Border x:Name="WindowFrame"
             Background="{StaticResource BgWindowGradient}"
             BorderBrush="{StaticResource WindowBorderBrush}"
             BorderThickness="1"
-            CornerRadius="{StaticResource RadiusWindow}">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="42" ShadowDepth="12" Direction="270" Opacity="0.58"/>
-        </Border.Effect>
+            CornerRadius="{StaticResource RadiusWindow}"
+            RenderTransformOrigin="0.5,0.5">
+        <Border.RenderTransform>
+            <TranslateTransform x:Name="WindowShakeTransform"/>
+        </Border.RenderTransform>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="54"/>
@@ -57,6 +59,15 @@
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                               StrokeThickness="1.8" Width="15" Height="15" Stretch="Uniform"/>
                     </Button>
+                    <Button x:Name="CancelSettingsButton"
+                            Visibility="Collapsed"
+                            Style="{StaticResource SubtleButton}"
+                            Content="{DynamicResource L.Settings.Cancel}"
+                            Height="32"
+                            Padding="11,0"
+                            Margin="0,0,6,0"
+                            FontSize="11.5"
+                            Click="DiscardSettings_Click"/>
                     <Button x:Name="DoneButton"
                             Visibility="Collapsed"
                             Style="{StaticResource AccentButton}"
@@ -374,6 +385,13 @@
                                         </Border.RenderTransform>
                                         <StackPanel Orientation="Horizontal">
                                             <Button Style="{StaticResource ClipActionButton}"
+                                                    Click="PlayReplay_Click" ToolTip="{DynamicResource L.Library.Preview}"
+                                                    IsEnabled="{Binding CanTrim}">
+                                                <Path Data="{StaticResource IconPlay}"
+                                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                      Stretch="Uniform"/>
+                                            </Button>
+                                            <Button Style="{StaticResource ClipActionButton}"
                                                     Click="RevealReplay_Click" ToolTip="{DynamicResource L.Library.Open}">
                                                 <Path Data="{StaticResource IconFolder}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                                       StrokeThickness="1.8" Stretch="Uniform"/>
@@ -442,7 +460,32 @@
             </Grid>
 
             <Grid x:Name="SettingsPanel" Grid.Row="1" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border x:Name="UnsavedChangesBar"
+                        Grid.Row="0" Margin="16,4,10,8" Padding="11,9"
+                        Visibility="Collapsed" Opacity="0"
+                        Background="{StaticResource AccentChipBgBrush}"
+                        BorderBrush="{StaticResource AccentChipBorderBrush}"
+                        BorderThickness="1" CornerRadius="11">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="UnsavedChangesTranslate" Y="-6"/>
+                    </Border.RenderTransform>
+                    <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="{DynamicResource L.Settings.UnsavedTitle}"
+                                       FontSize="11.5" FontWeight="Bold"
+                                       Foreground="{StaticResource AccentBrush}"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{DynamicResource L.Settings.UnsavedHint}"
+                                       FontSize="9.5"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Border>
                 <ScrollViewer x:Name="SettingsScrollViewer"
+                              Grid.Row="1"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               Padding="16,0,10,16">
                     <StackPanel>
@@ -453,6 +496,37 @@
                                     <TextBlock Text="{DynamicResource L.Replay.Instant}" Style="{StaticResource RowLabelText}"/>
                                     <ToggleButton x:Name="SettingsReplayToggle" HorizontalAlignment="Right"
                                                   Style="{StaticResource ToggleSwitch}"/>
+                                </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{DynamicResource L.Replay.WarnGameOff}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <Button Style="{StaticResource HelpIconButton}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Replay.WarnGameOff}"
+                                                                       Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.WarnGameOff}"
+                                                                       Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </StackPanel>
+                                        <TextBlock Text="{DynamicResource L.Replay.WarnGameOffHint}"
+                                                   Style="{StaticResource SecondaryText}"
+                                                   FontSize="10" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="WarnGameOffBox" Grid.Column="1"
+                                                  Style="{StaticResource ToggleSwitch}"
+                                                  VerticalAlignment="Center"/>
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <Grid Margin="13,11">
@@ -998,9 +1072,6 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
-                        <TextBlock Text="{DynamicResource L.Hotkey.ApplyHint}"
-                                   Style="{StaticResource SecondaryText}" TextAlignment="Center"
-                                   Margin="8,14,8,0"/>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
@@ -1008,52 +1079,88 @@
             <Border Grid.Row="2" BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="0,1,0,0" Margin="16,0">
                 <Grid>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                        <Button x:Name="GitHubButton"
-                                Style="{StaticResource FooterLinkButton}"
-                                Click="GitHub_Click"
-                                ToolTip="{DynamicResource L.Footer.GitHubTip}">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconGitHub}"
-                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      Width="13" Height="13" Stretch="Uniform"/>
-                                <TextBlock Text="GitHub" Margin="6,0,0,0"
-                                           VerticalAlignment="Center"/>
+                    <ToggleButton x:Name="AboutButton"
+                                  HorizontalAlignment="Right"
+                                  Style="{StaticResource FooterAboutButton}"
+                                  IsChecked="{Binding IsOpen, ElementName=AboutPopup, Mode=TwoWay}">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Data="{StaticResource IconInfo}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="13" Height="13" Stretch="Uniform"/>
+                            <TextBlock Text="{DynamicResource L.Footer.About}"
+                                       Margin="6,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </ToggleButton>
+                    <Popup x:Name="AboutPopup"
+                           PlacementTarget="{Binding ElementName=AboutButton}"
+                           Placement="Custom"
+                           CustomPopupPlacementCallback="AboutPopup_Placement"
+                           AllowsTransparency="True"
+                           StaysOpen="False"
+                           PopupAnimation="None"
+                           Opened="AboutPopup_Opened"
+                           Closed="AboutPopup_Closed">
+                        <Border x:Name="AboutPopupPanel"
+                                Width="218" Padding="7"
+                                Background="#FF151A1D"
+                                BorderBrush="{StaticResource WindowBorderBrush}"
+                                BorderThickness="1" CornerRadius="12"
+                                Opacity="0" RenderTransformOrigin="0.5,1">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="26" ShadowDepth="7"
+                                                  Direction="270" Opacity="0.52"/>
+                            </Border.Effect>
+                            <Border.RenderTransform>
+                                <TranslateTransform Y="5"/>
+                            </Border.RenderTransform>
+                            <StackPanel>
+                                <Button x:Name="GitHubButton"
+                                        Style="{StaticResource AboutMenuButton}"
+                                        Click="GitHub_Click"
+                                        ToolTip="{DynamicResource L.Footer.GitHubTip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconGitHub}"
+                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              Width="14" Height="14" Stretch="Uniform"/>
+                                        <TextBlock Text="GitHub" Margin="9,0,0,0"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="ReportBugButton"
+                                        Style="{StaticResource AboutMenuButton}"
+                                        Click="ReportBug_Click"
+                                        ToolTip="{DynamicResource L.Footer.ReportBugTip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconIssue}"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                              Width="14" Height="14" Stretch="Uniform"/>
+                                        <TextBlock Text="{DynamicResource L.Footer.ReportBug}"
+                                                   Margin="9,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="FeatureRequestButton"
+                                        Style="{StaticResource AboutMenuButton}"
+                                        Click="FeatureRequest_Click"
+                                        ToolTip="{DynamicResource L.Footer.FeatureTip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="{StaticResource IconFeature}"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                              Width="14" Height="14" Stretch="Uniform"/>
+                                        <TextBlock Text="{DynamicResource L.Footer.Feature}"
+                                                   Margin="9,0,0,0" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
-                        </Button>
-                        <Button x:Name="ReportBugButton"
-                                Margin="3,0,0,0"
-                                Style="{StaticResource FooterLinkButton}"
-                                Click="ReportBug_Click"
-                                ToolTip="{DynamicResource L.Footer.ReportBugTip}">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconIssue}"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                      Width="13" Height="13" Stretch="Uniform"/>
-                                <TextBlock Text="{DynamicResource L.Footer.ReportBug}"
-                                           Margin="6,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="FeatureRequestButton"
-                                Margin="3,0,0,0"
-                                Style="{StaticResource FooterLinkButton}"
-                                Click="FeatureRequest_Click"
-                                ToolTip="{DynamicResource L.Footer.FeatureTip}">
-                            <StackPanel Orientation="Horizontal">
-                                <Path Data="{StaticResource IconFeature}"
-                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="1.8" StrokeStartLineCap="Round"
-                                      StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                      Width="13" Height="13" Stretch="Uniform"/>
-                                <TextBlock Text="{DynamicResource L.Footer.Feature}"
-                                           Margin="6,0,0,0" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+                        </Border>
+                    </Popup>
                     <Button x:Name="UpdateVersionButton"
-                            HorizontalAlignment="Right"
+                            HorizontalAlignment="Left"
                             Style="{StaticResource UpdateVersionButton}"
                             ToolTipService.ShowOnDisabled="True"
                             Tag="current"

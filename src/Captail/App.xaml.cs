@@ -37,6 +37,10 @@ public partial class App : Application
     private int _recoveryFailures;
     private int _recoveryInProgress;
     private int _captureStateRefreshInProgress;
+    private string _pendingReplayOffGame = "";
+    private int _pendingReplayOffGameSamples;
+    private readonly HashSet<string> _warnedReplayOffGames =
+        new(StringComparer.OrdinalIgnoreCase);
     private OverlayNotificationWindow? _overlayNotification;
     private ReplayStatusIndicatorWindow? _recordingIndicator;
     private readonly UpdateService _updateService = new();
@@ -78,6 +82,9 @@ public partial class App : Application
                 argument => argument.StartsWith(
                     "--qa-game-capture=",
                     StringComparison.OrdinalIgnoreCase));
+            bool gameCaptureIdleTest = e.Args.Contains(
+                "--qa-game-capture-idle",
+                StringComparer.OrdinalIgnoreCase);
             bool replaySegmentsTest = e.Args.Contains(
                 "--qa-replay-segments",
                 StringComparer.OrdinalIgnoreCase);
@@ -116,6 +123,13 @@ public partial class App : Application
                     StringComparison.OrdinalIgnoreCase))
                 ?["--qa-clip-editor=".Length..];
             bool clipEditorTest = !string.IsNullOrWhiteSpace(clipEditorTestPath);
+            string? replayPlayerTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-replay-player=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-replay-player=".Length..];
+            bool replayPlayerTest =
+                !string.IsNullOrWhiteSpace(replayPlayerTestPath);
             string? audioMixTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-audio-mix=",
@@ -144,6 +158,7 @@ public partial class App : Application
             const bool codecTest = false;
             const bool capabilityModelTest = false;
             const bool gameCaptureTest = false;
+            const bool gameCaptureIdleTest = false;
             const bool replaySegmentsTest = false;
             const bool fileRetryTest = false;
             const bool automaticCapturePolicyTest = false;
@@ -151,6 +166,7 @@ public partial class App : Application
             const bool localizationTest = false;
             const bool updateCheckTest = false;
             const bool clipEditorTest = false;
+            const bool replayPlayerTest = false;
             const bool audioMixTest = false;
             const bool previewGeometryTest = false;
             const bool trimOverwriteTest = false;
@@ -166,8 +182,9 @@ public partial class App : Application
                     backgroundLaunch,
                     shutdownExisting,
                     _uiOnly || faultTest || codecTest || capabilityModelTest ||
-                    gameCaptureTest || replaySegmentsTest || updateCheckTest ||
-                    clipEditorTest || audioMixTest || previewGeometryTest ||
+                    gameCaptureTest || gameCaptureIdleTest ||
+                    replaySegmentsTest || updateCheckTest ||
+                    clipEditorTest || replayPlayerTest || audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
                     automaticCapturePolicyTest || replayRoutingTest ||
                     localizationTest))
@@ -222,6 +239,11 @@ public partial class App : Application
                 RunGameCaptureTest(e.Args);
                 return;
             }
+            if (gameCaptureIdleTest)
+            {
+                RunGameCaptureIdleTest();
+                return;
+            }
             if (replaySegmentsTest)
             {
                 RunReplaySegmentsTest();
@@ -258,6 +280,13 @@ public partial class App : Application
             if (clipEditorTest)
             {
                 await RunClipEditorTestAsync(clipEditorTestPath!);
+                return;
+            }
+            if (replayPlayerTest)
+            {
+                await RunClipEditorTestAsync(
+                    replayPlayerTestPath!,
+                    ClipWindowMode.Preview);
                 return;
             }
             if (audioMixTest)
@@ -414,6 +443,7 @@ public partial class App : Application
             "firefox.exe", "explorer.exe", "dwm.exe", "Spotify.exe",
             "vlc.exe", "mpv.exe", "obs64.exe", "Captail.exe",
             "ApplicationFrameHost.exe", "ShellExperienceHost.exe", "SearchHost.exe",
+            "ScreenClippingHost.exe", "SnippingTool.exe",
         ];
         string[] accepted =
         [
@@ -460,6 +490,22 @@ public partial class App : Application
                 "RenderTool.exe",
                 @"C:\Tools\RenderTool.exe",
                 isFullscreen: true);
+        bool fullscreenGameWakesDetector = ObsReplayEngine.ShouldWakeGameCapture(
+            new Interop.CaptureInterop.ForegroundAppInfo(
+                "ExampleGame.exe",
+                @"C:\Games\ExampleGame.exe",
+                true));
+        bool windowedSteamGameWakesDetector = ObsReplayEngine.ShouldWakeGameCapture(
+            new Interop.CaptureInterop.ForegroundAppInfo(
+                "cs2.exe",
+                @"D:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive\game\bin\win64\cs2.exe",
+                false));
+        bool fullscreenTelegramDoesNotWakeDetector =
+            !ObsReplayEngine.ShouldWakeGameCapture(
+                new Interop.CaptureInterop.ForegroundAppInfo(
+                    "Telegram.exe",
+                    @"C:\Apps\Telegram.exe",
+                    true));
         bool passed = falsePositives.Length == 0 &&
                       falseNegatives.Length == 0 &&
                       !ObsReplayEngine.IsAutomaticCaptureCandidate("") &&
@@ -467,7 +513,10 @@ public partial class App : Application
                       missingVideoRejected && blockedSteamGameAccepted &&
                       windowedSteamGameRejected &&
                       fullscreenTelegramRejected &&
-                      unknownFullscreenAppRejected;
+                      unknownFullscreenAppRejected &&
+                      fullscreenGameWakesDetector &&
+                      windowedSteamGameWakesDetector &&
+                      fullscreenTelegramDoesNotWakeDetector;
         Log.Write(
             $"AUTO_CAPTURE_POLICY_TEST {(passed ? "PASS" : "FAIL")}: " +
             $"falsePositives={string.Join(',', falsePositives)}, " +
@@ -478,7 +527,10 @@ public partial class App : Application
             $"blockedSteamGameAccepted={blockedSteamGameAccepted}, " +
             $"windowedSteamGameRejected={windowedSteamGameRejected}, " +
             $"fullscreenTelegramRejected={fullscreenTelegramRejected}, " +
-            $"unknownFullscreenAppRejected={unknownFullscreenAppRejected}");
+            $"unknownFullscreenAppRejected={unknownFullscreenAppRejected}, " +
+            $"fullscreenGameWakesDetector={fullscreenGameWakesDetector}, " +
+            $"windowedSteamGameWakesDetector={windowedSteamGameWakesDetector}, " +
+            $"fullscreenTelegramDoesNotWakeDetector={fullscreenTelegramDoesNotWakeDetector}");
         Shutdown(passed ? 0 : 22);
     }
 
@@ -680,7 +732,9 @@ public partial class App : Application
         }
     }
 
-    private async Task RunClipEditorTestAsync(string path)
+    private async Task RunClipEditorTestAsync(
+        string path,
+        ClipWindowMode mode = ClipWindowMode.Trim)
     {
         string fullPath = Path.GetFullPath(path);
         if (!File.Exists(fullPath))
@@ -701,7 +755,8 @@ public partial class App : Application
             new ReplayLibrary(ffmpeg),
             file.DirectoryName!,
             clip,
-            saved => Log.Write($"CLIP_EDITOR_QA saved={saved}"));
+            saved => Log.Write($"CLIP_EDITOR_QA saved={saved}"),
+            mode);
         MainWindow = window;
         window.ShowDialog();
         Shutdown(0);
@@ -956,31 +1011,38 @@ public partial class App : Application
             };
             if (!TryStartPipeline(showError: false))
                 throw new InvalidOperationException("OBS Game Capture did not start.");
+            ObsReplayEngine engine = _obs ?? throw new InvalidOperationException(
+                "OBS Game Capture engine is missing.");
 
             DateTime hookDeadline = DateTime.UtcNow.AddSeconds(8);
-            while (!_obs!.IsGameHooked && DateTime.UtcNow < hookDeadline)
+            while (DateTime.UtcNow < hookDeadline)
+            {
+                engine.RefreshCaptureState();
+                if (engine.IsGameHooked && engine.IsActive)
+                    break;
                 await Task.Delay(100);
-            if (_obs.IsGameHooked)
+            }
+            if (engine.IsGameHooked)
                 await Task.Delay(TimeSpan.FromSeconds(2));
-            uint totalBefore = _obs.TotalRenderedFrames;
-            uint laggedBefore = _obs.LaggedRenderedFrames;
+            uint totalBefore = engine.TotalRenderedFrames;
+            uint laggedBefore = engine.LaggedRenderedFrames;
             await Task.Delay(TimeSpan.FromSeconds(6));
-            uint totalAfter = _obs.TotalRenderedFrames;
-            uint laggedAfter = _obs.LaggedRenderedFrames;
+            uint totalAfter = engine.TotalRenderedFrames;
+            uint laggedAfter = engine.LaggedRenderedFrames;
             uint totalDelta = totalAfter - totalBefore;
             uint laggedDelta = laggedAfter - laggedBefore;
             double steadyLagPercent = totalDelta == 0
                 ? 100
                 : laggedDelta * 100d / totalDelta;
-            string path = await _obs!.SaveReplayAsync();
+            string path = await engine.SaveReplayAsync();
             bool passed = File.Exists(path) &&
                           new FileInfo(path).Length > 0 &&
-                          _obs.IsGameHooked &&
-                          _obs.EncodedFrameCount > 0 &&
+                          engine.IsGameHooked &&
+                          engine.EncodedFrameCount > 0 &&
                           steadyLagPercent < 10;
             Log.Write(
                 $"OBS_GAME_TEST {(passed ? "PASS" : "FAIL")}: " +
-                $"hooked={_obs.IsGameHooked}, frames={_obs.EncodedFrameCount}, " +
+                $"hooked={engine.IsGameHooked}, frames={engine.EncodedFrameCount}, " +
                 $"steadyLag={laggedDelta}/{totalDelta} ({steadyLagPercent:0.0}%), " +
                 $"path={path}");
             Shutdown(passed ? 0 : 8);
@@ -989,6 +1051,50 @@ public partial class App : Application
         {
             Log.Write($"OBS_GAME_TEST FAIL: {exception}");
             Shutdown(9);
+        }
+    }
+
+    private async void RunGameCaptureIdleTest()
+    {
+        try
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "Captail",
+                $"obs_game_idle_{Environment.ProcessId}");
+            _config = new Config
+            {
+                ReplayEnabled = true,
+                BufferSeconds = 300,
+                FrameRate = 240,
+                RecordingResolution = "1080p",
+                BitrateMbps = 50,
+                Codec = "av1",
+                CaptureSource = "game",
+                CaptureSystemAudio = true,
+                CaptureMicrophone = false,
+                OutputDirectory = root,
+            };
+            if (!TryStartPipeline(showError: false))
+                throw new InvalidOperationException("OBS Game Capture did not start.");
+
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            bool passed = !_obs!.IsGameHooked &&
+                          !_obs.IsActive &&
+                          !_obs.IsGameCaptureDetectorActive &&
+                          _obs.BufferedBytes == 0 &&
+                          _obs.EncodedFrameCount == 0;
+            Log.Write(
+                $"OBS_GAME_IDLE_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"hooked={_obs.IsGameHooked}, active={_obs.IsActive}, " +
+                $"detector={_obs.IsGameCaptureDetectorActive}, " +
+                $"frames={_obs.EncodedFrameCount}, bytes={_obs.BufferedBytes}");
+            Shutdown(passed ? 0 : 18);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"OBS_GAME_IDLE_TEST FAIL: {exception}");
+            Shutdown(19);
         }
     }
 
@@ -1473,7 +1579,7 @@ public partial class App : Application
 
     private async Task RefreshAutomaticCaptureStateSafeAsync()
     {
-        if (_uiOnly || !IsReplayRunning ||
+        if (_uiOnly ||
             Volatile.Read(ref _exiting) != 0 ||
             Interlocked.Exchange(ref _captureStateRefreshInProgress, 1) != 0)
         {
@@ -1482,12 +1588,15 @@ public partial class App : Application
 
         try
         {
+            RefreshReplayOffGameWarning();
+            if (!IsReplayRunning)
+                return;
             if (!await _pipelineGate.WaitAsync(0))
                 return;
             try
             {
                 ObsReplayEngine? engine = _obs;
-                if (engine is null || !engine.IsAutomaticCapture)
+                if (engine is null)
                     return;
                 (bool changed, string description) =
                     await RunOnObsThreadAsync(() =>
@@ -1514,6 +1623,62 @@ public partial class App : Application
         {
             Interlocked.Exchange(ref _captureStateRefreshInProgress, 0);
         }
+    }
+
+    private void RefreshReplayOffGameWarning()
+    {
+        Config? config = _config;
+        if (config is null ||
+            !config.WarnWhenGameStartsWithReplayOff ||
+            config.ReplayEnabled ||
+            IsReplayRunning)
+        {
+            _pendingReplayOffGame = "";
+            _pendingReplayOffGameSamples = 0;
+            if (IsReplayRunning)
+                _warnedReplayOffGames.Clear();
+            return;
+        }
+
+        Interop.CaptureInterop.ForegroundAppInfo foreground =
+            Interop.CaptureInterop.ForegroundApplication();
+        if (!ObsReplayEngine.ShouldWakeGameCapture(foreground))
+        {
+            _pendingReplayOffGame = "";
+            _pendingReplayOffGameSamples = 0;
+            return;
+        }
+
+        string gameKey = string.IsNullOrWhiteSpace(foreground.FullPath)
+            ? foreground.Executable
+            : foreground.FullPath;
+        if (_warnedReplayOffGames.Contains(gameKey))
+            return;
+
+        if (!string.Equals(
+                _pendingReplayOffGame,
+                gameKey,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            _pendingReplayOffGame = gameKey;
+            _pendingReplayOffGameSamples = 1;
+            return;
+        }
+
+        _pendingReplayOffGameSamples++;
+        if (_pendingReplayOffGameSamples < 4)
+            return;
+
+        _warnedReplayOffGames.Add(gameKey);
+        _pendingReplayOffGame = "";
+        _pendingReplayOffGameSamples = 0;
+        string gameName = Path.GetFileNameWithoutExtension(foreground.Executable);
+        ShowOverlayNotification(
+            "!",
+            Localization.Text("L.Notify.ReplayOffGameTitle"),
+            Localization.Format("L.Notify.ReplayOffGameDetail", gameName),
+            OverlayTone.Warning,
+            5200);
     }
 
     private async Task MonitorPipelineSafeAsync()
@@ -1821,10 +1986,10 @@ public partial class App : Application
                 $"sha256:{new string('0', 64)}");
             return Task.FromResult<UpdateRelease?>(
                 new UpdateRelease(
-                    new Version(0, 2, 0),
-                    "v0.2.0",
+                    new Version(0, 2, 2),
+                    "v0.2.2",
                     new Uri(
-                        "https://github.com/FaulMit/captail/releases/tag/v0.2.0"),
+                        "https://github.com/FaulMit/captail/releases/tag/v0.2.2"),
                     true,
                     asset,
                     asset,
@@ -2220,7 +2385,10 @@ public partial class App : Application
                 : Localization.Text("L.Tray.Disabled");
         }
         if (_saveMenuItem is not null)
+        {
             _saveMenuItem.InputGestureText = _config?.Hotkey ?? "";
+            _saveMenuItem.IsEnabled = active && availableReplaySeconds > 0;
+        }
         if (_toggleMenuItem is not null)
             _toggleMenuItem.InputGestureText =
                 _config?.ToggleReplayHotkey ?? "";

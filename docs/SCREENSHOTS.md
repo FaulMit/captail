@@ -11,6 +11,7 @@ Every release must ship a fresh screenshot set captured from the exact release-c
 | `docs/captail-main.png` | Instant Replay active | Complete main window showing `AV1 · 4K · 240 FPS`, enabled system and microphone audio, current version, Save button, and several real recent-replay rows. |
 | `docs/captail-settings-video.png` | Video settings | Hardware AV1 selected at `3840 × 2160` and `240 FPS`, plus source, bitrate, quality profile, display, and resolution controls. |
 | `docs/captail-settings-audio.png` | Audio and replay settings | Enabled system audio and microphone, separate tracks, volume, microphone boost, buffer, storage, and hotkey controls where they fit naturally. Use a second real settings screenshot when one readable frame cannot contain them. |
+| `docs/captail-player.png` | Real replay loaded in Preview | Working AV1 4K 240 FPS playback, seek bar, keyboard help, Trim action, fullscreen control, and matching media details. |
 | `docs/captail-editor.png` | Real replay loaded | Working preview of a real AV1 4K 240 FPS replay, selected trim range, video timeline, available audio tracks, matching media details, and save actions. |
 
 The next refresh should migrate the two older settings JPEG files to the stable PNG names above. After that migration, overwrite the stable files on every release instead of adding versioned duplicates.

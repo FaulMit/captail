@@ -12,6 +12,7 @@
   <sys:String x:Key="L.Minimize">Свернуть</sys:String>
   <sys:String x:Key="L.Close">Закрыть</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Открыть Captail на GitHub</sys:String>
+  <sys:String x:Key="L.Footer.About">О приложении</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">Сообщить об ошибке</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">Открыть форму GitHub с заполненной информацией о системе</sys:String>
   <sys:String x:Key="L.Footer.Feature">Идея</sys:String>
@@ -68,6 +69,9 @@
   <sys:String x:Key="L.Section.Hotkeys">БИНДЫ</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Мгновенный повтор</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">Предупреждать при запуске игры</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">Напомнит, если повтор выключен</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">Показывает одно ненавязчивое уведомление, когда игра запущена, а мгновенный повтор выключен. Запись автоматически не включается.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">Индикатор записи</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">Маленький значок в выбранном углу экрана</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">Положение индикатора</sys:String>
@@ -160,6 +164,8 @@
   <sys:String x:Key="L.Library.LoadFailed">Не удалось загрузить повторы.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Обновить список</sys:String>
   <sys:String x:Key="L.Library.Open">Показать в папке</sys:String>
+  <sys:String x:Key="L.Library.Preview">Воспроизвести повтор</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">Просмотр повтора</sys:String>
   <sys:String x:Key="L.Library.Trim">Обрезать</sys:String>
   <sys:String x:Key="L.Library.Delete">Удалить</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">Удалить этот повтор?</sys:String>
@@ -194,6 +200,14 @@
   <sys:String x:Key="L.Library.RangeSummary">Выбрано · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Назад на 5 секунд</sys:String>
   <sys:String x:Key="L.Library.Forward5">Вперёд на 5 секунд</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">Пуск / пауза</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">Управление воспроизведением</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">Перемотка</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">Назад или вперёд на 5 секунд</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">Скорость воспроизведения</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">Вниз медленнее · вверх быстрее</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">Переключить вид плеера</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">Выйти из полного экрана или закрыть</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Перезаписать</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Перезаписать исходный повтор?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">Выбранный участок и включённые аудиодорожки заменят исходный файл. Отменить это действие нельзя.</sys:String>
@@ -204,6 +218,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">Включить / выключить</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">Переключает мгновенный повтор</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">Нажмите «Готово», чтобы применить изменения.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">Есть несохранённые изменения</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">Используйте «Отмена» или «Готово».</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">Отмена</sys:String>
   <sys:String x:Key="L.Hotkey.Press">Нажмите клавиши…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Добавьте Ctrl / Alt / Shift</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">Бинд уже используется</sys:String>
@@ -254,6 +271,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">Захват не запущен</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">Настройки применены</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Повтор выключен</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">Мгновенный повтор выключен</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">Запущена {0}. Повторы не записываются.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Включите мгновенный повтор перед сохранением.</sys:String>
   <sys:String x:Key="L.Notify.Saving">Сохраняю повтор…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">Записываю последние {0} на диск.</sys:String>

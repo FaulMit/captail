@@ -14,6 +14,11 @@ public sealed class ObsReplayEngine : IDisposable
     private const string RequiredObsVersion = "32.1.2";
     private const int AutomaticHookStableChecks = 2;
     private const int AutomaticFallbackStableChecks = 3;
+    // Game Capture still needs occasional video ticks to discover a newly launched game.
+    // Two ticks per second are the minimum verified rate for a reliable hook handshake.
+    private const int GameCaptureIdleFrameRate = 2;
+    private const int GameCaptureIdleReleaseSeconds = 10;
+    private const int GameCaptureDetectorStartupSeconds = 8;
     private const int Windows11InitialBuild = 22000;
     private const long MonitorCaptureMethodAuto = 0;
     private const long MonitorCaptureMethodWgc = 2;
@@ -24,8 +29,9 @@ public sealed class ObsReplayEngine : IDisposable
             "discordcanary", "discordptb", "dwm", "eadesktop", "epicgameslauncher",
             "explorer", "firefox", "galaxyclient", "lockapp", "livelywpf",
             "mediaplayer", "mpv", "ms-teams", "msedge", "nvcontainer", "obs32",
-            "obs64", "opera", "opera_gx", "searchapp", "searchhost",
-            "shellexperiencehost", "signal", "slack", "spotify", "startmenuexperiencehost",
+            "obs64", "opera", "opera_gx", "screenclippinghost", "searchapp",
+            "searchhost", "shellexperiencehost", "signal", "slack", "snippingtool",
+            "spotify", "startmenuexperiencehost",
             "steam", "steamwebhelper", "systemsettings", "telegram", "textinputhost",
             "ubisoftconnect", "vivaldi", "vlc", "wallpaper32", "wallpaper64",
             "wallpaper_engine", "webviewhost", "whatsapp", "wmplayer", "zoom",
@@ -74,9 +80,15 @@ public sealed class ObsReplayEngine : IDisposable
     private uint _outputHeight;
     private uint _baseWidth;
     private uint _baseHeight;
+    private int _videoFrameRate;
     private bool _automaticGameActive;
     private bool _automaticDesktopFallbackActive;
     private bool _automaticGameSourceShowing;
+    private bool _gameCaptureDetectorShowing;
+    private DateTime _gameCaptureDetectorActivatedUtc;
+    private bool _idleOutputTransition;
+    private bool _gameOutputPaused;
+    private DateTime _gameHookLostUtc;
     private string _activeGameExecutable = "";
     private string _pendingAutomaticGameExecutable = "";
     private int _automaticHookStableChecks;
@@ -93,6 +105,7 @@ public sealed class ObsReplayEngine : IDisposable
             Localization.Text("L.Engine.CapabilitiesPending"));
     public bool IsGameCapture { get; }
     public bool IsAutomaticCapture { get; }
+    internal bool IsGameCaptureDetectorActive => _gameCaptureDetectorShowing;
     public bool IsActive =>
         _started &&
         _output != 0 &&
@@ -130,7 +143,21 @@ public sealed class ObsReplayEngine : IDisposable
         }
     }
 
-    public bool IsGameHooked =>
+    public bool IsGameHooked
+    {
+        get
+        {
+            if (!IsRawGameHooked)
+                return false;
+            string executable = ReadStringProcedure(
+                ObsNative.obs_source_get_proc_handler(_gameVideoSource),
+                "get_hooked",
+                "executable");
+            return IsAutomaticCaptureCandidate(executable);
+        }
+    }
+
+    private bool IsRawGameHooked =>
         _gameVideoSource != 0 &&
         ReadBoolProcedure(
             ObsNative.obs_source_get_proc_handler(_gameVideoSource),
@@ -180,6 +207,18 @@ public sealed class ObsReplayEngine : IDisposable
             normalizedPath.Contains(marker, StringComparison.OrdinalIgnoreCase));
     }
 
+    internal static bool ShouldWakeGameCapture(
+        CaptureInterop.ForegroundAppInfo foreground)
+    {
+        if (!IsAutomaticCaptureCandidate(foreground.Executable))
+            return false;
+
+        string normalizedPath = foreground.FullPath.Replace('/', '\\');
+        return foreground.IsFullscreen ||
+               AutomaticGamePathMarkers.Any(marker =>
+                   normalizedPath.Contains(marker, StringComparison.OrdinalIgnoreCase));
+    }
+
     internal static string? ResolveReplayGameExecutable(
         bool isAutomaticCapture,
         bool automaticGameIdentified,
@@ -204,8 +243,13 @@ public sealed class ObsReplayEngine : IDisposable
     {
         get
         {
+            if (_started && IsGameCapture && !IsGameHooked)
+                return true;
             if (!IsActive)
                 return false;
+
+            if (_gameOutputPaused)
+                return true;
 
             uint frames = ObsNative.obs_get_total_frames();
             DateTime now = DateTime.UtcNow;
@@ -253,7 +297,17 @@ public sealed class ObsReplayEngine : IDisposable
         if (_gameVideoSource == 0)
             return false;
 
-        bool hooked = IsGameHooked;
+        if (IsGameCapture && !_gameCaptureDetectorShowing)
+        {
+            if (!ShouldWakeGameCapture(CaptureInterop.ForegroundApplication()))
+                return false;
+
+            SetGameCaptureDetectorShowing(true);
+            Log.Write("Game candidate found; Game Capture detector activated.");
+            return true;
+        }
+
+        bool hooked = IsRawGameHooked;
         string executable = hooked
             ? ReadStringProcedure(
                 ObsNative.obs_source_get_proc_handler(_gameVideoSource),
@@ -263,8 +317,57 @@ public sealed class ObsReplayEngine : IDisposable
 
         if (IsGameCapture)
         {
-            _activeGameExecutable = hooked ? executable : "";
-            return false;
+            bool validHook = hooked && IsAutomaticCaptureCandidate(executable);
+            string previousExecutable = _activeGameExecutable;
+            bool outputWasActive = IsActive;
+            bool pausedBefore = _gameOutputPaused;
+
+            if (validHook)
+            {
+                _activeGameExecutable = executable;
+                _lastRejectedAutomaticExecutable = "";
+                _gameHookLostUtc = default;
+                ResumeOrStartGameReplayBuffer();
+            }
+            else
+            {
+                _activeGameExecutable = "";
+                if (hooked)
+                {
+                    if (!string.Equals(
+                            _lastRejectedAutomaticExecutable,
+                            executable,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        _lastRejectedAutomaticExecutable = executable;
+                        Log.Write(
+                            "Game Capture ignored non-game process: " +
+                            Path.GetFileName(executable));
+                    }
+                    SetGameCaptureDetectorShowing(false);
+                }
+                else
+                {
+                    _lastRejectedAutomaticExecutable = "";
+                }
+
+                SuspendOrReleaseGameReplayBuffer();
+
+                if (!hooked && !IsActive &&
+                    DateTime.UtcNow - _gameCaptureDetectorActivatedUtc >=
+                    TimeSpan.FromSeconds(GameCaptureDetectorStartupSeconds) &&
+                    !ShouldWakeGameCapture(CaptureInterop.ForegroundApplication()))
+                {
+                    SetGameCaptureDetectorShowing(false);
+                }
+            }
+
+            return outputWasActive != IsActive ||
+                   pausedBefore != _gameOutputPaused ||
+                   !string.Equals(
+                       previousExecutable,
+                       _activeGameExecutable,
+                       StringComparison.OrdinalIgnoreCase);
         }
 
         if (_desktopVideoSource == 0)
@@ -509,6 +612,15 @@ public sealed class ObsReplayEngine : IDisposable
     {
         if (IsAutomaticCapture)
             RefreshCaptureState();
+        if (IsGameCapture && _gameOutputPaused)
+        {
+            if (!ObsNative.obs_output_pause(_output, false))
+                throw new InvalidOperationException(
+                    Localization.Text("L.Engine.BufferStartFailed"));
+            _gameOutputPaused = false;
+            _gameHookLostUtc = DateTime.UtcNow;
+            Log.Write("Paused Game Capture buffer resumed for replay save.");
+        }
 
         Task<string> completion;
         ulong initialMuxBytes;
@@ -699,40 +811,9 @@ public sealed class ObsReplayEngine : IDisposable
         _outputWidth = outputWidth;
         _outputHeight = outputHeight;
 
-        nint graphicsModule = Marshal.StringToCoTaskMemUTF8(
-            Path.Combine(baseDirectory, "libobs-d3d11.dll"));
-        try
-        {
-            var video = new ObsNative.VideoInfo
-            {
-                GraphicsModule = graphicsModule,
-                FpsNum = (uint)_config.FrameRate,
-                FpsDen = 1,
-                BaseWidth = _baseWidth,
-                BaseHeight = _baseHeight,
-                OutputWidth = outputWidth,
-                OutputHeight = outputHeight,
-                OutputFormat = ObsNative.VideoFormat.Nv12,
-                Adapter = 0,
-                GpuConversion = true,
-                ColorSpace = ObsNative.VideoColorSpace.Cs709,
-                Range = ObsNative.VideoRange.Partial,
-                ScaleType = _config.FrameRate >= 120
-                    ? ObsNative.ScaleType.Bilinear
-                    : ObsNative.ScaleType.Bicubic,
-            };
-            int result = ObsNative.obs_reset_video(ref video);
-            if (result != 0)
-            {
-                DiagnoseEffects(baseDirectory, dataRoot);
-                throw new InvalidOperationException(
-                    Localization.Format("L.Engine.VideoFailed", result));
-            }
-        }
-        finally
-        {
-            Marshal.FreeCoTaskMem(graphicsModule);
-        }
+        ResetObsVideo(
+            IsGameCapture ? GameCaptureIdleFrameRate : _config.FrameRate,
+            diagnoseOnFailure: true);
 
         var audio = new ObsNative.AudioInfo
         {
@@ -748,6 +829,61 @@ public sealed class ObsReplayEngine : IDisposable
             ToObsPath(Path.Combine(pluginDataRoot, "obs-plugins", "%module%")));
         ObsNative.obs_load_all_modules();
         ObsNative.obs_post_load_modules();
+    }
+
+    private void ResetObsVideo(int frameRate, bool diagnoseOnFailure = false)
+    {
+        if (_videoFrameRate == frameRate)
+            return;
+
+        string baseDirectory = AppContext.BaseDirectory;
+        nint graphicsModule = Marshal.StringToCoTaskMemUTF8(
+            Path.Combine(baseDirectory, "libobs-d3d11.dll"));
+        try
+        {
+            var video = new ObsNative.VideoInfo
+            {
+                GraphicsModule = graphicsModule,
+                FpsNum = (uint)frameRate,
+                FpsDen = 1,
+                BaseWidth = _baseWidth,
+                BaseHeight = _baseHeight,
+                OutputWidth = _outputWidth,
+                OutputHeight = _outputHeight,
+                OutputFormat = ObsNative.VideoFormat.Nv12,
+                Adapter = 0,
+                GpuConversion = true,
+                ColorSpace = ObsNative.VideoColorSpace.Cs709,
+                Range = ObsNative.VideoRange.Partial,
+                ScaleType = _config.FrameRate >= 120
+                    ? ObsNative.ScaleType.Bilinear
+                    : ObsNative.ScaleType.Bicubic,
+            };
+            int result = ObsNative.obs_reset_video(ref video);
+            if (result != 0)
+            {
+                if (diagnoseOnFailure)
+                {
+                    DiagnoseEffects(
+                        baseDirectory,
+                        Path.Combine(baseDirectory, "data"));
+                }
+                throw new InvalidOperationException(
+                    Localization.Format("L.Engine.VideoFailed", result));
+            }
+            _videoFrameRate = frameRate;
+            if (_videoEncoder != 0)
+            {
+                ObsNative.obs_encoder_set_video(
+                    _videoEncoder,
+                    ObsNative.obs_get_video());
+            }
+            Log.Write($"OBS video clock: {frameRate} FPS.");
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(graphicsModule);
+        }
     }
 
     private EncoderCapabilities DetectCapabilities()
@@ -903,30 +1039,24 @@ public sealed class ObsReplayEngine : IDisposable
         {
             _gameVideoSource = CreateGameSource(desktopFallback: false);
             _videoSource = _gameVideoSource;
+            // Detector stays dormant until a plausible foreground game appears.
+            // This prevents hooks into unrelated fullscreen applications and
+            // leaves GPU nearly idle while no game is running.
         }
 
         if (_videoSource == 0)
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.VideoSourceFailed"));
 
-        const uint systemMix = 1u;
-        if (IsGameCapture && _config.CaptureSystemAudio)
-        {
-            ObsNative.obs_source_set_audio_mixers(_gameVideoSource, systemMix);
-            ObsNative.obs_source_set_volume(
-                _gameVideoSource,
-                NormalizeVolume(_config.SystemAudioVolume));
-        }
-
         // Captail always has one video source. Connecting it directly avoids an
         // extra scene-composition pass, which matters at 144/240 FPS.
         ObsNative.obs_set_output_source(0, _videoSource);
 
-        if (!IsGameCapture && _config.CaptureSystemAudio)
+        if (_config.CaptureSystemAudio)
         {
             nint system = CreateAudioSource(
                 "wasapi_output_capture",
-                "Captail System Audio",
+                IsGameCapture ? "Captail Game Audio" : "Captail System Audio",
                 _config.SystemAudioDeviceId,
                 _config.SeparateAudioTracks ? 1u : 1u,
                 NormalizeVolume(_config.SystemAudioVolume));
@@ -970,7 +1100,7 @@ public sealed class ObsReplayEngine : IDisposable
             ObsNative.obs_data_set_bool(
                 settings,
                 "capture_audio",
-                !desktopFallback && _config.CaptureSystemAudio);
+                false);
             nint source = ObsNative.obs_source_create(
                 "game_capture",
                 desktopFallback
@@ -1308,6 +1438,143 @@ public sealed class ObsReplayEngine : IDisposable
         Extreme,
     }
 
+    private void ResumeOrStartGameReplayBuffer()
+    {
+        if (_output == 0)
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.BufferUnavailable"));
+
+        if (ObsNative.obs_output_active(_output))
+        {
+            if (_gameOutputPaused)
+            {
+                if (!ObsNative.obs_output_pause(_output, false))
+                    throw new InvalidOperationException(
+                        Localization.Text("L.Engine.BufferStartFailed"));
+                _gameOutputPaused = false;
+                _previousFrameCheckUtc = default;
+                Log.Write("Game Capture found; Replay Buffer resumed.");
+            }
+            return;
+        }
+
+        ResetObsVideo(_config.FrameRate);
+        if (!ObsNative.obs_output_start(_output))
+        {
+            string error = PtrToString(ObsNative.obs_output_get_last_error(_output));
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(error)
+                    ? Localization.Text("L.Engine.BufferStartFailed")
+                    : error);
+        }
+
+        _gameOutputPaused = false;
+        _replayWindowStartedUtc = DateTime.UtcNow;
+        _previousFrameCheckUtc = default;
+        Log.Write("Game Capture found; Replay Buffer started.");
+    }
+
+    private void SuspendOrReleaseGameReplayBuffer()
+    {
+        if (_output == 0 || !ObsNative.obs_output_active(_output))
+        {
+            _gameHookLostUtc = default;
+            _gameOutputPaused = false;
+            return;
+        }
+
+        DateTime now = DateTime.UtcNow;
+        if (_gameHookLostUtc == default)
+            _gameHookLostUtc = now;
+
+        if (!_gameOutputPaused)
+        {
+            if (ObsNative.obs_output_can_pause(_output) &&
+                ObsNative.obs_output_pause(_output, true))
+            {
+                _gameOutputPaused = true;
+                Log.Write(
+                    "Game Capture lost; Replay Buffer paused for recovery grace.");
+            }
+            else
+            {
+                Log.Write(
+                    "Game Capture lost; Replay Buffer pause unavailable.");
+            }
+        }
+
+        if (now - _gameHookLostUtc <
+            TimeSpan.FromSeconds(GameCaptureIdleReleaseSeconds))
+        {
+            return;
+        }
+
+        StopGameReplayBufferForIdle();
+    }
+
+    private void StopGameReplayBufferForIdle()
+    {
+        if (_output == 0 || !ObsNative.obs_output_active(_output))
+            return;
+
+        _idleOutputTransition = true;
+        try
+        {
+            ObsNative.obs_output_stop(_output);
+            for (int attempt = 0;
+                 attempt < 20 && ObsNative.obs_output_active(_output);
+                 attempt++)
+            {
+                Thread.Sleep(25);
+            }
+            if (ObsNative.obs_output_active(_output))
+            {
+                ObsNative.obs_output_force_stop(_output);
+                for (int attempt = 0;
+                     attempt < 20 && ObsNative.obs_output_active(_output);
+                     attempt++)
+                {
+                    Thread.Sleep(25);
+                }
+            }
+        }
+        finally
+        {
+            _idleOutputTransition = false;
+            _gameOutputPaused = false;
+            _gameHookLostUtc = default;
+            _replayWindowStartedUtc = default;
+        }
+
+        if (ObsNative.obs_output_active(_output))
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.BufferUnexpectedStop"));
+
+        ResetObsVideo(GameCaptureIdleFrameRate);
+        if (!ShouldWakeGameCapture(CaptureInterop.ForegroundApplication()))
+            SetGameCaptureDetectorShowing(false);
+        Log.Write("Game Capture idle; Replay Buffer released.");
+    }
+
+    private void SetGameCaptureDetectorShowing(bool showing)
+    {
+        if (_gameVideoSource == 0 || _gameCaptureDetectorShowing == showing)
+            return;
+
+        if (showing)
+        {
+            ObsNative.obs_source_inc_showing(_gameVideoSource);
+            _gameCaptureDetectorActivatedUtc = DateTime.UtcNow;
+        }
+        else
+        {
+            ObsNative.obs_source_dec_showing(_gameVideoSource);
+            _gameCaptureDetectorActivatedUtc = default;
+        }
+
+        _gameCaptureDetectorShowing = showing;
+    }
+
     private void CreateReplayBuffer()
     {
         // Game target is discovered at runtime. Save to root first, then move
@@ -1380,6 +1647,14 @@ public sealed class ObsReplayEngine : IDisposable
             _stoppedCallback,
             0);
 
+        if (IsGameCapture)
+        {
+            _replayWindowStartedUtc = default;
+            Log.Write(
+                "Game Capture idle; hook detector active, Replay Buffer sleeping.");
+            return;
+        }
+
         if (!ObsNative.obs_output_start(_output))
         {
             string error = PtrToString(ObsNative.obs_output_get_last_error(_output));
@@ -1421,7 +1696,7 @@ public sealed class ObsReplayEngine : IDisposable
 
     private void OnOutputStopped(nint _, nint __)
     {
-        if (_disposing || _resettingReplayWindow)
+        if (_disposing || _resettingReplayWindow || _idleOutputTransition)
             return;
         string error = PtrToString(ObsNative.obs_output_get_last_error(_output));
         Faulted?.Invoke(
@@ -1576,6 +1851,11 @@ public sealed class ObsReplayEngine : IDisposable
         {
             ObsNative.obs_source_dec_showing(_gameVideoSource);
             _automaticGameSourceShowing = false;
+        }
+        if (_gameCaptureDetectorShowing && _gameVideoSource != 0)
+        {
+            ObsNative.obs_source_dec_showing(_gameVideoSource);
+            _gameCaptureDetectorShowing = false;
         }
 
         if (_desktopVideoSource != 0)

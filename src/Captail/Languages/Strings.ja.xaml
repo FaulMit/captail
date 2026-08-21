@@ -9,6 +9,7 @@
   <sys:String x:Key="L.Minimize">最小化する</sys:String>
   <sys:String x:Key="L.Close">閉じる</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">GitHub で Captail を開く</sys:String>
+  <sys:String x:Key="L.Footer.About">情報</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">バグを報告</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">システム情報を入力済みの GitHub フォームを開く</sys:String>
   <sys:String x:Key="L.Footer.Feature">機能提案</sys:String>
@@ -65,6 +66,9 @@
   <sys:String x:Key="L.Section.Hotkeys">ホットキー</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">インスタントリプレイ</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">ゲーム開始時に通知</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">インスタントリプレイがオフの場合に通知</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">インスタントリプレイが無効な状態でゲームを検出すると、通知を一度だけ表示します。録画は自動で有効になりません。</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">録画インジケーター</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">選択した画面隅にある小さなステータス アイコン</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">インジケーターの位置</sys:String>
@@ -157,6 +161,8 @@
   <sys:String x:Key="L.Library.LoadFailed">リプレイを読み込めませんでした。</sys:String>
   <sys:String x:Key="L.Library.Refresh">リプレイを更新する</sys:String>
   <sys:String x:Key="L.Library.Open">フォルダ内に表示</sys:String>
+  <sys:String x:Key="L.Library.Preview">リプレイを再生</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">リプレイプレイヤー</sys:String>
   <sys:String x:Key="L.Library.Trim">トリム</sys:String>
   <sys:String x:Key="L.Library.Delete">削除</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">このリプレイを削除しますか?</sys:String>
@@ -191,6 +197,14 @@
   <sys:String x:Key="L.Library.RangeSummary">選択済み · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">5秒戻る</sys:String>
   <sys:String x:Key="L.Library.Forward5">5秒進む</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">再生 / 一時停止</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">再生を切り替えます</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">シーク</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">5秒戻る / 進む</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">再生速度</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">下で遅く · 上で速く</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">プレーヤー表示を切り替えます</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">全画面を終了または閉じます</sys:String>
   <sys:String x:Key="L.Library.Overwrite">上書き</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">元のリプレイを上書きしますか?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">選択した範囲と有効なオーディオ トラックは、元のファイルを置き換えます。これを元に戻すことはできません。</sys:String>
@@ -201,6 +215,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">有効/無効</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">インスタント リプレイを切り替えます</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">「完了」を押して変更を適用します。</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">未保存の変更</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">キャンセルまたは完了を使用します。</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">キャンセル</sys:String>
   <sys:String x:Key="L.Hotkey.Press">キーを押してください…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Ctrl / Alt / Shift を追加</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">ホットキーはすでに使用されています</sys:String>
@@ -251,6 +268,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">キャプチャが開始されませんでした</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">適用された設定</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">インスタント リプレイ オフ</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">インスタントリプレイはオフです</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">{0} が起動中です。リプレイは録画されていません。</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">保存する前にインスタント リプレイを有効にしてください。</sys:String>
   <sys:String x:Key="L.Notify.Saving">リプレイを保存中…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">最後の {0} をディスクに書き込みます。</sys:String>

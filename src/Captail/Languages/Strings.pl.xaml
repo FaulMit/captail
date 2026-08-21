@@ -9,6 +9,7 @@
   <sys:String x:Key="L.Minimize">Minimalizuj</sys:String>
   <sys:String x:Key="L.Close">Zamknij</sys:String>
   <sys:String x:Key="L.Footer.GitHubTip">Otwórz Captail w GitHubie</sys:String>
+  <sys:String x:Key="L.Footer.About">Informacje</sys:String>
   <sys:String x:Key="L.Footer.ReportBug">Zgłoś błąd</sys:String>
   <sys:String x:Key="L.Footer.ReportBugTip">Otwórz formularz GitHub z uzupełnionymi danymi systemu</sys:String>
   <sys:String x:Key="L.Footer.Feature">Pomysł</sys:String>
@@ -65,6 +66,9 @@
   <sys:String x:Key="L.Section.Hotkeys">Skróty klawiszowe</sys:String>
 
   <sys:String x:Key="L.Replay.Instant">Natychmiastowa powtórka</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOff">Ostrzegaj po uruchomieniu gry</sys:String>
+  <sys:String x:Key="L.Replay.WarnGameOffHint">Powiadamia, gdy powtórka jest wyłączona</sys:String>
+  <sys:String x:Key="L.Help.WarnGameOff">Wyświetla jedno dyskretne powiadomienie po wykryciu gry, gdy natychmiastowa powtórka jest wyłączona. Nie włącza nagrywania automatycznie.</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicator">Wskaźnik nagrywania</sys:String>
   <sys:String x:Key="L.Replay.RecordingIndicatorHint">Mała ikona stanu w rogu wybranego ekranu</sys:String>
   <sys:String x:Key="L.Replay.IndicatorPosition">Pozycja wskaźnika</sys:String>
@@ -157,6 +161,8 @@
   <sys:String x:Key="L.Library.LoadFailed">Nie udało się wczytać powtórek.</sys:String>
   <sys:String x:Key="L.Library.Refresh">Odśwież powtórki</sys:String>
   <sys:String x:Key="L.Library.Open">Pokaż w folderze</sys:String>
+  <sys:String x:Key="L.Library.Preview">Odtwórz powtórkę</sys:String>
+  <sys:String x:Key="L.Library.PreviewTitle">Odtwarzacz powtórek</sys:String>
   <sys:String x:Key="L.Library.Trim">Przytnij</sys:String>
   <sys:String x:Key="L.Library.Delete">Usuń</sys:String>
   <sys:String x:Key="L.Library.DeleteTitle">Usunąć tę powtórkę?</sys:String>
@@ -191,6 +197,14 @@
   <sys:String x:Key="L.Library.RangeSummary">Wybrane · {0}</sys:String>
   <sys:String x:Key="L.Library.Back5">Cofnij się o 5 sekund</sys:String>
   <sys:String x:Key="L.Library.Forward5">Do przodu o 5 sekund</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlayback">Odtwórz / pauza</sys:String>
+  <sys:String x:Key="L.Library.ShortcutPlaybackHint">Przełącz odtwarzanie</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeek">Przewijanie</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSeekHint">Wstecz lub do przodu o 5 sekund</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeed">Szybkość odtwarzania</sys:String>
+  <sys:String x:Key="L.Library.ShortcutSpeedHint">W dół wolniej · w górę szybciej</sys:String>
+  <sys:String x:Key="L.Library.ShortcutFullscreenHint">Przełącz widok odtwarzacza</sys:String>
+  <sys:String x:Key="L.Library.ShortcutCloseHint">Wyjdź z pełnego ekranu lub zamknij</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Zastąp</sys:String>
   <sys:String x:Key="L.Library.OverwriteTitle">Zastąpić oryginalną powtórkę?</sys:String>
   <sys:String x:Key="L.Library.OverwriteMessage">Wybrany zakres i włączone ścieżki audio zastąpią oryginalny plik. Tego nie można cofnąć.</sys:String>
@@ -201,6 +215,9 @@
   <sys:String x:Key="L.Hotkey.Toggle">Włącz / wyłącz</sys:String>
   <sys:String x:Key="L.Hotkey.ToggleHint">Włącza natychmiastową powtórkę</sys:String>
   <sys:String x:Key="L.Hotkey.ApplyHint">Naciśnij „Gotowe”, aby zastosować zmiany.</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedTitle">Niezapisane zmiany</sys:String>
+  <sys:String x:Key="L.Settings.UnsavedHint">Użyj Anuluj lub Gotowe.</sys:String>
+  <sys:String x:Key="L.Settings.Cancel">Anuluj</sys:String>
   <sys:String x:Key="L.Hotkey.Press">Naciśnij klawisze…</sys:String>
   <sys:String x:Key="L.Hotkey.AddModifier">Dodaj Ctrl / Alt / Shift</sys:String>
   <sys:String x:Key="L.Hotkey.InUse">Klawisz skrótu jest już używany</sys:String>
@@ -251,6 +268,8 @@
   <sys:String x:Key="L.Notify.CaptureFailed">Przechwytywanie nie rozpoczęło się</sys:String>
   <sys:String x:Key="L.Notify.SettingsApplied">Zastosowano ustawienia</sys:String>
   <sys:String x:Key="L.Notify.ReplayOff">Natychmiastowa powtórka wyłączona</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameTitle">Natychmiastowa powtórka jest wyłączona</sys:String>
+  <sys:String x:Key="L.Notify.ReplayOffGameDetail">Uruchomiono {0}. Powtórki nie są nagrywane.</sys:String>
   <sys:String x:Key="L.Notify.EnableBeforeSave">Włącz natychmiastową powtórkę przed zapisaniem.</sys:String>
   <sys:String x:Key="L.Notify.Saving">Zapisuję powtórkę…</sys:String>
   <sys:String x:Key="L.Notify.SavingDetail">Zapisywanie ostatniego {0} na dysku.</sys:String>
