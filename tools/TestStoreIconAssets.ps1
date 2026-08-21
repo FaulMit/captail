@@ -10,6 +10,14 @@ if (-not (Test-Path -LiteralPath $resolvedPackageRoot -PathType Container)) {
     throw "Store package root not found: $resolvedPackageRoot"
 }
 
+$resourceIndex = Join-Path $resolvedPackageRoot "resources.pri"
+if (-not (Test-Path -LiteralPath $resourceIndex -PathType Leaf)) {
+    throw "Store package resource index not found: $resourceIndex"
+}
+if ((Get-Item -LiteralPath $resourceIndex).Length -le 0) {
+    throw "Store package resource index is empty: $resourceIndex"
+}
+
 $assetsDirectory = Join-Path $resolvedPackageRoot "Assets"
 $baseLogo = Join-Path $assetsDirectory "Square44x44Logo.png"
 if (-not (Test-Path -LiteralPath $baseLogo -PathType Leaf)) {
