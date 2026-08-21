@@ -16,6 +16,11 @@ on:
           - build-only
           - draft
           - submit
+      update_listing:
+        description: Synchronize EN/RU Store text and screenshots from store-listing
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -49,6 +54,11 @@ jobs:
 
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Validate Microsoft Store listing
+        if: ${{ inputs.update_listing }}
+        shell: pwsh
+        run: ./tools/SyncStoreListing.ps1 -Version $env:RELEASE_VERSION -ValidateOnly
 
       - name: Set up .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
@@ -123,6 +133,7 @@ jobs:
       STORE_CLIENT_ID: ${{ secrets.AZURE_AD_APPLICATION_CLIENT_ID }}
       STORE_CLIENT_SECRET: ${{ secrets.AZURE_AD_APPLICATION_SECRET }}
       STORE_SELLER_ID: ${{ secrets.SELLER_ID }}
+      UPDATE_STORE_LISTING: ${{ inputs.update_listing }}
 
     steps:
       - name: Validate publishing context
@@ -145,6 +156,9 @@ jobs:
           if ($missing.Count -gt 0) {
             throw "Missing Microsoft Store environment values: $($missing -join ', ')"
           }
+
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download Store package
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
@@ -195,7 +209,7 @@ jobs:
             throw "Microsoft Store authentication failed: $LASTEXITCODE"
           }
 
-      - name: Upload package to Partner Center
+      - name: Upload package as Partner Center draft
         shell: pwsh
         env:
           PACKAGE_PATH: ${{ steps.package.outputs.path }}
@@ -204,15 +218,29 @@ jobs:
             'publish',
             $env:PACKAGE_PATH,
             '-id',
-            $env:STORE_PRODUCT_ID
+            $env:STORE_PRODUCT_ID,
+            '-nc'
           )
-          if ($env:RELEASE_MODE -eq 'draft') {
-            $arguments += '-nc'
-          }
 
           & msstore @arguments
           if ($LASTEXITCODE -ne 0) {
             throw "Partner Center package upload failed: $LASTEXITCODE"
+          }
+
+      - name: Synchronize Store listing
+        if: ${{ inputs.update_listing }}
+        shell: pwsh
+        run: |
+          ./tools/SyncStoreListing.ps1 `
+            -Version $env:RELEASE_VERSION
+
+      - name: Submit draft for certification
+        if: ${{ inputs.mode == 'submit' }}
+        shell: pwsh
+        run: |
+          & msstore submission publish $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) {
+            throw "Partner Center submission commit failed: $LASTEXITCODE"
           }
 
       - name: Report submission status
@@ -233,6 +261,8 @@ jobs:
           ## Captail $env:RELEASE_VERSION
 
           Package $action.
+
+          Store listing synchronization: ``$env:UPDATE_STORE_LISTING``
 
           Product ID: ``$env:STORE_PRODUCT_ID``
           "@ >> $env:GITHUB_STEP_SUMMARY

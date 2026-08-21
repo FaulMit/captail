@@ -154,6 +154,14 @@ jobs:
         shell: pwsh
         run: ./tools/TestLocalizedLayout.ps1
 
+      - name: Validate Microsoft Store listing
+        shell: pwsh
+        run: |
+          $listing = Get-Content ./store-listing/listing.json -Raw | ConvertFrom-Json
+          ./tools/SyncStoreListing.ps1 `
+            -Version ([string]$listing.ReleaseVersion) `
+            -ValidateOnly
+
       - name: Test sanitized diagnostic log export
         shell: pwsh
         run: ./tools/TestDiagnosticLogExporter.ps1
