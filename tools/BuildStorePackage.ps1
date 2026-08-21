@@ -4,6 +4,9 @@ param(
     [ValidatePattern('^\d+\.\d+\.\d+$')]
     [string]$Version,
 
+    [ValidateRange(0, 65535)]
+    [int]$PackageRevision = 0,
+
     [string]$OutputDirectory = "",
 
     [string]$MakeAppxPath = ""
@@ -22,7 +25,7 @@ if (-not $outputRoot.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCa
     throw "Store output must stay inside repository: $outputRoot"
 }
 
-$packageVersion = "$Version.0"
+$packageVersion = "$Version.$PackageRevision"
 $packageName = "Captail-$packageVersion-x64"
 $stagingRoot = Join-Path $outputRoot "staging"
 $dotnetArtifacts = Join-Path $stagingRoot "dotnet"
@@ -182,7 +185,7 @@ foreach ($size in $taskbarIconSizes) {
             $graphics.SmoothingMode =
                 [Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
-            $markInset = [single]($size * 0.105)
+            $markInset = [single]0
             $markBounds = [Drawing.RectangleF]::new(
                 $markInset,
                 $markInset,
@@ -195,7 +198,7 @@ foreach ($size in $taskbarIconSizes) {
                 [single]($markBounds.Top + $ringInset),
                 [single]($markBounds.Width - 2 * $ringInset),
                 [single]($markBounds.Height - 2 * $ringInset))
-            $mint = [Drawing.Color]::FromArgb(255, 99, 224, 189)
+            $mint = [Drawing.Color]::FromArgb(255, 69, 201, 167)
             $pen = [Drawing.Pen]::new($mint, $ringWidth)
             $pen.StartCap = [Drawing.Drawing2D.LineCap]::Round
             $pen.EndCap = [Drawing.Drawing2D.LineCap]::Round
@@ -224,10 +227,12 @@ foreach ($size in $taskbarIconSizes) {
             $graphics.Dispose()
         }
 
-        $name = "Square44x44Logo.targetsize-${size}_altform-unplated.png"
-        $bitmap.Save(
-            (Join-Path $assetsDirectory $name),
-            [Drawing.Imaging.ImageFormat]::Png)
+        foreach ($form in @("", "_altform-unplated", "_altform-lightunplated")) {
+            $name = "Square44x44Logo.targetsize-${size}${form}.png"
+            $bitmap.Save(
+                (Join-Path $assetsDirectory $name),
+                [Drawing.Imaging.ImageFormat]::Png)
+        }
     }
     finally {
         $bitmap.Dispose()

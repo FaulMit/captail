@@ -149,16 +149,22 @@ function New-CaptailMaster {
             }
         }
 
-        $markInset = if ($Transparent) { $Size * 0.105 } else { $Size * 0.185 }
+        $markInset = if ($Transparent) { 0 } else { $Size * 0.185 }
         $markBounds = [Drawing.RectangleF]::new(
             [single]$markInset,
             [single]$markInset,
             [single]($Size - 2 * $markInset),
             [single]($Size - 2 * $markInset))
+        $markColor = if ($Transparent) {
+            [Drawing.Color]::FromArgb(255, 69, 201, 167)
+        }
+        else {
+            [Drawing.Color]::FromArgb(255, 99, 224, 189)
+        }
         Draw-CaptailMark `
             -Graphics $graphics `
             -Bounds $markBounds `
-            -Color ([Drawing.Color]::FromArgb(255, 99, 224, 189))
+            -Color $markColor
     }
     finally {
         $graphics.Dispose()
@@ -292,18 +298,20 @@ try {
             -Height $size
     }
 
-    Save-ScaledPng $tileMaster (Join-Path $msixDirectory "Square44x44Logo.png") 44 44
+    Save-ScaledPng $markMaster (Join-Path $msixDirectory "Square44x44Logo.png") 44 44
     Save-ScaledPng $tileMaster (Join-Path $msixDirectory "StoreLogo.png") 50 50
     Save-ScaledPng $tileMaster (Join-Path $msixDirectory "Square150x150Logo.png") 150 150
     Save-ScaledPng $tileMaster (Join-Path $msixDirectory "Square310x310Logo.png") 310 310
     New-WideLogo (Join-Path $msixDirectory "Wide310x150Logo.png")
 
     foreach ($size in @(16, 20, 24, 30, 32, 36, 40, 44, 48, 60, 64, 72, 80, 96, 256)) {
-        Save-ScaledPng `
-            -Source $markMaster `
-            -Path (Join-Path $msixDirectory ("Square44x44Logo.targetsize-{0}_altform-unplated.png" -f $size)) `
-            -Width $size `
-            -Height $size
+        foreach ($form in @("", "_altform-unplated", "_altform-lightunplated")) {
+            Save-ScaledPng `
+                -Source $markMaster `
+                -Path (Join-Path $msixDirectory ("Square44x44Logo.targetsize-{0}{1}.png" -f $size, $form)) `
+                -Width $size `
+                -Height $size
+        }
     }
 }
 finally {
@@ -407,7 +415,7 @@ Use either super banner, not both. Both versions contain no product name, as req
 ## Other folders
 
 - `Master`: 1024 x 1024 tile, transparent mark, and generated banner source.
-- `MSIX`: package logos plus unplated target-size variants.
+- `MSIX`: package logos plus default, dark-theme, and light-theme target-size variants.
 - `Windows`: common PNG sizes and multi-resolution `Captail.ico`.
 - `Preview`: contact sheet for quick visual review.
 

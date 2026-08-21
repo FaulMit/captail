@@ -16,46 +16,13 @@ foreach ($size in $sizes) {
         $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
 
-        $inset = [Math]::Max(1.0, $size * 0.035)
-        $radius = $size * 0.22
-        $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
-        try {
-            $diameter = $radius * 2
-            $bounds = [System.Drawing.RectangleF]::new(
-                [single]$inset,
-                [single]$inset,
-                [single]($size - 2 * $inset),
-                [single]($size - 2 * $inset))
-            $path.AddArc($bounds.Left, $bounds.Top, $diameter, $diameter, 180, 90)
-            $path.AddArc($bounds.Right - $diameter, $bounds.Top, $diameter, $diameter, 270, 90)
-            $path.AddArc($bounds.Right - $diameter, $bounds.Bottom - $diameter, $diameter, $diameter, 0, 90)
-            $path.AddArc($bounds.Left, $bounds.Bottom - $diameter, $diameter, $diameter, 90, 90)
-            $path.CloseFigure()
-
-            $background = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 18, 23, 26))
-            $border = [System.Drawing.Pen]::new(
-                [System.Drawing.Color]::FromArgb(255, 40, 49, 54),
-                [single][Math]::Max(1.0, $size * 0.022))
-            try {
-                $graphics.FillPath($background, $path)
-                $graphics.DrawPath($border, $path)
-            }
-            finally {
-                $background.Dispose()
-                $border.Dispose()
-            }
-        }
-        finally {
-            $path.Dispose()
-        }
-
-        $mint = [System.Drawing.Color]::FromArgb(255, 99, 224, 189)
-        $ringWidth = [single][Math]::Max(1.7, $size * 0.075)
+        $mint = [System.Drawing.Color]::FromArgb(255, 69, 201, 167)
+        $ringWidth = [single][Math]::Max(1.7, $size * 0.108)
         $ringPen = [System.Drawing.Pen]::new($mint, $ringWidth)
         $ringPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
         $ringPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
         try {
-            $ringInset = [single]($size * 0.235)
+            $ringInset = [single]($size * 0.135)
             $ringSize = [single]($size - 2 * $ringInset)
             $graphics.DrawArc($ringPen, $ringInset, $ringInset, $ringSize, $ringSize, -72, 304)
         }
