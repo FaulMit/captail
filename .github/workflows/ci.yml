@@ -162,6 +162,10 @@ jobs:
             -Version ([string]$listing.ReleaseVersion) `
             -ValidateOnly
 
+      - name: Test Microsoft Store release workflow
+        shell: pwsh
+        run: ./tools/TestStoreReleaseWorkflow.ps1
+
       - name: Test sanitized diagnostic log export
         shell: pwsh
         run: ./tools/TestDiagnosticLogExporter.ps1

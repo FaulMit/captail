@@ -39,7 +39,9 @@ expiration date and update `AZURE_AD_APPLICATION_SECRET` in GitHub.
 7. Keep **Synchronize EN/RU Store text and screenshots** enabled for a normal
    release. Disable it only when intentionally testing package upload without
    changing the Store listing.
-8. Review the workflow summary and Partner Center submission status.
+8. Review the workflow summary and Partner Center submission status. In
+   `submit` mode, the workflow waits for Partner Center to finish the initial
+   submission commit and fails if package processing is rejected or stalls.
 
 The workflow stores the `.msixupload` package for three days. Microsoft Store
 certification and rollout continue in Partner Center after the workflow ends.
@@ -78,6 +80,9 @@ If synchronization fails, the submission stays an uncommitted draft.
 - The package SHA-256 is verified before upload.
 - Store listing metadata and screenshots are validated before Partner Center is
   contacted.
+- A submitted package is not reported as successful while Partner Center still
+  returns `CommitStarted`; the workflow polls the certification handoff and
+  fails on commit errors or timeout.
 - EN/RU listing synchronization is enabled by default and never commits a
   partially updated submission.
 - `build-only` is the default mode.
