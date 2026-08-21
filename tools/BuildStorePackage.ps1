@@ -9,7 +9,9 @@ param(
 
     [string]$OutputDirectory = "",
 
-    [string]$MakeAppxPath = ""
+    [string]$MakeAppxPath = "",
+
+    [string]$MakePriPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -75,6 +77,12 @@ if (-not $MakeAppxPath) {
 }
 if (-not $MakeAppxPath -or -not (Test-Path -LiteralPath $MakeAppxPath)) {
     throw "MakeAppx.exe not found. Install Windows SDK or pass -MakeAppxPath."
+}
+if (-not $MakePriPath) {
+    $MakePriPath = Join-Path (Split-Path -Parent $MakeAppxPath) "makepri.exe"
+}
+if (-not (Test-Path -LiteralPath $MakePriPath -PathType Leaf)) {
+    throw "MakePri.exe not found. Install Windows SDK or pass -MakePriPath."
 }
 
 Write-Host "Publishing Captail $Version for Microsoft Store..."
@@ -246,6 +254,27 @@ $manifestPath = Join-Path $packageRoot "AppxManifest.xml"
     $manifestPath,
     $manifest,
     [Text.UTF8Encoding]::new($false))
+
+$priConfigPath = Join-Path $packageRoot "priconfig.xml"
+$resourceIndexPath = Join-Path $packageRoot "resources.pri"
+Write-Host "Generating package resource index..."
+& $MakePriPath createconfig /cf $priConfigPath /dq en-US /o
+if ($LASTEXITCODE -ne 0) {
+    throw "MakePri createconfig failed with exit code $LASTEXITCODE."
+}
+& $MakePriPath new `
+    /pr $packageRoot `
+    /cf $priConfigPath `
+    /in "faulmit.Captail" `
+    /of $resourceIndexPath `
+    /o
+if ($LASTEXITCODE -ne 0) {
+    throw "MakePri new failed with exit code $LASTEXITCODE."
+}
+if (-not (Test-Path -LiteralPath $resourceIndexPath -PathType Leaf)) {
+    throw "MakePri did not create resources.pri."
+}
+Remove-Item -LiteralPath $priConfigPath -Force
 
 Write-Host "Creating MSIX..."
 & $MakeAppxPath pack /d $packageRoot /p $msixPath /o
