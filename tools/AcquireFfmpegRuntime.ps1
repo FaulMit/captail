@@ -7,21 +7,29 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$version = "n7.1.5-12-g1fdbca85aa"
+$version = "n8.1-latest"
 $isStatic = $Flavor -eq "Static"
 $archiveName = if ($isStatic) {
-    "ffmpeg-$version-win64-lgpl-7.1.zip"
+    "ffmpeg-$version-win64-lgpl-8.1.zip"
 }
 else {
-    "ffmpeg-$version-win64-lgpl-shared-7.1.zip"
+    "ffmpeg-$version-win64-lgpl-shared-8.1.zip"
 }
-$url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-01-13-21/$archiveName"
-$expectedArchiveSha256 = if ($isStatic) {
-    "bc25a2260a1eaa6fd91d5774a8d8bc425c7d43ae9e8c74297d2d6ebc38e188cb"
+$releaseApiUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/tags/latest"
+$release = Invoke-RestMethod -UseBasicParsing -Uri $releaseApiUrl -Headers @{
+    Accept = "application/vnd.github+json"
+    "User-Agent" = "Captail-build"
 }
-else {
-    "289ec4ca5a832cb1f2486ee35301d345c5dfaa28018f6177cdbbfbc2ad6f2e33"
+$asset = $release.assets | Where-Object { $_.name -eq $archiveName } |
+    Select-Object -First 1
+if (-not $asset) {
+    throw "FFmpeg release asset not found: $archiveName"
 }
+if ($asset.digest -notmatch '^sha256:([0-9a-fA-F]{64})$') {
+    throw "FFmpeg release asset has no valid GitHub SHA-256 digest: $archiveName"
+}
+$expectedArchiveSha256 = $Matches[1]
+$url = [string]$asset.browser_download_url
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
 
