@@ -7,6 +7,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
 $version = "n8.1-latest"
 $isStatic = $Flavor -eq "Static"
 $archiveName = if ($isStatic) {
