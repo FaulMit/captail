@@ -7,6 +7,11 @@ on:
         description: Semantic version without the v prefix, for example 0.1.8
         required: true
         type: string
+      package_revision:
+        description: Internal MSIX revision; increase when republishing the same visible version
+        required: true
+        default: 0
+        type: number
       mode:
         description: Build only, upload a Partner Center draft, or submit for certification
         required: true
@@ -31,6 +36,7 @@ concurrency:
 
 env:
   RELEASE_VERSION: ${{ inputs.version }}
+  STORE_PACKAGE_REVISION: ${{ inputs.package_revision }}
   STORE_OUTPUT: artifacts/store/${{ inputs.version }}
 
 jobs:
@@ -47,6 +53,10 @@ jobs:
         run: |
           if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') {
             throw "Invalid semantic version: $env:RELEASE_VERSION"
+          }
+          if ($env:STORE_PACKAGE_REVISION -notmatch '^\d+$' -or
+              [int]$env:STORE_PACKAGE_REVISION -gt 65535) {
+            throw "Invalid Store package revision: $env:STORE_PACKAGE_REVISION"
           }
           if ($env:RELEASE_MODE -notin @('build-only', 'draft', 'submit')) {
             throw "Invalid release mode: $env:RELEASE_MODE"
@@ -78,13 +88,14 @@ jobs:
         run: |
           ./tools/BuildStorePackage.ps1 `
             -Version $env:RELEASE_VERSION `
+            -PackageRevision $env:STORE_PACKAGE_REVISION `
             -OutputDirectory $env:STORE_OUTPUT
 
       - name: Verify Store upload artifact
         shell: pwsh
         run: |
           $upload = Join-Path $env:STORE_OUTPUT `
-            "Captail-$($env:RELEASE_VERSION).0-x64.msixupload"
+            "Captail-$($env:RELEASE_VERSION).$($env:STORE_PACKAGE_REVISION)-x64.msixupload"
           $checksumFile = Join-Path $env:STORE_OUTPUT 'SHA256SUMS.txt'
           if (-not (Test-Path -LiteralPath $upload)) {
             throw "Store upload package not found: $upload"
@@ -113,7 +124,7 @@ jobs:
         with:
           name: Captail-${{ inputs.version }}-Microsoft-Store
           path: |
-            ${{ env.STORE_OUTPUT }}/Captail-${{ inputs.version }}.0-x64.msixupload
+            ${{ env.STORE_OUTPUT }}/Captail-${{ inputs.version }}.${{ inputs.package_revision }}-x64.msixupload
             ${{ env.STORE_OUTPUT }}/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 3
@@ -261,6 +272,8 @@ jobs:
           ## Captail $env:RELEASE_VERSION
 
           Package $action.
+
+          MSIX identity version: ``$env:RELEASE_VERSION.$env:STORE_PACKAGE_REVISION``
 
           Store listing synchronization: ``$env:UPDATE_STORE_LISTING``
 

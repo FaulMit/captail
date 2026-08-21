@@ -28,14 +28,18 @@ expiration date and update `AZURE_AD_APPLICATION_SECRET` in GitHub.
 2. Open **Actions** and select **Microsoft Store release**.
 3. Select **Run workflow** from `main`.
 4. Enter the three-part version, for example `0.2.0`.
-5. Select one mode:
+5. Keep package revision `0` for a new visible version. Increase it when
+   republishing the same visible version, for example `0.2.1` revision `1`
+   produces MSIX identity version `0.2.1.1` while Captail still displays
+   `0.2.1`.
+6. Select one mode:
    - `build-only`: build and validate the package without contacting Partner Center.
    - `draft`: upload the package but leave the submission as a draft.
    - `submit`: upload the package and submit it for Microsoft certification.
-6. Keep **Synchronize EN/RU Store text and screenshots** enabled for a normal
+7. Keep **Synchronize EN/RU Store text and screenshots** enabled for a normal
    release. Disable it only when intentionally testing package upload without
    changing the Store listing.
-7. Review the workflow summary and Partner Center submission status.
+8. Review the workflow summary and Partner Center submission status.
 
 The workflow stores the `.msixupload` package for three days. Microsoft Store
 certification and rollout continue in Partner Center after the workflow ends.
