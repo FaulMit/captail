@@ -52,6 +52,10 @@ public sealed class Config
     /// false mixes both sources into one track.
     /// </summary>
     public bool SeparateAudioTracks { get; set; }
+    /// <summary>"simple" preserves device loopback; "advanced" uses process rules.</summary>
+    public string AudioRoutingMode { get; set; } = "simple";
+    public List<ProcessAudioRoute> ProcessAudioRoutes { get; set; } = [];
+    public int AdvancedMicrophoneTrack { get; set; } = 1;
 
     public string OutputDirectory { get; set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Captail");
@@ -177,6 +181,16 @@ public sealed class Config
         AudioBitrateKbps = source.AudioBitrateKbps;
         AudioCodec = source.AudioCodec;
         SeparateAudioTracks = source.SeparateAudioTracks;
+        AudioRoutingMode = source.AudioRoutingMode;
+        ProcessAudioRoutes = (source.ProcessAudioRoutes ?? [])
+            .Where(route => route is not null)
+            .Select(route => new ProcessAudioRoute
+            {
+                Executable = route.Executable,
+                Track = route.Track,
+            })
+            .ToList();
+        AdvancedMicrophoneTrack = source.AdvancedMicrophoneTrack;
         OutputDirectory = source.OutputDirectory;
         OrganizeReplaysByGame = source.OrganizeReplaysByGame;
         Normalize();
@@ -201,6 +215,9 @@ public sealed class Config
         AudioBitrateKbps == other.AudioBitrateKbps &&
         string.Equals(AudioCodec, other.AudioCodec, StringComparison.Ordinal) &&
         SeparateAudioTracks == other.SeparateAudioTracks &&
+        string.Equals(AudioRoutingMode, other.AudioRoutingMode, StringComparison.Ordinal) &&
+        AdvancedMicrophoneTrack == other.AdvancedMicrophoneTrack &&
+        ProcessAudioRoutesEqual(ProcessAudioRoutes, other.ProcessAudioRoutes) &&
         string.Equals(OutputDirectory, other.OutputDirectory, StringComparison.OrdinalIgnoreCase) &&
         OrganizeReplaysByGame == other.OrganizeReplaysByGame;
 
@@ -238,7 +255,86 @@ public sealed class Config
         MicrophoneDeviceId = NormalizeIdentifier(MicrophoneDeviceId);
         AudioBitrateKbps = Math.Clamp(AudioBitrateKbps, 64, 512);
         AudioCodec = AllowedText(AudioCodec, ["aac", "opus"], "aac");
+        AudioRoutingMode = AllowedText(
+            AudioRoutingMode,
+            ["simple", "advanced"],
+            "simple");
+        AdvancedMicrophoneTrack = AdvancedMicrophoneTrack is >= 1 and <= 6
+            ? AdvancedMicrophoneTrack
+            : 1;
+        ProcessAudioRoutes = NormalizeProcessAudioRoutes(ProcessAudioRoutes);
         OutputDirectory = NormalizePath(OutputDirectory, allowEmpty: false);
+    }
+
+    private static List<ProcessAudioRoute> NormalizeProcessAudioRoutes(
+        IEnumerable<ProcessAudioRoute>? routes)
+    {
+        var normalized = new Dictionary<string, ProcessAudioRoute>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (ProcessAudioRoute? route in routes ?? [])
+        {
+            string executable = NormalizeExecutableName(route?.Executable);
+            if (executable.Length == 0 || route?.Track is not (>= 1 and <= 6))
+                continue;
+
+            // The first valid rule wins. This makes conflicting persisted
+            // entries deterministic without silently moving an existing route.
+            normalized.TryAdd(
+                executable,
+                new ProcessAudioRoute
+                {
+                    Executable = executable,
+                    Track = route.Track,
+                });
+        }
+        return normalized.Values
+            .OrderBy(route => route.Executable, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    internal static string NormalizeExecutableName(string? value)
+    {
+        string candidate = value?.Trim().Trim('"') ?? "";
+        if (candidate.Length == 0)
+            return "";
+        try
+        {
+            candidate = Path.GetFileName(candidate.Replace('/', '\\')).Trim();
+        }
+        catch
+        {
+            return "";
+        }
+        if (candidate.Length == 0 ||
+            candidate.Length > 260 ||
+            candidate.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return "";
+        }
+
+        string extension = Path.GetExtension(candidate);
+        if (extension.Length == 0)
+            candidate += ".exe";
+        else if (!string.Equals(extension, ".exe", StringComparison.OrdinalIgnoreCase))
+            return "";
+        else
+            candidate = candidate[..^extension.Length] + ".exe";
+        return candidate.ToLowerInvariant();
+    }
+
+    private static bool ProcessAudioRoutesEqual(
+        IReadOnlyList<ProcessAudioRoute>? left,
+        IReadOnlyList<ProcessAudioRoute>? right)
+    {
+        ProcessAudioRoute[] leftRoutes = NormalizeProcessAudioRoutes(left).ToArray();
+        ProcessAudioRoute[] rightRoutes = NormalizeProcessAudioRoutes(right).ToArray();
+        return leftRoutes.Length == rightRoutes.Length &&
+               leftRoutes.Zip(rightRoutes).All(pair =>
+                   pair.First.Track == pair.Second.Track &&
+                   string.Equals(
+                       pair.First.Executable,
+                       pair.Second.Executable,
+                       StringComparison.OrdinalIgnoreCase));
     }
 
     private static int AllowedValue(int value, int[] allowed, int fallback) =>
@@ -291,4 +387,10 @@ public sealed class Config
 
     private static string NormalizeLanguage(string? language) =>
         Localization.NormalizeLanguage(language);
+}
+
+public sealed class ProcessAudioRoute
+{
+    public string Executable { get; set; } = "";
+    public int Track { get; set; } = 1;
 }

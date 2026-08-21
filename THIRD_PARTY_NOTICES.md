@@ -11,6 +11,14 @@ Captail dynamically uses and may redistribute selected components from OBS Studi
 
 `tools/AcquireObsRuntime.ps1` prepares the runtime. Distributions contain only components required for libobs, Replay Buffer, Windows capture, WASAPI audio, and supported hardware encoders.
 
+Captail's `native/ProcessAudio` module narrowly adapts the process-loopback
+activation, audio format, silent-buffer, timestamp, and packet-delivery portions
+of OBS Studio 32.1.2 `plugins/win-wasapi/win-wasapi.cpp`. Window matching,
+device capture, OBS UI properties, and other unrelated `win-wasapi`
+functionality are not copied. `tools/AcquireObsPluginSdk.ps1` downloads the
+pinned OBS 32.1.2 source archive with SHA-256 verification and extracts the
+public libobs headers used to compile the module.
+
 ## FFmpeg
 
 - Project: https://ffmpeg.org/

@@ -80,6 +80,10 @@ if (-not (Test-Path -LiteralPath $captailExe)) {
 if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "obs.dll"))) {
     throw "Published OBS runtime not found."
 }
+if (-not (Test-Path -LiteralPath (
+        Join-Path $publishDirectory "obs-plugins\64bit\captail-process-audio.dll"))) {
+    throw "Published process-audio plugin not found."
+}
 if (-not (Test-Path -LiteralPath (Join-Path $publishDirectory "ffmpeg\ffmpeg.exe"))) {
     throw "Published FFmpeg runtime not found."
 }

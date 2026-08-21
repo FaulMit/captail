@@ -142,10 +142,18 @@ internal static class BugReportInfo
             FormatAudio(config));
     }
 
-    private static string FormatAudio(Config config)
+    internal static string FormatAudio(Config config)
     {
         var sources = new List<string>();
-        if (config.CaptureSystemAudio)
+        bool advanced = string.Equals(
+            config.AudioRoutingMode,
+            "advanced",
+            StringComparison.OrdinalIgnoreCase);
+        if (advanced)
+        {
+            sources.Add($"process audio ({config.ProcessAudioRoutes.Count} rules)");
+        }
+        else if (config.CaptureSystemAudio)
         {
             sources.Add(
                 $"{(config.CaptureSource == "game" ? "game" : "system")} audio " +
@@ -162,9 +170,11 @@ internal static class BugReportInfo
         if (sources.Count == 0)
             return "no audio";
 
-        string trackMode = config.SeparateAudioTracks && sources.Count > 1
-            ? "separate tracks"
-            : "mixed track";
+        string trackMode = advanced
+            ? $"{ObsReplayEngine.AudioTrackCount(config)} tracks"
+            : config.SeparateAudioTracks && sources.Count > 1
+                ? "separate tracks"
+                : "mixed track";
         return $"{string.Join(" + ", sources)}; {trackMode}; " +
                $"{config.AudioCodec.ToUpperInvariant()} " +
                $"{config.AudioBitrateKbps} kbps";

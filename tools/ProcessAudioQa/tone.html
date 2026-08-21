@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Captail process audio QA tone</title>
+<style>
+  body { font: 24px system-ui; margin: 48px; }
+  button { font: inherit; padding: 12px 24px; }
+</style>
+<h1>Captail process audio QA</h1>
+<p>Chrome tone: 659.25 Hz</p>
+<button id="toggle">Start tone</button>
+<script>
+  let context;
+  let oscillator;
+  let gain;
+  async function toggle(event) {
+    if (oscillator) {
+      oscillator.stop();
+      oscillator = null;
+      event.target.textContent = "Start tone";
+      return;
+    }
+
+    context ??= new AudioContext();
+    await context.resume();
+    oscillator = new OscillatorNode(context, { frequency: 659.25 });
+    gain = new GainNode(context, { gain: 0.08 });
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    event.target.textContent = "Stop tone";
+  }
+  document.querySelector("#toggle").addEventListener("click", toggle);
+  if (new URLSearchParams(location.search).has("autostart"))
+    toggle({ target: document.querySelector("#toggle") });
+</script>
+</html>
