@@ -160,6 +160,8 @@
                 <TextBox x:Name="SearchBox"
                          Style="{StaticResource DarkTextBox}"
                          Height="38"
+                         FontFamily="{StaticResource FontUi}"
+                         FontSize="12.5"
                          Padding="34,8,12,8"
                          TextChanged="SearchBox_TextChanged"/>
                 <Path Data="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M16 16l5 5"

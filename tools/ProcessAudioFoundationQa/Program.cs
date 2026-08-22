@@ -36,6 +36,7 @@ internal static class Program
             Run("advanced diagnostics privacy", AdvancedDiagnosticsPrivacy);
             Run("audio routing format limits", AudioRoutingFormatLimits);
             Run("audio process group priority", AudioProcessGroupPriority);
+            Run("audio route view refresh stability", AudioRouteViewRefreshStability);
             Console.WriteLine($"PASS {_passed} process audio foundation tests");
             return 0;
         }
@@ -194,6 +195,35 @@ internal static class Program
         Equal(0, item.GroupOrder);
         item.IsSelected = false;
         Equal(1, item.GroupOrder);
+    }
+
+    private static void AudioRouteViewRefreshStability()
+    {
+        var item = new ProcessAudioRouteItem(
+            "chat.exe",
+            "Chat",
+            isSelected: false,
+            track: 1);
+        var quiet = new ProcessAudioSessionSnapshot(
+            "chat.exe",
+            "Chat",
+            null,
+            0.1f,
+            true,
+            true,
+            1);
+        Equal(true, item.UpdateSession(quiet));
+
+        ProcessAudioSessionSnapshot louder = quiet with { Peak = 0.8f };
+        Equal(false, item.UpdateSession(louder));
+
+        ProcessAudioSessionSnapshot inactive = louder with
+        {
+            Peak = 0,
+            IsActive = false,
+        };
+        Equal(true, item.UpdateSession(inactive));
+        Equal(false, item.UpdateSession(inactive));
     }
 
     private static void NativeFailureVisibilityAndRecovery()

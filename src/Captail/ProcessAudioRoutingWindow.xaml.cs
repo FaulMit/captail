@@ -105,6 +105,7 @@ public partial class ProcessAudioRoutingWindow : Window
         _receivedFirstUpdate = true;
         _sessionsAvailable = update.IsAvailable;
         LoadingState.Visibility = Visibility.Collapsed;
+        bool refreshView = false;
         var visible = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (ProcessAudioSessionSnapshot session in update.Sessions)
         {
@@ -122,8 +123,9 @@ public partial class ProcessAudioRoutingWindow : Window
                     isSelected: false,
                     NextDefaultTrack());
                 AddApplication(item);
+                refreshView = true;
             }
-            item.UpdateSession(session);
+            refreshView |= item.UpdateSession(session);
         }
 
         foreach (ProcessAudioRouteItem item in _applications.ToArray())
@@ -131,12 +133,16 @@ public partial class ProcessAudioRoutingWindow : Window
             if (visible.Contains(item.Executable))
                 continue;
             if (item.IsSelected)
-                item.MarkNotRunning();
+                refreshView |= item.MarkNotRunning();
             else
+            {
                 _applications.Remove(item);
+                refreshView = true;
+            }
         }
 
-        ApplicationsView.Refresh();
+        if (refreshView)
+            ApplicationsView.Refresh();
         UpdateEmptyState(update.IsAvailable);
         UpdateText();
     }
@@ -404,8 +410,10 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
         }
     }
 
-    internal void UpdateSession(ProcessAudioSessionSnapshot session)
+    internal bool UpdateSession(ProcessAudioSessionSnapshot session)
     {
+        int previousGroupOrder = GroupOrder;
+        string previousDisplayName = DisplayName;
         DisplayName = session.DisplayName;
         OnPropertyChanged(nameof(Initials));
         Peak = session.Peak;
@@ -413,15 +421,22 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
         IsActive = session.IsActive;
         HasAudioSession = session.HasAudioSession;
         ProcessCount = session.ProcessCount;
+        return previousGroupOrder != GroupOrder ||
+               !string.Equals(
+                   previousDisplayName,
+                   DisplayName,
+                   StringComparison.CurrentCulture);
     }
 
-    internal void MarkNotRunning()
+    internal bool MarkNotRunning()
     {
+        int previousGroupOrder = GroupOrder;
         Peak = 0;
         IsRunning = false;
         IsActive = false;
         HasAudioSession = false;
         ProcessCount = 0;
+        return previousGroupOrder != GroupOrder;
     }
 
     private static string BuildInitials(string displayName)
