@@ -100,6 +100,10 @@ internal static class ObsNative
     internal static extern bool obs_enum_encoder_types(nuint index, out nint id);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool obs_enum_input_types(nuint index, out nint id);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_enter_graphics();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
@@ -146,6 +150,22 @@ internal static class ObsNative
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern nint obs_get_audio();
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern nint obs_scene_create(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern nint obs_scene_get_source(nint scene);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern nint obs_scene_add(nint scene, nint source);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_sceneitem_remove(nint sceneItem);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_scene_release(nint scene);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern uint obs_get_total_frames();
@@ -345,5 +365,13 @@ internal static class ObsNative
         ref CallData callData,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
         out byte value,
+        nuint size);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static extern bool calldata_get_data(
+        ref CallData callData,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
+        out long value,
         nuint size);
 }

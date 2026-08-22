@@ -133,7 +133,7 @@ public static class Localization
     }
 
     public static string Text(string key) =>
-        Application.Current.TryFindResource(key)?.ToString() ?? key;
+        Application.Current?.TryFindResource(key)?.ToString() ?? key;
 
     public static string Format(string key, params object?[] arguments) =>
         string.Format(

@@ -3,7 +3,9 @@ artifacts/
 runtime/
 src/**/bin/
 src/**/obj/
-native/**/build/
+native/**/build*/
+tools/**/bin/
+tools/**/obj/
 
 # IDE and user state
 .vs/

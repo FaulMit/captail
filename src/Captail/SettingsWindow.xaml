@@ -869,29 +869,31 @@
                         <TextBlock Text="{DynamicResource L.Section.Audio}" Style="{StaticResource SectionHeaderText}"/>
                         <Border Style="{StaticResource SettingsGroup}">
                             <StackPanel>
-                                <Grid Margin="13,11">
-                                    <TextBlock x:Name="SystemAudioLabel" Text="{DynamicResource L.Audio.SystemAudio}"
-                                               Style="{StaticResource RowLabelText}"/>
-                                    <ToggleButton x:Name="SystemAudioBox" HorizontalAlignment="Right"
-                                                  Style="{StaticResource ToggleSwitch}" Click="AudioToggle_Click"/>
-                                </Grid>
-                                <ComboBox x:Name="AudioDeviceBox" Style="{StaticResource DarkCombo}" Margin="13,0,13,11"/>
-                                <Grid x:Name="SystemVolumeRow" Margin="13,0,13,11">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="42"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="{DynamicResource L.Audio.Volume}" Style="{StaticResource SecondaryText}"
-                                               VerticalAlignment="Center"/>
-                                    <Slider x:Name="SystemVolumeSlider" Grid.Column="1"
-                                            Style="{StaticResource VolumeSlider}"/>
-                                    <TextBlock Grid.Column="2"
-                                               Text="{Binding ElementName=SystemVolumeSlider, Path=Value, StringFormat={}{0:0}%}"
-                                               Style="{StaticResource MonoText}"
-                                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                                </Grid>
-                                <Border Style="{StaticResource RowDivider}"/>
+                                <StackPanel x:Name="SimpleSystemAudioPanel">
+                                    <Grid Margin="13,11">
+                                        <TextBlock x:Name="SystemAudioLabel" Text="{DynamicResource L.Audio.SystemAudio}"
+                                                   Style="{StaticResource RowLabelText}"/>
+                                        <ToggleButton x:Name="SystemAudioBox" HorizontalAlignment="Right"
+                                                      Style="{StaticResource ToggleSwitch}" Click="AudioToggle_Click"/>
+                                    </Grid>
+                                    <ComboBox x:Name="AudioDeviceBox" Style="{StaticResource DarkCombo}" Margin="13,0,13,11"/>
+                                    <Grid x:Name="SystemVolumeRow" Margin="13,0,13,11">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="42"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{DynamicResource L.Audio.Volume}" Style="{StaticResource SecondaryText}"
+                                                   VerticalAlignment="Center"/>
+                                        <Slider x:Name="SystemVolumeSlider" Grid.Column="1"
+                                                Style="{StaticResource VolumeSlider}"/>
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding ElementName=SystemVolumeSlider, Path=Value, StringFormat={}{0:0}%}"
+                                                   Style="{StaticResource MonoText}"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                </StackPanel>
                                 <Grid Margin="13,11">
                                     <TextBlock Text="{DynamicResource L.Audio.Microphone}" Style="{StaticResource RowLabelText}"/>
                                     <ToggleButton x:Name="MicBox" HorizontalAlignment="Right"
@@ -966,10 +968,31 @@
                                                    Style="{StaticResource SecondaryText}" Margin="0,3,0,0"/>
                                     </StackPanel>
                                     <ComboBox x:Name="AudioTrackModeBox" Grid.Column="1"
-                                              Style="{StaticResource DarkCombo}">
+                                              Style="{StaticResource DarkCombo}"
+                                              SelectionChanged="AudioTrackModeBox_SelectionChanged">
                                         <ComboBoxItem Tag="mixed" Content="{DynamicResource L.Audio.OneMixed}"/>
                                         <ComboBoxItem Tag="separate" Content="{DynamicResource L.Audio.Separate}"/>
+                                        <ComboBoxItem x:Name="AdvancedAudioTrackItem" Tag="advanced"
+                                                      Content="{DynamicResource L.Audio.PerAppRouting}"/>
                                     </ComboBox>
+                                </Grid>
+                                <Grid x:Name="AdvancedAudioRoutingRow" Margin="13,0,13,11"
+                                      Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                        <TextBlock Text="{DynamicResource L.Audio.ApplicationAudio}"
+                                                   Style="{StaticResource RowLabelText}"/>
+                                        <TextBlock x:Name="AdvancedAudioRoutingSummaryText"
+                                                   Style="{StaticResource SecondaryText}"
+                                                   Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="{DynamicResource L.Audio.ConfigureRouting}"
+                                            Style="{StaticResource SubtleButton}"
+                                            Click="ConfigureAudioRouting_Click"/>
                                 </Grid>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <Grid Margin="13,11">
@@ -990,7 +1013,8 @@
                                             </Button.ToolTip>
                                         </Button>
                                     </StackPanel>
-                                    <ComboBox x:Name="AudioCodecBox" Grid.Column="1" Style="{StaticResource DarkCombo}">
+                                    <ComboBox x:Name="AudioCodecBox" Grid.Column="1" Style="{StaticResource DarkCombo}"
+                                              SelectionChanged="AudioCodecBox_SelectionChanged">
                                         <ComboBoxItem Tag="aac" Content="AAC"/>
                                         <ComboBoxItem Tag="opus" Content="Opus · MKV"/>
                                     </ComboBox>

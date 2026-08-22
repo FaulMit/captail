@@ -1,0 +1,397 @@
+<Window x:Class="Captail.ProcessAudioRoutingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L.AdvancedAudio.Title}"
+        Icon="Assets/Captail.ico"
+        Width="620" Height="640"
+        MinWidth="560" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Foreground="{StaticResource TextPrimaryBrush}"
+        FontFamily="{StaticResource FontUi}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <Style x:Key="RouteCheckBox" TargetType="CheckBox">
+            <Setter Property="Width" Value="19"/>
+            <Setter Property="Height" Value="19"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Box"
+                                Background="{StaticResource BgControlBrush}"
+                                BorderBrush="{StaticResource BorderControlBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5">
+                            <Path x:Name="Check"
+                                  Data="M4 9l3 3 7-7"
+                                  Stroke="{StaticResource OnAccentBrush}"
+                                  StrokeThickness="2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Visibility="Collapsed"
+                                  Margin="3" Stretch="Uniform"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Box" Property="BorderBrush"
+                                        Value="{StaticResource AccentBrush}"/>
+                                <Setter TargetName="Check" Property="Visibility"
+                                        Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush"
+                                        Value="{StaticResource AccentDimBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RouteListItem" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Row"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="9"
+                                Padding="10,9"
+                                Margin="5,1">
+                            <ContentPresenter/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background"
+                                        Value="{StaticResource BgHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="RouteMeter" TargetType="ProgressBar"
+               BasedOn="{StaticResource DiskProgress}">
+            <Setter Property="Height" Value="4"/>
+            <Setter Property="Maximum" Value="1"/>
+            <Setter Property="Width" Value="86"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Background" Value="{StaticResource DividerBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding HasAudioSession}" Value="False">
+                    <Setter Property="Opacity" Value="0.12"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                    <Setter Property="Opacity" Value="0.22"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource BgWindowGradient}"
+            BorderBrush="{StaticResource WindowBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RadiusWindow}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="58"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="64"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="18,0,12,0"
+                  Background="Transparent"
+                  MouseLeftButtonDown="Header_MouseLeftButtonDown">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid Width="22" Height="22" Margin="0,0,11,0"
+                      VerticalAlignment="Center">
+                    <Rectangle Width="3" Height="8" RadiusX="1.5" RadiusY="1.5"
+                               Fill="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                    <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5"
+                               Fill="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Rectangle Width="3" Height="11" RadiusX="1.5" RadiusY="1.5"
+                               Fill="{StaticResource AccentBrush}"
+                               HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                    <TextBlock Text="{DynamicResource L.AdvancedAudio.Title}"
+                               FontSize="14.5" FontWeight="ExtraBold"/>
+                    <TextBlock x:Name="FormatSummaryText"
+                               Style="{StaticResource SecondaryText}"
+                               Margin="0,3,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="2" Style="{StaticResource IconButton}"
+                        Click="Close_Click"
+                        ToolTip="{DynamicResource L.Close}">
+                    <Path Data="M6 6l12 12 M18 6L6 18"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.8" Width="13" Height="13"
+                          Stretch="Uniform"/>
+                </Button>
+            </Grid>
+
+            <Border Grid.Row="1" Height="1"
+                    Background="{StaticResource DividerBrush}"/>
+
+            <Grid Grid.Row="2" Margin="18,14,18,10">
+                <TextBox x:Name="SearchBox"
+                         Style="{StaticResource DarkTextBox}"
+                         Height="38"
+                         FontFamily="{StaticResource FontUi}"
+                         FontSize="12.5"
+                         Padding="34,8,12,8"
+                         TextChanged="SearchBox_TextChanged"/>
+                <Path Data="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M16 16l5 5"
+                      Stroke="{StaticResource TextMutedBrush}"
+                      StrokeThickness="1.7"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      Width="16" Height="16"
+                      Stretch="Uniform"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center"
+                      Margin="11,0,0,0"
+                      IsHitTestVisible="False"/>
+                <TextBlock x:Name="SearchPlaceholder"
+                           Text="{DynamicResource L.AdvancedAudio.Search}"
+                           Foreground="{StaticResource TextMutedBrush}"
+                           FontSize="12"
+                           VerticalAlignment="Center"
+                           Margin="35,0,0,0"
+                           IsHitTestVisible="False"/>
+            </Grid>
+
+            <Grid Grid.Row="3" Margin="12,0,12,0">
+                <ListBox x:Name="ApplicationsList"
+                         ItemsSource="{Binding ApplicationsView}"
+                         ItemContainerStyle="{StaticResource RouteListItem}"
+                         Foreground="{StaticResource TextPrimaryBrush}"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                               Style="{StaticResource SectionHeaderText}"
+                                               Margin="8,10,8,5"/>
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid MinHeight="42">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="100"/>
+                                    <ColumnDefinition Width="116"/>
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                          Style="{StaticResource RouteCheckBox}"
+                                          VerticalAlignment="Center"
+                                          Margin="0,0,11,0"/>
+
+                                <Border Grid.Column="1" Width="34" Height="34"
+                                        CornerRadius="9"
+                                        Background="{StaticResource BgControlBrush}"
+                                        BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="1"
+                                        Margin="0,0,11,0">
+                                    <Grid>
+                                        <Image Source="{Binding Icon}"
+                                               Width="24" Height="24"
+                                               Stretch="Uniform"
+                                               SnapsToDevicePixels="True"/>
+                                        <TextBlock Text="{Binding Initials}"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   FontSize="11" FontWeight="ExtraBold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Icon}"
+                                                                     Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center"
+                                            Margin="0,0,12,0">
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               FontSize="12.5" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                                        <TextBlock Text="{Binding Executable}"
+                                                   Style="{StaticResource MonoText}"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding ProcessCountText}"
+                                                   Style="{StaticResource SecondaryText}"
+                                                   Margin="7,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <ProgressBar Grid.Column="3"
+                                             Style="{StaticResource RouteMeter}"
+                                             Value="{Binding Peak, Mode=OneWay}"
+                                             HorizontalAlignment="Left"
+                                             VerticalAlignment="Center"/>
+
+                                <ComboBox Grid.Column="4"
+                                          Style="{StaticResource DarkCombo}"
+                                          Height="34"
+                                          ItemsSource="{Binding DataContext.AvailableTracks, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          DisplayMemberPath="Label"
+                                          SelectedValuePath="Number"
+                                          SelectedValue="{Binding Track, Mode=TwoWay}"
+                                          IsEnabled="{Binding IsSelected}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <StackPanel x:Name="LoadingState" VerticalAlignment="Center"
+                            HorizontalAlignment="Center">
+                    <Control Style="{StaticResource LoadingIndicator}"/>
+                    <TextBlock Text="{DynamicResource L.AdvancedAudio.Loading}"
+                               Style="{StaticResource SecondaryText}"
+                               Margin="0,10,0,0"/>
+                </StackPanel>
+
+                <StackPanel x:Name="EmptyState" Visibility="Collapsed"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            MaxWidth="330">
+                    <TextBlock x:Name="EmptyTitleText"
+                               Text="{DynamicResource L.AdvancedAudio.EmptyTitle}"
+                               FontSize="13" FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="EmptyDetailText"
+                               Text="{DynamicResource L.AdvancedAudio.EmptyDetail}"
+                               Style="{StaticResource SecondaryText}"
+                               TextWrapping="Wrap" TextAlignment="Center"
+                               Margin="0,6,0,0"/>
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="4" Margin="18,10,18,0"
+                    Background="{StaticResource BgSurfaceBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="12,10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="100"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="30" Height="30" CornerRadius="8"
+                            Background="{StaticResource AccentSubtleBrush}"
+                            Margin="0,0,10,0">
+                        <Path Data="{StaticResource IconMic}"
+                              Stroke="{StaticResource AccentBrush}"
+                              StrokeThickness="1.7"
+                              Width="15" Height="15" Stretch="Uniform"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource L.Audio.Microphone}"
+                                   FontSize="12.5" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="MicrophoneHintText"
+                                   Style="{StaticResource SecondaryText}"
+                                   Margin="0,3,0,0"/>
+                    </StackPanel>
+                    <ComboBox x:Name="MicrophoneTrackBox" Grid.Column="2"
+                              Style="{StaticResource DarkCombo}"
+                              Height="34"
+                              ItemsSource="{Binding AvailableTracks}"
+                              DisplayMemberPath="Label"
+                              SelectedValuePath="Number"/>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="5" Margin="18,10,18,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="SelectionSummaryText"
+                               FontSize="11.5" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Text="{DynamicResource L.AdvancedAudio.UnassignedHint}"
+                               Style="{StaticResource SecondaryText}"
+                               Margin="0,3,0,0"/>
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Content="{DynamicResource L.Settings.Cancel}"
+                        Style="{StaticResource SubtleButton}"
+                        Height="36" Padding="15,0" Margin="10,0,8,0"
+                        Click="Cancel_Click"/>
+                <Button Grid.Column="2"
+                        Content="{DynamicResource L.Done}"
+                        Style="{StaticResource AccentButton}"
+                        Height="36" Padding="18,0"
+                        Click="Done_Click"/>
+            </Grid>
+
+            <Border x:Name="ValidationBanner"
+                    Grid.Row="0" Grid.RowSpan="6"
+                    Visibility="Collapsed"
+                    VerticalAlignment="Bottom"
+                    Margin="18,0,18,70"
+                    Background="#FF201B19"
+                    BorderBrush="#FF76503D"
+                    BorderThickness="1"
+                    CornerRadius="9"
+                    Padding="12,9">
+                <TextBlock x:Name="ValidationText"
+                           Foreground="#FFE7C0A6"
+                           FontSize="11.5"
+                           TextWrapping="Wrap"/>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

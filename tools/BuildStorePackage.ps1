@@ -121,6 +121,7 @@ foreach ($requiredPath in @(
     (Join-Path $packageRoot "Captail.exe"),
     (Join-Path $packageRoot "CaptailObsBridge.dll"),
     (Join-Path $packageRoot "obs.dll"),
+    (Join-Path $packageRoot "obs-plugins\64bit\captail-process-audio.dll"),
     (Join-Path $packageRoot "libmpv-2.dll"),
     (Join-Path $packageRoot "ffmpeg\ffmpeg.exe"),
     (Join-Path $packageRoot "ffmpeg\ffprobe.exe"))) {

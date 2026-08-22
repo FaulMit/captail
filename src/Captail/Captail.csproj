@@ -51,7 +51,12 @@
     <AcquireObsRuntimeOnBuild Condition="'$(AcquireObsRuntimeOnBuild)' == ''">true</AcquireObsRuntimeOnBuild>
     <AcquireFfmpegRuntimeOnBuild Condition="'$(AcquireFfmpegRuntimeOnBuild)' == ''">true</AcquireFfmpegRuntimeOnBuild>
     <ObsBridgeSource>$(MSBuildProjectDirectory)\..\..\native\ObsBridge</ObsBridgeSource>
-    <ObsBridgeBuild>$(ObsBridgeSource)\build</ObsBridgeBuild>
+    <NativeBuildSuffix Condition="'$(NativeBuildSuffix)' == ''"></NativeBuildSuffix>
+    <ObsBridgeBuild>$(ObsBridgeSource)\build$(NativeBuildSuffix)</ObsBridgeBuild>
+    <ObsPluginSdkRoot>$(MSBuildProjectDirectory)\..\..\runtime\obs-sdk</ObsPluginSdkRoot>
+    <ProcessAudioSource>$(MSBuildProjectDirectory)\..\..\native\ProcessAudio</ProcessAudioSource>
+    <ProcessAudioBuild>$(ProcessAudioSource)\build$(NativeBuildSuffix)</ProcessAudioBuild>
+    <NativeCmakeGenerator Condition="'$(NativeCmakeGenerator)' == ''">Visual Studio 17 2022</NativeCmakeGenerator>
     <MpvWindowsX64Enabled>false</MpvWindowsX64Enabled>
     <MpvWindowsArm64Enabled>false</MpvWindowsArm64Enabled>
   </PropertyGroup>
@@ -75,6 +80,11 @@
           BeforeTargets="PrepareForBuild"
           Condition="'$(AcquireFfmpegRuntimeOnBuild)' == 'true' and !Exists('$(FfmpegRuntimeRoot)\ffmpeg.exe')">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\AcquireFfmpegRuntime.ps1&quot;" />
+  </Target>
+
+  <Target Name="AcquireObsPluginSdk"
+          BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\AcquireObsPluginSdk.ps1&quot;" />
   </Target>
 
   <Target Name="CopyFfmpegRuntimeToBuild"
@@ -105,7 +115,7 @@
 
   <Target Name="BuildObsBridge" BeforeTargets="Build">
     <Exec Condition="!Exists('$(ObsBridgeBuild)\CaptailObsBridge.sln')"
-          Command="cmake -S &quot;$(ObsBridgeSource)&quot; -B &quot;$(ObsBridgeBuild)&quot; -G &quot;Visual Studio 17 2022&quot; -A x64" />
+          Command="cmake -S &quot;$(ObsBridgeSource)&quot; -B &quot;$(ObsBridgeBuild)&quot; -G &quot;$(NativeCmakeGenerator)&quot; -A x64" />
     <Exec Command="cmake --build &quot;$(ObsBridgeBuild)&quot; --config Release --target CaptailObsBridge" />
   </Target>
 
@@ -120,6 +130,29 @@
           Condition="'$(PublishDir)' != ''">
     <Copy SourceFiles="$(ObsBridgeBuild)\Release\CaptailObsBridge.dll"
           DestinationFolder="$(PublishDir)" />
+  </Target>
+
+  <Target Name="BuildProcessAudioPlugin"
+          BeforeTargets="Build"
+          DependsOnTargets="AcquireObsPluginSdk">
+    <Exec Condition="!Exists('$(ProcessAudioBuild)\CaptailProcessAudio.sln')"
+          Command="cmake -S &quot;$(ProcessAudioSource)&quot; -B &quot;$(ProcessAudioBuild)&quot; -G &quot;$(NativeCmakeGenerator)&quot; -A x64 -DOBS_INCLUDE_DIR=&quot;$(ObsPluginSdkRoot)\include&quot;" />
+    <Exec Command="cmake --build &quot;$(ProcessAudioBuild)&quot; --config Release --target CaptailProcessAudio" />
+  </Target>
+
+  <Target Name="CopyProcessAudioPlugin"
+          AfterTargets="Build"
+          DependsOnTargets="BuildProcessAudioPlugin">
+    <Copy SourceFiles="$(ProcessAudioBuild)\Release\captail-process-audio.dll"
+          DestinationFolder="$(OutDir)obs-plugins\64bit" />
+  </Target>
+
+  <Target Name="CopyProcessAudioPluginToPublish"
+          AfterTargets="Publish"
+          DependsOnTargets="BuildProcessAudioPlugin"
+          Condition="'$(PublishDir)' != ''">
+    <Copy SourceFiles="$(ProcessAudioBuild)\Release\captail-process-audio.dll"
+          DestinationFolder="$(PublishDir)obs-plugins\64bit" />
   </Target>
 
   <ItemGroup>

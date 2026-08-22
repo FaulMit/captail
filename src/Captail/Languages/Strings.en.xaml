@@ -266,6 +266,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">Recovering Instant Replay</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">Could not recover Instant Replay</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Replay temporarily unavailable</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">Application audio capture is recovering. Replay recording continues.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">Application audio capture recovered.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">Audio routing adjusted</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">Related applications use different tracks. Captail prioritized the child application to prevent duplicated audio.</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">Retry in {0} sec.</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} Retrying in {1} sec.</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">Capture did not start</sys:String>
@@ -310,6 +314,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">Capture monitor not found.</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">Video subsystem failed to start: code {0}.</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">Audio subsystem failed to start.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">Advanced application audio routing requires Windows 10 version 2004 or newer.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">Advanced application audio source is unavailable. Reinstall or update Captail.</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">No compatible hardware video encoder found. Update graphics driver.</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">{0} is unavailable on {1}; selected {2}.</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">Could not create video source.</sys:String>
@@ -323,6 +329,33 @@
   <sys:String x:Key="L.Engine.SavedPathMissing">Replay was saved, but file path was not returned.</sys:String>
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">Replay buffer stopped unexpectedly.</sys:String>
   <sys:String x:Key="L.Engine.BufferError">Replay buffer: {0}</sys:String>
+
+  <sys:String x:Key="L.Audio.PerAppRouting">Per-app routing</sys:String>
+  <sys:String x:Key="L.Audio.ConfigureRouting">Configure</sys:String>
+  <sys:String x:Key="L.Audio.NoAppsSelected">No apps selected</sys:String>
+  <sys:String x:Key="L.Audio.RoutingSummary">{0} apps · {1} tracks</sys:String>
+  <sys:String x:Key="L.Audio.ApplicationAudio">Application audio</sys:String>
+  <sys:String x:Key="L.Help.AdvancedRouting">Send each application's audio to its own recording track.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Title">Application audio routing</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Search">Search apps or processes</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.TrackFormat">Track {0}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.FormatSummary">{0} · {1} · up to {2} tracks</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectionSummary">{0} apps · {1} tracks</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Selected">SELECTED</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Available">PLAYING AUDIO</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">OTHER PROCESSES</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Loading">Finding apps with audio...</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyTitle">No audio sessions found</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Play sound in an app, then it will appear here.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableTitle">Audio sessions unavailable</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableDetail">Check the Windows audio service and try again.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneEnabled">Choose where microphone audio is saved</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneDisabled">Enable microphone in settings to route it</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnassignedHint">Unchecked apps are not recorded.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectAtLeastOne">Select at least one app or enable microphone.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.ProcessCount">{0} processes</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioTitle">Application audio</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioEmpty">Select at least one app or enable microphone before saving.</sys:String>
 
   <sys:String x:Key="L.Unit.Seconds">{0} sec</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} min</sys:String>

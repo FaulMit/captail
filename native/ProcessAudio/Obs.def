@@ -1,0 +1,9 @@
+LIBRARY obs.dll
+EXPORTS
+    calldata_set_data
+    obs_data_get_int
+    obs_get_audio_info
+    obs_register_source_s
+    obs_source_get_proc_handler
+    obs_source_output_audio
+    proc_handler_add

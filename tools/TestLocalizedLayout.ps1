@@ -51,7 +51,7 @@ $typeface = [Windows.Media.Typeface]::new(
 $failures = [Collections.Generic.List[string]]::new()
 $files = @(Get-ChildItem -LiteralPath $languageRoot -Filter "Strings.*.xaml")
 
-[xml]$settings = Get-Content -LiteralPath $settingsPath
+[xml]$settings = Get-Content -LiteralPath $settingsPath -Encoding utf8
 $namespaces = [Xml.XmlNamespaceManager]::new($settings.NameTable)
 $namespaces.AddNamespace(
     "x",
@@ -70,7 +70,7 @@ foreach ($contract in $settingsLayoutContracts) {
 }
 
 foreach ($file in $files) {
-    [xml]$dictionary = Get-Content -LiteralPath $file.FullName
+    [xml]$dictionary = Get-Content -LiteralPath $file.FullName -Encoding utf8
     $values = @{}
     foreach ($entry in $dictionary.ResourceDictionary.String) {
         $values[$entry.Key] = [string]$entry.'#text'

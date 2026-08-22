@@ -266,6 +266,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">Восстановление повтора</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">Не удалось восстановить повтор</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Повтор временно недоступен</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">Захват звука приложения восстанавливается. Запись повтора продолжается.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">Захват звука приложения восстановлен.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">Маршрутизация звука скорректирована</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">Связанные приложения используют разные дорожки. Captail выбрал дочернее приложение, чтобы не дублировать звук.</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">Повторная попытка через {0} сек.</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} Повторная попытка через {1} сек.</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">Захват не запущен</sys:String>
@@ -310,6 +314,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">Монитор для захвата не найден.</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">Видеоподсистема не запустилась: код {0}.</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">Аудиоподсистема не запустилась.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">Для расширенной маршрутизации звука приложений требуется Windows 10 версии 2004 или новее.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">Источник расширенного звука приложений недоступен. Переустановите или обновите Captail.</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">Совместимый аппаратный видеокодировщик не найден. Обновите драйвер видеокарты.</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">Кодек {0} недоступен на {1}; выбран {2}.</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">Не удалось создать источник видео.</sys:String>
@@ -323,6 +329,33 @@
   <sys:String x:Key="L.Engine.SavedPathMissing">Повтор сохранён, но путь к файлу не получен.</sys:String>
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">Буфер повтора неожиданно остановился.</sys:String>
   <sys:String x:Key="L.Engine.BufferError">Буфер повтора: {0}</sys:String>
+
+  <sys:String x:Key="L.Audio.PerAppRouting">По приложениям</sys:String>
+  <sys:String x:Key="L.Audio.ConfigureRouting">Настроить</sys:String>
+  <sys:String x:Key="L.Audio.NoAppsSelected">Приложения не выбраны</sys:String>
+  <sys:String x:Key="L.Audio.RoutingSummary">Приложений: {0} · дорожек: {1}</sys:String>
+  <sys:String x:Key="L.Audio.ApplicationAudio">Звук приложений</sys:String>
+  <sys:String x:Key="L.Help.AdvancedRouting">Распределяйте звук каждого приложения по отдельным дорожкам записи.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Title">Маршрутизация звука приложений</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Search">Найти приложение или процесс</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.TrackFormat">Дорожка {0}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.FormatSummary">{0} · {1} · до {2} дорожек</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectionSummary">Приложений: {0} · дорожек: {1}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Selected">ВЫБРАНО</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Available">ВОСПРОИЗВОДЯТ ЗВУК</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">ДРУГИЕ ПРОЦЕССЫ</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Loading">Ищем приложения со звуком...</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Аудиосессии не найдены</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Включите звук в приложении — оно появится здесь.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableTitle">Аудиосессии недоступны</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableDetail">Проверьте службу звука Windows и повторите попытку.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneEnabled">Выберите дорожку для микрофона</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneDisabled">Включите микрофон в настройках для маршрутизации</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnassignedHint">Неотмеченные приложения не записываются.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectAtLeastOne">Выберите приложение или включите микрофон.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.ProcessCount">Процессов: {0}</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioTitle">Звук приложений</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioEmpty">Перед сохранением выберите приложение или включите микрофон.</sys:String>
 
   <sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} мин</sys:String>

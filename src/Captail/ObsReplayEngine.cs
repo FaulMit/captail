@@ -5,6 +5,30 @@ using Captail.Interop;
 
 namespace Captail;
 
+internal enum AdvancedProcessAudioAvailability
+{
+    Available,
+    UnsupportedWindowsVersion,
+    SourceUnavailable,
+}
+
+internal sealed class AdvancedProcessAudioUnavailableException(
+    AdvancedProcessAudioAvailability availability)
+    : InvalidOperationException(GetMessage(availability))
+{
+    internal AdvancedProcessAudioAvailability Availability { get; } = availability;
+
+    private static string GetMessage(AdvancedProcessAudioAvailability availability) =>
+        availability switch
+        {
+            AdvancedProcessAudioAvailability.UnsupportedWindowsVersion =>
+                Localization.Text("L.Engine.ProcessAudioUnsupportedWindows"),
+            AdvancedProcessAudioAvailability.SourceUnavailable =>
+                Localization.Text("L.Engine.ProcessAudioSourceUnavailable"),
+            _ => Localization.Text("L.Engine.AudioFailed"),
+        };
+}
+
 [SuppressMessage(
     "Usage",
     "CA2216:Disposable types should declare finalizer",
@@ -20,6 +44,7 @@ public sealed class ObsReplayEngine : IDisposable
     private const int GameCaptureIdleReleaseSeconds = 10;
     private const int GameCaptureDetectorStartupSeconds = 8;
     private const int Windows11InitialBuild = 22000;
+    private const int ProcessLoopbackMinimumBuild = 19041;
     private const long MonitorCaptureMethodAuto = 0;
     private const long MonitorCaptureMethodWgc = 2;
     private static readonly string[] CapabilityCodecNames = ["h264", "hevc", "av1"];
@@ -60,6 +85,9 @@ public sealed class ObsReplayEngine : IDisposable
     private readonly ObsNative.SignalCallback _stoppedCallback;
     private readonly List<nint> _audioSources = [];
     private readonly List<nint> _audioEncoders = [];
+    private readonly Dictionary<nint, nint> _processAudioSceneItems = [];
+    private ProcessAudioReconciler? _processAudioReconciler;
+    private int _processAudioSourceNumber;
 
     private nint _videoSource;
     private nint _desktopVideoSource;
@@ -67,6 +95,7 @@ public sealed class ObsReplayEngine : IDisposable
     private nint _videoEncoder;
     private nint _output;
     private nint _outputSignals;
+    private nint _processAudioScene;
     private TaskCompletionSource<string>? _pendingSave;
     private bool _started;
     private bool _obsStarted;
@@ -103,6 +132,11 @@ public sealed class ObsReplayEngine : IDisposable
     public EncoderCapabilities Capabilities { get; private set; } =
         EncoderCapabilities.Failed(
             Localization.Text("L.Engine.CapabilitiesPending"));
+    internal AdvancedProcessAudioAvailability ProcessAudioAvailability
+    {
+        get;
+        private set;
+    } = AdvancedProcessAudioAvailability.SourceUnavailable;
     public bool IsGameCapture { get; }
     public bool IsAutomaticCapture { get; }
     internal bool IsGameCaptureDetectorActive => _gameCaptureDetectorShowing;
@@ -552,6 +586,14 @@ public sealed class ObsReplayEngine : IDisposable
         {
             InitializeObs();
             Capabilities = DetectCapabilities();
+            ProcessAudioAvailability = DetectProcessAudioAvailability(
+                Environment.OSVersion.Version,
+                HasInputType("captail_process_audio_capture"));
+            if (!IsAudioRoutingAvailable(_config, ProcessAudioAvailability))
+            {
+                throw new AdvancedProcessAudioUnavailableException(
+                    ProcessAudioAvailability);
+            }
             EnsureConfiguredCodecIsSupported();
             CreateSources();
             CreateEncoders();
@@ -1052,7 +1094,21 @@ public sealed class ObsReplayEngine : IDisposable
         // extra scene-composition pass, which matters at 144/240 FPS.
         ObsNative.obs_set_output_source(0, _videoSource);
 
-        if (_config.CaptureSystemAudio)
+        if (IsAdvancedAudioRouting)
+        {
+            _processAudioScene = ObsNative.obs_scene_create(
+                "Captail Process Audio Mixer");
+            if (_processAudioScene == 0)
+            {
+                throw new InvalidOperationException(
+                    "Could not create the advanced process audio mixer.");
+            }
+            nint sceneSource = ObsNative.obs_scene_get_source(_processAudioScene);
+            ObsNative.obs_source_set_audio_mixers(sceneSource, 0x3Fu);
+            ObsNative.obs_set_output_source(1, sceneSource);
+        }
+
+        if (!IsAdvancedAudioRouting && _config.CaptureSystemAudio)
         {
             nint system = CreateAudioSource(
                 "wasapi_output_capture",
@@ -1066,10 +1122,11 @@ public sealed class ObsReplayEngine : IDisposable
 
         if (_config.CaptureMicrophone)
         {
-            uint micMix = _config.SeparateAudioTracks &&
-                          _config.CaptureSystemAudio
-                ? 2u
-                : 1u;
+            uint micMix = IsAdvancedAudioRouting
+                ? MixerBit(_config.AdvancedMicrophoneTrack)
+                : _config.SeparateAudioTracks && _config.CaptureSystemAudio
+                    ? 2u
+                    : 1u;
             nint microphone = CreateAudioSource(
                 "wasapi_input_capture",
                 "Captail Microphone",
@@ -1202,6 +1259,131 @@ public sealed class ObsReplayEngine : IDisposable
     private static float DecibelsToLinear(int decibels) =>
         MathF.Pow(10f, Math.Clamp(decibels, 0, 20) / 20f);
 
+    internal ProcessAudioReconcileResult ReconcileProcessAudio(
+        ProcessSnapshot snapshot)
+    {
+        ObjectDisposedException.ThrowIf(_disposing, this);
+        if (!_obsStarted)
+            throw new InvalidOperationException("The OBS pipeline is not initialized.");
+
+        _processAudioReconciler ??= new ProcessAudioReconciler(
+            CreateProcessAudioSource,
+            DestroyProcessAudioSource,
+            Log.Write,
+            ReadProcessAudioStatus);
+        return _processAudioReconciler.Reconcile(
+            snapshot,
+            _config.ProcessAudioRoutes.Select(route =>
+                new ProcessAudioTarget(route.Executable, route.Track)));
+    }
+
+    private nint CreateProcessAudioSource(ProcessIdentity identity, int track)
+    {
+        nint settings = ObsNative.obs_data_create();
+        try
+        {
+            ObsNative.obs_data_set_int(settings, "target_pid", identity.ProcessId);
+            ObsNative.obs_data_set_int(
+                settings,
+                "target_creation_time",
+                identity.CreationTime);
+            nint source = ObsNative.obs_source_create(
+                "captail_process_audio_capture",
+                $"Captail Process Audio {++_processAudioSourceNumber}",
+                settings,
+                0);
+            if (source == 0)
+                return 0;
+            if (!TryReadProcessAudioStatus(source, out _))
+            {
+                ObsNative.obs_source_remove(source);
+                ObsNative.obs_source_release(source);
+                return 0;
+            }
+
+            ObsNative.obs_source_set_audio_mixers(source, MixerBit(track));
+            nint sceneItem = ObsNative.obs_scene_add(_processAudioScene, source);
+            if (sceneItem == 0)
+            {
+                ObsNative.obs_source_remove(source);
+                ObsNative.obs_source_release(source);
+                return 0;
+            }
+            _processAudioSceneItems.Add(source, sceneItem);
+            return source;
+        }
+        finally
+        {
+            ObsNative.obs_data_release(settings);
+        }
+    }
+
+    private void DestroyProcessAudioSource(nint source)
+    {
+        if (_processAudioSceneItems.Remove(source, out nint sceneItem))
+            ObsNative.obs_sceneitem_remove(sceneItem);
+        ObsNative.obs_source_remove(source);
+        ObsNative.obs_source_release(source);
+    }
+
+    private static ProcessAudioSourceStatus ReadProcessAudioStatus(nint source)
+    {
+        if (!TryReadProcessAudioStatus(source, out ProcessAudioSourceStatus status))
+        {
+            throw new InvalidOperationException(
+                "Could not read process audio source status.");
+        }
+        return status;
+    }
+
+    private static bool TryReadProcessAudioStatus(
+        nint source,
+        out ProcessAudioSourceStatus status)
+    {
+        status = default;
+        nint handler = ObsNative.obs_source_get_proc_handler(source);
+        if (handler == 0)
+            return false;
+
+        const int stackSize = 256;
+        nint stack = Marshal.AllocHGlobal(stackSize);
+        try
+        {
+            for (int offset = 0; offset < stackSize; offset += sizeof(long))
+                Marshal.WriteInt64(stack, offset, 0);
+            var callData = new ObsNative.CallData
+            {
+                Stack = stack,
+                Size = (nuint)nint.Size,
+                Capacity = stackSize,
+                Fixed = true,
+            };
+            if (!ObsNative.proc_handler_call(handler, "get_status", ref callData) ||
+                !ObsNative.calldata_get_data(
+                    ref callData,
+                    "state",
+                    out long state,
+                    sizeof(long)) ||
+                !ObsNative.calldata_get_data(
+                    ref callData,
+                    "error_code",
+                    out long errorCode,
+                    sizeof(long)) ||
+                !Enum.IsDefined((ProcessAudioSourceState)state))
+            {
+                return false;
+            }
+            status = new ProcessAudioSourceStatus(
+                (ProcessAudioSourceState)state,
+                errorCode);
+            return true;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(stack);
+        }
+    }
+
     private void CreateEncoders()
     {
         EncoderLoadProfile loadProfile = SelectLoadProfile();
@@ -1260,9 +1442,12 @@ public sealed class ObsReplayEngine : IDisposable
                     audioSettings,
                     "bitrate",
                     _config.AudioBitrateKbps);
+                string encoderName = IsAdvancedAudioRouting
+                    ? $"Captail Audio Track {index + 1}"
+                    : $"Captail Audio {index + 1}";
                 nint encoder = ObsNative.obs_audio_encoder_create(
                     audioEncoderId,
-                    $"Captail Audio {index + 1}",
+                    encoderName,
                     audioSettings,
                     (nuint)index,
                     0);
@@ -1667,12 +1852,80 @@ public sealed class ObsReplayEngine : IDisposable
     }
 
     private int AudioTrackCount()
+        => AudioTrackCount(_config);
+
+    internal static uint MixerBit(int track)
     {
-        int enabled = (_config.CaptureSystemAudio ? 1 : 0) +
-                      (_config.CaptureMicrophone ? 1 : 0);
+        if (track is not (>= 1 and <= 6))
+            throw new ArgumentOutOfRangeException(nameof(track));
+        return 1u << (track - 1);
+    }
+
+    internal static int AudioTrackCount(Config config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (string.Equals(
+                config.AudioRoutingMode,
+                "advanced",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            int highest = config.ProcessAudioRoutes.Count == 0
+                ? 1
+                : config.ProcessAudioRoutes.Max(route => route.Track);
+            if (config.CaptureMicrophone)
+                highest = Math.Max(highest, config.AdvancedMicrophoneTrack);
+            return highest;
+        }
+
+        int enabled = (config.CaptureSystemAudio ? 1 : 0) +
+                      (config.CaptureMicrophone ? 1 : 0);
         if (enabled == 0)
-            return 1; // Replay Buffer requires an audio encoder; this track remains silent.
-        return _config.SeparateAudioTracks && enabled > 1 ? 2 : 1;
+            return 1;
+        return config.SeparateAudioTracks && enabled > 1 ? 2 : 1;
+    }
+
+    internal static AdvancedProcessAudioAvailability DetectProcessAudioAvailability(
+        Version windowsVersion,
+        bool sourceRegistered)
+    {
+        ArgumentNullException.ThrowIfNull(windowsVersion);
+        if (windowsVersion.Major < 10 ||
+            windowsVersion.Major == 10 && windowsVersion.Build < ProcessLoopbackMinimumBuild)
+        {
+            return AdvancedProcessAudioAvailability.UnsupportedWindowsVersion;
+        }
+        return sourceRegistered
+            ? AdvancedProcessAudioAvailability.Available
+            : AdvancedProcessAudioAvailability.SourceUnavailable;
+    }
+
+    internal static bool IsAudioRoutingAvailable(
+        Config config,
+        AdvancedProcessAudioAvailability processAudioAvailability)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return !string.Equals(
+                   config.AudioRoutingMode,
+                   "advanced",
+                   StringComparison.OrdinalIgnoreCase) ||
+               processAudioAvailability == AdvancedProcessAudioAvailability.Available;
+    }
+
+    private bool IsAdvancedAudioRouting => string.Equals(
+        _config.AudioRoutingMode,
+        "advanced",
+        StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasInputType(string expected)
+    {
+        for (nuint index = 0;
+             ObsNative.obs_enum_input_types(index, out nint id);
+             index++)
+        {
+            if (string.Equals(PtrToString(id), expected, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
     }
 
     private void OnReplaySaved(nint _, nint __)
@@ -1858,6 +2111,10 @@ public sealed class ObsReplayEngine : IDisposable
             _gameCaptureDetectorShowing = false;
         }
 
+        _processAudioReconciler?.Dispose();
+        _processAudioReconciler = null;
+        _processAudioSceneItems.Clear();
+
         if (_desktopVideoSource != 0)
             ObsNative.obs_source_remove(_desktopVideoSource);
         if (_gameVideoSource != 0)
@@ -1879,6 +2136,11 @@ public sealed class ObsReplayEngine : IDisposable
         foreach (nint source in _audioSources)
             ObsNative.obs_source_release(source);
         _audioSources.Clear();
+        if (_processAudioScene != 0)
+        {
+            ObsNative.obs_scene_release(_processAudioScene);
+            _processAudioScene = 0;
+        }
 
         ObsNative.obs_wait_for_destroy_queue();
         ObsNative.obs_shutdown();

@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using Captail.Interop;
 using H.NotifyIcon;
 
 namespace Captail;
@@ -50,6 +51,9 @@ public partial class App : Application
     private readonly SemaphoreSlim _pipelineGate = new(1, 1);
     private readonly SingleThreadTaskScheduler _obsTaskScheduler =
         new("Captail OBS");
+    private ProcessAudioMonitor? _processAudioMonitor;
+    private AdvancedProcessAudioAvailability _processAudioAvailability =
+        AdvancedProcessAudioAvailability.SourceUnavailable;
     private volatile bool _replayRunning;
     private string? _captureDescription;
     private int _exiting;
@@ -60,6 +64,8 @@ public partial class App : Application
 #endif
 
     private bool IsReplayRunning => _replayRunning;
+    internal AdvancedProcessAudioAvailability ProcessAudioAvailability =>
+        _processAudioAvailability;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -68,6 +74,14 @@ public partial class App : Application
         try
         {
             _uiOnly = e.Args.Contains("--ui-only", StringComparer.OrdinalIgnoreCase);
+            _processAudioAvailability =
+                ObsReplayEngine.DetectProcessAudioAvailability(
+                    Environment.OSVersion.Version,
+                    File.Exists(Path.Combine(
+                        AppContext.BaseDirectory,
+                        "obs-plugins",
+                        "64bit",
+                        "captail-process-audio.dll")));
 #if DEBUG
             bool faultTest = e.Args.Contains(
                 "--qa-fault-recovery",
@@ -116,6 +130,9 @@ public partial class App : Application
                 StringComparer.OrdinalIgnoreCase);
             bool recordingIndicatorGameTest = e.Args.Contains(
                 "--qa-recording-indicator-game",
+                StringComparer.OrdinalIgnoreCase);
+            bool audioRoutingUiTest = e.Args.Contains(
+                "--qa-audio-routing-ui",
                 StringComparer.OrdinalIgnoreCase);
             string? clipEditorTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
@@ -170,6 +187,7 @@ public partial class App : Application
             const bool audioMixTest = false;
             const bool previewGeometryTest = false;
             const bool trimOverwriteTest = false;
+            const bool audioRoutingUiTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
                     "--background",
@@ -187,7 +205,7 @@ public partial class App : Application
                     clipEditorTest || replayPlayerTest || audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
                     automaticCapturePolicyTest || replayRoutingTest ||
-                    localizationTest))
+                    localizationTest || audioRoutingUiTest))
             {
                 Shutdown();
                 return;
@@ -340,6 +358,12 @@ public partial class App : Application
                         recordingIndicatorTestPosition ?? "top-right");
                     _recordingIndicator.SetGameDetected(recordingIndicatorGameTest);
                     _recordingIndicator.SetState(ReplayIndicatorState.Active);
+                }
+                if (audioRoutingUiTest)
+                {
+                    _ = Dispatcher.BeginInvoke(
+                        DispatcherPriority.ApplicationIdle,
+                        () => _settingsWindow?.OpenAudioRoutingForQa());
                 }
 #endif
                 return;
@@ -898,9 +922,24 @@ public partial class App : Application
                 0,
                 0,
                 10_000);
+            int recordingSeconds = ParseQaInt(
+                args,
+                "--qa-record-seconds=",
+                4,
+                1,
+                30);
             bool audioTracks = args.Contains(
                 "--qa-audio-tracks",
                 StringComparer.OrdinalIgnoreCase);
+            IReadOnlyList<ProcessAudioRoute> advancedRoutes =
+                ParseQaProcessAudioRoutes(args);
+            bool advancedAudio = advancedRoutes.Count > 0;
+            int advancedMicrophoneTrack = ParseQaInt(
+                args,
+                "--qa-advanced-mic-track=",
+                0,
+                0,
+                6);
             string audioCodec = args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-audio-codec=",
@@ -937,21 +976,32 @@ public partial class App : Application
                     Codec = codec,
                     AudioCodec = audioCodec,
                     CaptureSource = "desktop",
-                    CaptureSystemAudio = audioTracks,
+                    CaptureSystemAudio = !advancedAudio && audioTracks,
                     SystemAudioVolume = audioTracks ? 37 : 100,
-                    CaptureMicrophone = audioTracks,
+                    CaptureMicrophone = advancedAudio
+                        ? advancedMicrophoneTrack > 0
+                        : audioTracks,
                     MicrophoneVolume = audioTracks ? 63 : 100,
                     MicrophoneBoostDb = audioTracks ? 12 : 0,
                     SeparateAudioTracks = audioTracks,
+                    AudioRoutingMode = advancedAudio ? "advanced" : "simple",
+                    ProcessAudioRoutes = advancedRoutes.ToList(),
+                    AdvancedMicrophoneTrack = Math.Max(1, advancedMicrophoneTrack),
                     OutputDirectory = root,
                 };
-                bool started = TryStartPipeline(showError: false);
+                _config.Normalize();
+                bool started = advancedAudio
+                    ? await TryStartPipelineAsync(showError: false)
+                    : TryStartPipeline(showError: false);
                 if (!started ||
                     !string.Equals(_obs?.ActiveCodec, codec, StringComparison.OrdinalIgnoreCase))
                 {
                     allPassed = false;
                     Log.Write($"OBS_CODEC_TEST {codec}: start failed");
-                    StopPipeline();
+                    if (advancedAudio)
+                        await StopPipelineCoreAsync();
+                    else
+                        StopPipeline();
                     continue;
                 }
 
@@ -960,14 +1010,20 @@ public partial class App : Application
                 Log.Write(
                     $"OBS_CODEC_TEST {codec}: source={_obs.Description}, " +
                     $"changed={sourceChanged}, game={_obs.ActiveGameExecutable}");
-                await Task.Delay(TimeSpan.FromSeconds(4));
-                string path = await _obs!.SaveReplayAsync();
+                await Task.Delay(TimeSpan.FromSeconds(recordingSeconds));
+                Task<string> saveOperation = advancedAudio
+                    ? await RunOnObsThreadAsync(() => _obs!.SaveReplayAsync())
+                    : _obs!.SaveReplayAsync();
+                string path = await saveOperation;
                 bool saved = File.Exists(path) && new FileInfo(path).Length > 0;
                 allPassed &= saved;
                 Log.Write(
                     $"OBS_CODEC_TEST {codec}: saved={saved}, " +
                     $"frames={_obs.EncodedFrameCount}, path={path}");
-                StopPipeline();
+                if (advancedAudio)
+                    await StopPipelineCoreAsync();
+                else
+                    StopPipeline();
             }
 
             Log.Write($"OBS_CODEC_TEST {(allPassed ? "PASS" : "FAIL")}");
@@ -1193,6 +1249,37 @@ public partial class App : Application
                int.TryParse(value[prefix.Length..], out int parsed)
             ? Math.Clamp(parsed, minimum, maximum)
             : fallback;
+    }
+
+    private static IReadOnlyList<ProcessAudioRoute> ParseQaProcessAudioRoutes(
+        IEnumerable<string> args)
+    {
+        const string prefix = "--qa-advanced-audio=";
+        string? value = args.FirstOrDefault(argument => argument.StartsWith(
+            prefix,
+            StringComparison.OrdinalIgnoreCase));
+        if (value is null)
+            return [];
+
+        var routes = new List<ProcessAudioRoute>();
+        foreach (string entry in value[prefix.Length..].Split(
+                     ',',
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            int separator = entry.LastIndexOf(':');
+            if (separator <= 0 ||
+                !int.TryParse(entry[(separator + 1)..], out int track))
+            {
+                throw new ArgumentException(
+                    "--qa-advanced-audio must use executable.exe:track entries.");
+            }
+            routes.Add(new ProcessAudioRoute
+            {
+                Executable = entry[..separator],
+                Track = track,
+            });
+        }
+        return routes;
     }
 #endif
 
@@ -1483,6 +1570,20 @@ public partial class App : Application
             _replayRunning = true;
             _captureDescription = description;
             _capabilities = engine.Capabilities;
+            _processAudioAvailability = engine.ProcessAudioAvailability;
+            if (string.Equals(
+                    _config.AudioRoutingMode,
+                    "advanced",
+                    StringComparison.OrdinalIgnoreCase) &&
+                _config.ProcessAudioRoutes.Count > 0)
+            {
+                _processAudioMonitor = new ProcessAudioMonitor(
+                    ProcessSnapshot.Capture,
+                    snapshot => RunOnObsThreadAsync(
+                        () => engine.ReconcileProcessAudio(snapshot)),
+                    Log.Write,
+                    OnProcessAudioMonitorEvent);
+            }
             if (!string.Equals(
                     requestedCodec,
                     _config.Codec,
@@ -1500,7 +1601,11 @@ public partial class App : Application
         catch (Exception exception)
         {
             if (engine is not null)
+            {
                 _capabilities = engine.Capabilities;
+                _processAudioAvailability = engine.ProcessAudioAvailability;
+            }
+            await StopProcessAudioMonitorAsync();
             _obs = null;
             _replayRunning = false;
             _captureDescription = null;
@@ -1537,6 +1642,7 @@ public partial class App : Application
 
     private async Task StopPipelineCoreAsync()
     {
+        await StopProcessAudioMonitorAsync();
         ObsReplayEngine? engine = _obs;
         _obs = null;
         _replayRunning = false;
@@ -1553,6 +1659,70 @@ public partial class App : Application
         catch (Exception exception)
         {
             Log.Write($"OBS pipeline shutdown failed: {exception}");
+        }
+    }
+
+    private async Task StopProcessAudioMonitorAsync()
+    {
+        ProcessAudioMonitor? monitor = _processAudioMonitor;
+        _processAudioMonitor = null;
+        if (monitor is not null)
+            await monitor.DisposeAsync();
+    }
+
+    private void OnProcessAudioMonitorEvent(ProcessAudioMonitorEvent status)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnProcessAudioMonitorEvent(status));
+            return;
+        }
+
+        switch (status.Kind)
+        {
+            case ProcessAudioMonitorEventKind.PersistentFailure:
+                string failure = Localization.Text(
+                    "L.Notify.ProcessAudioRecovering");
+                Log.Write(
+                    $"Process audio recovery remains active " +
+                    $"(sources={status.Count}, HRESULT=" +
+                    $"0x{unchecked((uint)status.ErrorCode):X8}).");
+                ShowOverlayNotification(
+                    "↻",
+                    Localization.Text("L.Notify.RecoveryTitle"),
+                    failure,
+                    OverlayTone.Warning);
+                _pendingUiError = failure;
+                _settingsWindow?.ShowError(
+                    Localization.Text("L.Notify.RecoveryTitle"),
+                    failure);
+                break;
+
+            case ProcessAudioMonitorEventKind.Recovered:
+                string previousFailure = Localization.Text(
+                    "L.Notify.ProcessAudioRecovering");
+                if (string.Equals(
+                        _pendingUiError,
+                        previousFailure,
+                        StringComparison.Ordinal))
+                {
+                    _pendingUiError = null;
+                }
+                _settingsWindow?.ClearError(previousFailure);
+                ShowOverlayNotification(
+                    "✓",
+                    Localization.Text("L.Notify.RecoveredTitle"),
+                    Localization.Text("L.Notify.ProcessAudioRecovered"),
+                    OverlayTone.Success);
+                break;
+
+            case ProcessAudioMonitorEventKind.RoutingConflict:
+                ShowOverlayNotification(
+                    "!",
+                    Localization.Text("L.Notify.ProcessAudioConflictTitle"),
+                    Localization.Text("L.Notify.ProcessAudioConflict"),
+                    OverlayTone.Warning);
+                break;
         }
     }
 
@@ -1944,6 +2114,7 @@ public partial class App : Application
             SetAudioSourcesAsync,
             ApplySettingsAsync,
             capabilities,
+            _processAudioAvailability,
             CheckForUpdatesAsync,
             PrepareAndLaunchUpdateAsync);
         _settingsWindow.Closed += (_, _) =>
@@ -2860,6 +3031,7 @@ public partial class App : Application
         {
             if (!gracefulShutdownCompleted)
             {
+                StopProcessAudioMonitorAsync().GetAwaiter().GetResult();
                 gateHeld = _pipelineGate.Wait(TimeSpan.FromSeconds(50));
                 if (!gateHeld)
                     Log.Write("Timed out waiting for replay save during shutdown.");
