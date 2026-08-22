@@ -179,3 +179,30 @@ jobs:
           if ($process.ExitCode -ne 0) {
             throw "Localization policy QA failed: $($process.ExitCode)"
           }
+
+      - name: Build pull request Portable package
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content ./src/Captail/Captail.csproj
+          $version = [string]($project.Project.PropertyGroup.Version |
+            Select-Object -First 1)
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Invalid Captail project version: $version"
+          }
+          ./tools/BuildRelease.ps1 `
+            -Version $version `
+            -OutputDirectory artifacts/pr-preview `
+            -SkipInstaller
+
+      - name: Upload pull request Portable package
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: Captail-PR-${{ github.event.pull_request.number }}-win-x64
+          path: |
+            artifacts/pr-preview/Captail-*-Portable-win-x64.zip
+            artifacts/pr-preview/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
