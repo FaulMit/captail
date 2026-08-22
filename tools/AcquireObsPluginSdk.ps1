@@ -3,6 +3,28 @@ param(
     [string]$Destination = ""
 )
 
+function Get-Sha256Hash {
+    param(
+        [Parameter(Mandatory)]
+        [string]$LiteralPath
+    )
+
+    $stream = [IO.File]::OpenRead($LiteralPath)
+    try {
+        $algorithm = [Security.Cryptography.SHA256]::Create()
+        try {
+            return [BitConverter]::ToString(
+                $algorithm.ComputeHash($stream)).Replace("-", "")
+        }
+        finally {
+            $algorithm.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 $ErrorActionPreference = "Stop"
 $version = "32.1.2"
 $expectedArchiveSha256 = "21cba22292985cf0da967d5c618999b40eaa32b73d2ab8b06154b5ea1b3d3798"
@@ -38,7 +60,7 @@ if ((Test-Path -LiteralPath $header) -and
 
 $archive = Join-Path $env:TEMP "obs-studio-$version-source.zip"
 if (Test-Path -LiteralPath $archive) {
-    $existingHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+    $existingHash = Get-Sha256Hash -LiteralPath $archive
     if (-not $existingHash.Equals(
             $expectedArchiveSha256,
             [StringComparison]::OrdinalIgnoreCase)) {
@@ -50,7 +72,7 @@ if (-not (Test-Path -LiteralPath $archive)) {
     Write-Host "Downloading OBS Studio $version public headers..."
     Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive
 }
-$actualHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+$actualHash = Get-Sha256Hash -LiteralPath $archive
 if (-not $actualHash.Equals(
         $expectedArchiveSha256,
         [StringComparison]::OrdinalIgnoreCase)) {
