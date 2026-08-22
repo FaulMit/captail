@@ -37,6 +37,7 @@ internal static class Program
             Run("audio routing format limits", AudioRoutingFormatLimits);
             Run("audio process group priority", AudioProcessGroupPriority);
             Run("audio route view refresh stability", AudioRouteViewRefreshStability);
+            Run("process icon loading and caching", ProcessIconLoadingAndCaching);
             Console.WriteLine($"PASS {_passed} process audio foundation tests");
             return 0;
         }
@@ -224,6 +225,27 @@ internal static class Program
         };
         Equal(true, item.UpdateSession(inactive));
         Equal(false, item.UpdateSession(inactive));
+    }
+
+    private static void ProcessIconLoadingAndCaching()
+    {
+        string executablePath = Environment.ProcessPath
+            ?? throw new InvalidOperationException("QA executable path is unavailable.");
+        System.Windows.Media.ImageSource? first = ProcessIconProvider
+            .GetAsync(executablePath)
+            .GetAwaiter()
+            .GetResult();
+        if (first is null || !first.IsFrozen)
+            throw new InvalidOperationException("Executable icon was not loaded and frozen.");
+
+        System.Windows.Media.ImageSource? second = ProcessIconProvider
+            .GetAsync(executablePath)
+            .GetAwaiter()
+            .GetResult();
+        Equal(true, ReferenceEquals(first, second));
+        Equal(
+            null,
+            ProcessIconProvider.GetAsync(null).GetAwaiter().GetResult());
     }
 
     private static void NativeFailureVisibilityAndRecovery()

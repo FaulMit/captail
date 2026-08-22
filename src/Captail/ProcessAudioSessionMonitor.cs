@@ -23,6 +23,8 @@ internal static class ProcessAudioSessionDiscovery
 {
     private static readonly ConcurrentDictionary<uint, CachedProcessMetadata>
         MetadataCache = [];
+    private static readonly ConcurrentDictionary<string, CachedExecutablePath>
+        ExecutablePathCache = new(StringComparer.OrdinalIgnoreCase);
 
     internal static IReadOnlyList<ProcessAudioSessionSnapshot> Capture()
     {
@@ -140,16 +142,16 @@ internal static class ProcessAudioSessionDiscovery
                 }
                 if (executable.Length == 0)
                     continue;
-                var metadata = new ProcessMetadata(
-                    executable,
-                    Path.GetFileNameWithoutExtension(executable),
-                    null);
                 if (!processes.TryGetValue(
-                        metadata.Executable,
+                        executable,
                         out MutableSession? combined))
                 {
+                    var metadata = new ProcessMetadata(
+                        executable,
+                        Path.GetFileNameWithoutExtension(executable),
+                        ResolveExecutablePath(process, executable));
                     combined = new MutableSession(metadata);
-                    processes.Add(metadata.Executable, combined);
+                    processes.Add(executable, combined);
                 }
                 combined.ProcessIds.Add(processId);
             }
@@ -221,6 +223,48 @@ internal static class ProcessAudioSessionDiscovery
         }
     }
 
+    private static string? ResolveExecutablePath(Process process, string executable)
+    {
+        DateTime now = DateTime.UtcNow;
+        if (ExecutablePathCache.TryGetValue(
+                executable,
+                out CachedExecutablePath? cached) &&
+            cached.ExpiresUtc > now)
+        {
+            return cached.Path;
+        }
+
+        string? executablePath = null;
+        try
+        {
+            executablePath = process.MainModule?.FileName;
+            if (string.IsNullOrWhiteSpace(executablePath) ||
+                !Path.IsPathFullyQualified(executablePath))
+            {
+                executablePath = null;
+            }
+        }
+        catch
+        {
+            // Elevated and protected processes may hide their image path.
+        }
+
+        ExecutablePathCache[executable] = new CachedExecutablePath(
+            executablePath,
+            now.Add(executablePath is null
+                ? TimeSpan.FromSeconds(30)
+                : TimeSpan.FromMinutes(10)));
+        if (ExecutablePathCache.Count > 512)
+        {
+            foreach ((string name, CachedExecutablePath value) in ExecutablePathCache)
+            {
+                if (value.ExpiresUtc <= now)
+                    ExecutablePathCache.TryRemove(name, out _);
+            }
+        }
+        return executablePath;
+    }
+
     private static string FriendlyName(string executable, string? executablePath)
     {
         if (!string.IsNullOrWhiteSpace(executablePath))
@@ -252,6 +296,10 @@ internal static class ProcessAudioSessionDiscovery
 
     private sealed record CachedProcessMetadata(
         ProcessMetadata Metadata,
+        DateTime ExpiresUtc);
+
+    private sealed record CachedExecutablePath(
+        string? Path,
         DateTime ExpiresUtc);
 
     private sealed class MutableSession(ProcessMetadata metadata)

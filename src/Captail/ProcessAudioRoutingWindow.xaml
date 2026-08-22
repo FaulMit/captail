@@ -226,15 +226,33 @@
 
                                 <Border Grid.Column="1" Width="34" Height="34"
                                         CornerRadius="9"
-                                        Background="{StaticResource AccentSubtleBrush}"
-                                        BorderBrush="{StaticResource AccentChipBorderBrush}"
+                                        Background="{StaticResource BgControlBrush}"
+                                        BorderBrush="{StaticResource DividerBrush}"
                                         BorderThickness="1"
                                         Margin="0,0,11,0">
-                                    <TextBlock Text="{Binding Initials}"
-                                               Foreground="{StaticResource AccentBrush}"
-                                               FontSize="11" FontWeight="ExtraBold"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
+                                    <Grid>
+                                        <Image Source="{Binding Icon}"
+                                               Width="24" Height="24"
+                                               Stretch="Uniform"
+                                               SnapsToDevicePixels="True"/>
+                                        <TextBlock Text="{Binding Initials}"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   FontSize="11" FontWeight="ExtraBold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Icon}"
+                                                                     Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
                                 </Border>
 
                                 <StackPanel Grid.Column="2" VerticalAlignment="Center"

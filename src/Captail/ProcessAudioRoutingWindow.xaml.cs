@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Captail;
 
@@ -18,6 +19,7 @@ public partial class ProcessAudioRoutingWindow : Window
     private bool _receivedFirstUpdate;
     private bool _closing;
     private bool _sessionsAvailable = true;
+    private readonly CancellationTokenSource _iconCancellation = new();
 
     internal ProcessAudioRoutingWindow(
         IEnumerable<ProcessAudioRoute> routes,
@@ -78,10 +80,12 @@ public partial class ProcessAudioRoutingWindow : Window
         Closed += async (_, _) =>
         {
             _closing = true;
+            _iconCancellation.Cancel();
             ProcessAudioSessionMonitor? monitor = _monitor;
             _monitor = null;
             if (monitor is not null)
                 await monitor.DisposeAsync();
+            _iconCancellation.Dispose();
         };
     }
 
@@ -126,6 +130,7 @@ public partial class ProcessAudioRoutingWindow : Window
                 refreshView = true;
             }
             refreshView |= item.UpdateSession(session);
+            QueueIconLoad(item, session.ExecutablePath);
         }
 
         foreach (ProcessAudioRouteItem item in _applications.ToArray())
@@ -151,6 +156,25 @@ public partial class ProcessAudioRoutingWindow : Window
     {
         item.Changed += Application_Changed;
         _applications.Add(item);
+    }
+
+    private void QueueIconLoad(
+        ProcessAudioRouteItem item,
+        string? executablePath)
+    {
+        if (!item.BeginIconLoad(executablePath))
+            return;
+        _ = LoadIconAsync(item, executablePath!, _iconCancellation.Token);
+    }
+
+    private static async Task LoadIconAsync(
+        ProcessAudioRouteItem item,
+        string executablePath,
+        CancellationToken cancellationToken)
+    {
+        ImageSource? icon = await ProcessIconProvider.GetAsync(executablePath);
+        if (!cancellationToken.IsCancellationRequested)
+            item.ApplyIcon(executablePath, icon);
     }
 
     private void Application_Changed(ProcessAudioRouteItem item)
@@ -318,6 +342,8 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
     private bool _isActive;
     private bool _hasAudioSession;
     private int _processCount;
+    private ImageSource? _icon;
+    private string? _iconPath;
 
     internal ProcessAudioRouteItem(
         string executable,
@@ -343,6 +369,11 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
         private set => SetField(ref _displayName, value);
     }
     public string Initials => BuildInitials(DisplayName);
+    public ImageSource? Icon
+    {
+        get => _icon;
+        private set => SetField(ref _icon, value);
+    }
     public string GroupName => Localization.Text(
         IsSelected
             ? "L.AdvancedAudio.Selected"
@@ -437,6 +468,31 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
         HasAudioSession = false;
         ProcessCount = 0;
         return previousGroupOrder != GroupOrder;
+    }
+
+    internal bool BeginIconLoad(string? executablePath)
+    {
+        if (string.IsNullOrWhiteSpace(executablePath) ||
+            string.Equals(
+                _iconPath,
+                executablePath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        _iconPath = executablePath;
+        return true;
+    }
+
+    internal void ApplyIcon(string executablePath, ImageSource? icon)
+    {
+        if (string.Equals(
+                _iconPath,
+                executablePath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            Icon = icon;
+        }
     }
 
     private static string BuildInitials(string displayName)
