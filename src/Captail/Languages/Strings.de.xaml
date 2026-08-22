@@ -344,6 +344,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">{0} Apps · {1} Spuren</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">AUSGEWÄHLT</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">MIT AUDIO</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">ANDERE PROZESSE</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">Apps mit Audio werden gesucht...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Keine Audiositzungen gefunden</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Audio in einer App abspielen; sie erscheint dann hier.</sys:String>

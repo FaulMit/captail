@@ -92,6 +92,9 @@
             <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Background" Value="{StaticResource DividerBrush}"/>
             <Style.Triggers>
+                <DataTrigger Binding="{Binding HasAudioSession}" Value="False">
+                    <Setter Property="Opacity" Value="0.12"/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsRunning}" Value="False">
                     <Setter Property="Opacity" Value="0.22"/>
                 </DataTrigger>
@@ -186,6 +189,10 @@
                          Foreground="{StaticResource TextPrimaryBrush}"
                          Background="Transparent"
                          BorderThickness="0"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ScrollViewer.CanContentScroll="True"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto">
                     <ListBox.GroupStyle>

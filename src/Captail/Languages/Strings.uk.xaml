@@ -341,6 +341,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">Застосунків: {0} · доріжок: {1}</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">ВИБРАНО</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">ВІДТВОРЮЮТЬ ЗВУК</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">ІНШІ ПРОЦЕСИ</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">Шукаємо застосунки зі звуком...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Аудіосесій не знайдено</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Увімкніть звук у застосунку — він з’явиться тут.</sys:String>

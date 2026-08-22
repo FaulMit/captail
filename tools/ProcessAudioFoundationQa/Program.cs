@@ -35,6 +35,7 @@ internal static class Program
             Run("advanced unavailable reasons", AdvancedUnavailableReasons);
             Run("advanced diagnostics privacy", AdvancedDiagnosticsPrivacy);
             Run("audio routing format limits", AudioRoutingFormatLimits);
+            Run("audio process group priority", AudioProcessGroupPriority);
             Console.WriteLine($"PASS {_passed} process audio foundation tests");
             return 0;
         }
@@ -155,6 +156,44 @@ internal static class Program
         Equal("opus", opus.AudioCodec);
         Equal("MKV", opus.Container);
         Equal(6, opus.MaxTracks);
+    }
+
+    private static void AudioProcessGroupPriority()
+    {
+        var process = new ProcessAudioSessionSnapshot(
+            "chat.exe",
+            "Chat",
+            null,
+            0,
+            false,
+            false,
+            2);
+        var audio = process with
+        {
+            Peak = 0.4f,
+            IsActive = true,
+            HasAudioSession = true,
+            ProcessCount = 1,
+        };
+        ProcessAudioSessionSnapshot merged =
+            ProcessAudioSessionMonitor.MergeProcesses([process], [audio]).Single();
+        Equal(true, merged.HasAudioSession);
+        Equal(true, merged.IsActive);
+        Equal(2, merged.ProcessCount);
+
+        var item = new ProcessAudioRouteItem(
+            "chat.exe",
+            "Chat",
+            isSelected: false,
+            track: 1);
+        item.UpdateSession(process);
+        Equal(2, item.GroupOrder);
+        item.UpdateSession(audio);
+        Equal(1, item.GroupOrder);
+        item.IsSelected = true;
+        Equal(0, item.GroupOrder);
+        item.IsSelected = false;
+        Equal(1, item.GroupOrder);
     }
 
     private static void NativeFailureVisibilityAndRecovery()

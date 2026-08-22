@@ -346,6 +346,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">{0} 个应用 · {1} 条音轨</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">已选择</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">正在播放音频</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">其他进程</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">正在查找有音频的应用...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">未找到音频会话</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">在应用中播放声音后，它会显示在这里。</sys:String>

@@ -343,6 +343,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">Приложений: {0} · дорожек: {1}</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">ВЫБРАНО</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">ВОСПРОИЗВОДЯТ ЗВУК</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">ДРУГИЕ ПРОЦЕССЫ</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">Ищем приложения со звуком...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Аудиосессии не найдены</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Включите звук в приложении — оно появится здесь.</sys:String>

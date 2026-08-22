@@ -344,6 +344,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">앱 {0}개 · 트랙 {1}개</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">선택됨</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">오디오 재생 중</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">기타 프로세스</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">오디오가 있는 앱 찾는 중...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">오디오 세션을 찾지 못함</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">앱에서 소리를 재생하면 여기에 표시됩니다.</sys:String>

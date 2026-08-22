@@ -310,6 +310,7 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
     private double _peak;
     private bool _isRunning;
     private bool _isActive;
+    private bool _hasAudioSession;
     private int _processCount;
 
     internal ProcessAudioRouteItem(
@@ -339,8 +340,10 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
     public string GroupName => Localization.Text(
         IsSelected
             ? "L.AdvancedAudio.Selected"
-            : "L.AdvancedAudio.Available");
-    public int GroupOrder => IsSelected ? 0 : 1;
+            : IsActive
+                ? "L.AdvancedAudio.Available"
+                : "L.AdvancedAudio.OtherProcesses");
+    public int GroupOrder => IsSelected ? 0 : IsActive ? 1 : 2;
     public string ProcessCountText => ProcessCount > 1
         ? Localization.Format("L.AdvancedAudio.ProcessCount", ProcessCount)
         : "";
@@ -378,7 +381,18 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
     public bool IsActive
     {
         get => _isActive;
-        private set => SetField(ref _isActive, value);
+        private set
+        {
+            if (!SetField(ref _isActive, value))
+                return;
+            OnPropertyChanged(nameof(GroupName));
+            OnPropertyChanged(nameof(GroupOrder));
+        }
+    }
+    public bool HasAudioSession
+    {
+        get => _hasAudioSession;
+        private set => SetField(ref _hasAudioSession, value);
     }
     public int ProcessCount
     {
@@ -397,6 +411,7 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
         Peak = session.Peak;
         IsRunning = true;
         IsActive = session.IsActive;
+        HasAudioSession = session.HasAudioSession;
         ProcessCount = session.ProcessCount;
     }
 
@@ -405,6 +420,7 @@ internal sealed class ProcessAudioRouteItem : INotifyPropertyChanged
         Peak = 0;
         IsRunning = false;
         IsActive = false;
+        HasAudioSession = false;
         ProcessCount = 0;
     }
 

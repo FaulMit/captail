@@ -12,6 +12,7 @@ internal sealed record ProcessAudioSessionSnapshot(
     string? ExecutablePath,
     float Peak,
     bool IsActive,
+    bool HasAudioSession,
     int ProcessCount);
 
 internal sealed record ProcessAudioSessionUpdate(
@@ -93,6 +94,7 @@ internal static class ProcessAudioSessionDiscovery
                     session.Metadata.ExecutablePath,
                     session.Peak,
                     session.IsActive,
+                    true,
                     session.ProcessIds.Count))
                 .OrderByDescending(session => session.IsActive)
                 .ThenBy(
@@ -104,6 +106,68 @@ internal static class ProcessAudioSessionDiscovery
         {
             manager.Dispose();
         }
+    }
+
+    internal static IReadOnlyList<ProcessAudioSessionSnapshot> CaptureProcesses()
+    {
+        var processes = new Dictionary<string, MutableSession>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (Process process in Process.GetProcesses())
+        {
+            using (process)
+            {
+                uint processId;
+                try
+                {
+                    processId = checked((uint)process.Id);
+                }
+                catch
+                {
+                    continue;
+                }
+                if (processId == 0 || processId == Environment.ProcessId)
+                    continue;
+
+                string executable;
+                try
+                {
+                    executable = Config.NormalizeExecutableName(
+                        process.ProcessName);
+                }
+                catch
+                {
+                    continue;
+                }
+                if (executable.Length == 0)
+                    continue;
+                var metadata = new ProcessMetadata(
+                    executable,
+                    Path.GetFileNameWithoutExtension(executable),
+                    null);
+                if (!processes.TryGetValue(
+                        metadata.Executable,
+                        out MutableSession? combined))
+                {
+                    combined = new MutableSession(metadata);
+                    processes.Add(metadata.Executable, combined);
+                }
+                combined.ProcessIds.Add(processId);
+            }
+        }
+
+        return processes.Values
+            .Select(process => new ProcessAudioSessionSnapshot(
+                process.Metadata.Executable,
+                process.Metadata.DisplayName,
+                process.Metadata.ExecutablePath,
+                0,
+                false,
+                false,
+                process.ProcessIds.Count))
+            .OrderBy(
+                process => process.DisplayName,
+                StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
     }
 
     private static ProcessMetadata? ResolveProcessMetadata(uint processId)
@@ -202,12 +266,15 @@ internal static class ProcessAudioSessionDiscovery
 internal sealed class ProcessAudioSessionMonitor : IAsyncDisposable
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(160);
+    private static readonly TimeSpan ProcessRefreshInterval = TimeSpan.FromSeconds(2);
     private readonly Action<ProcessAudioSessionUpdate> _updated;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly Dictionary<string, float> _displayedPeaks =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Task _worker;
     private DateTime _lastFailureLogUtc;
+    private DateTime _nextProcessRefreshUtc;
+    private IReadOnlyList<ProcessAudioSessionSnapshot> _knownProcesses = [];
     private int _disposed;
 
     internal ProcessAudioSessionMonitor(
@@ -221,33 +288,55 @@ internal sealed class ProcessAudioSessionMonitor : IAsyncDisposable
     {
         while (!_cancellation.IsCancellationRequested)
         {
+            DateTime now = DateTime.UtcNow;
+            if (now >= _nextProcessRefreshUtc)
+            {
+                _nextProcessRefreshUtc = now + ProcessRefreshInterval;
+                try
+                {
+                    _knownProcesses = ProcessAudioSessionDiscovery.CaptureProcesses();
+                }
+                catch (Exception exception)
+                {
+                    LogFailure("Process list", exception, now);
+                }
+            }
+
+            IReadOnlyList<ProcessAudioSessionSnapshot> audioSessions = [];
+            bool audioAvailable = true;
             try
             {
-                IReadOnlyList<ProcessAudioSessionSnapshot> sessions =
-                    ProcessAudioSessionDiscovery.Capture();
+                audioSessions = ProcessAudioSessionDiscovery.Capture();
+            }
+            catch (Exception exception)
+            {
+                audioAvailable = false;
+                LogFailure("Audio-session meter", exception, now);
+            }
+
+            try
+            {
+                IReadOnlyList<ProcessAudioSessionSnapshot> sessions = MergeProcesses(
+                    _knownProcesses,
+                    audioSessions);
                 var visibleExecutables = new HashSet<string>(
                     sessions.Select(session => session.Executable),
                     StringComparer.OrdinalIgnoreCase);
                 ProcessAudioSessionSnapshot[] smoothed = sessions
-                    .Select(SmoothPeak)
+                    .Select(session => session.HasAudioSession
+                        ? SmoothPeak(session)
+                        : session)
                     .ToArray();
                 foreach (string executable in _displayedPeaks.Keys.ToArray())
                 {
                     if (!visibleExecutables.Contains(executable))
                         _displayedPeaks.Remove(executable);
                 }
-                _updated(new ProcessAudioSessionUpdate(smoothed, true));
+                _updated(new ProcessAudioSessionUpdate(smoothed, audioAvailable));
             }
             catch (Exception exception)
             {
-                DateTime now = DateTime.UtcNow;
-                if (now - _lastFailureLogUtc >= TimeSpan.FromSeconds(30))
-                {
-                    _lastFailureLogUtc = now;
-                    Log.Write(
-                        $"Audio-session meter unavailable " +
-                        $"({exception.GetType().Name}).");
-                }
+                LogFailure("Audio process list", exception, now);
                 _updated(new ProcessAudioSessionUpdate([], false));
             }
 
@@ -260,6 +349,50 @@ internal sealed class ProcessAudioSessionMonitor : IAsyncDisposable
                 break;
             }
         }
+    }
+
+    internal static IReadOnlyList<ProcessAudioSessionSnapshot> MergeProcesses(
+        IReadOnlyList<ProcessAudioSessionSnapshot> processes,
+        IReadOnlyList<ProcessAudioSessionSnapshot> audioSessions)
+    {
+        var merged = processes.ToDictionary(
+            process => process.Executable,
+            StringComparer.OrdinalIgnoreCase);
+        foreach (ProcessAudioSessionSnapshot session in audioSessions)
+        {
+            if (merged.TryGetValue(
+                    session.Executable,
+                    out ProcessAudioSessionSnapshot? process))
+            {
+                merged[session.Executable] = process with
+                {
+                    DisplayName = session.DisplayName,
+                    ExecutablePath = session.ExecutablePath ?? process.ExecutablePath,
+                    Peak = session.Peak,
+                    IsActive = session.IsActive,
+                    HasAudioSession = true,
+                    ProcessCount = Math.Max(
+                        process.ProcessCount,
+                        session.ProcessCount),
+                };
+            }
+            else
+            {
+                merged.Add(session.Executable, session);
+            }
+        }
+        return merged.Values.ToArray();
+    }
+
+    private void LogFailure(
+        string operation,
+        Exception exception,
+        DateTime now)
+    {
+        if (now - _lastFailureLogUtc < TimeSpan.FromSeconds(30))
+            return;
+        _lastFailureLogUtc = now;
+        Log.Write($"{operation} unavailable ({exception.GetType().Name}).");
     }
 
     private ProcessAudioSessionSnapshot SmoothPeak(

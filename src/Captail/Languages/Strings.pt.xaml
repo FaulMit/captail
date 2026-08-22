@@ -344,6 +344,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">{0} aplicativos · {1} faixas</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">SELECIONADOS</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">REPRODUZINDO ÁUDIO</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">OUTROS PROCESSOS</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">Procurando aplicativos com áudio...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Nenhuma sessão de áudio encontrada</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Reproduza som em um aplicativo para ele aparecer aqui.</sys:String>

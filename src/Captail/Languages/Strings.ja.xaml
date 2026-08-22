@@ -344,6 +344,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">{0} アプリ · {1} トラック</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">選択済み</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">音声を再生中</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">その他のプロセス</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">音声のあるアプリを検索中...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">音声セッションが見つかりません</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">アプリで音声を再生すると、ここに表示されます。</sys:String>

@@ -344,6 +344,7 @@
   <sys:String x:Key="L.AdvancedAudio.SelectionSummary">{0} applications · {1} pistes</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Selected">SÉLECTIONNÉES</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Available">AVEC AUDIO</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.OtherProcesses">AUTRES PROCESSUS</sys:String>
   <sys:String x:Key="L.AdvancedAudio.Loading">Recherche des applications audio...</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Aucune session audio trouvée</sys:String>
   <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Lancez du son dans une application pour la voir ici.</sys:String>
