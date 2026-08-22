@@ -263,6 +263,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">Recuperando la repetición instantánea</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">No se pudo recuperar la repetición instantánea</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">La repetición no está disponible temporalmente</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">La captura de audio de la aplicación se está recuperando. La grabación continúa.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">La captura de audio de la aplicación se recuperó.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">Enrutamiento de audio ajustado</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">Las aplicaciones relacionadas usan pistas distintas. Captail priorizó la aplicación secundaria para evitar audio duplicado.</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">Vuelva a intentarlo en {0} seg.</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} Reintentando en {1} seg.</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">La captura no comenzó</sys:String>
@@ -308,6 +312,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">Monitor de captura no encontrado.</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">El subsistema de vídeo no pudo iniciarse: código {0}.</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">El subsistema de audio no pudo iniciarse.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">El enrutamiento avanzado de audio por aplicación requiere Windows 10 versión 2004 o posterior.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">La fuente avanzada de audio de aplicaciones no está disponible. Reinstala o actualiza Captail.</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">No se encontró ningún codificador de vídeo de hardware compatible. Actualice el controlador de gráficos.</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">{0} no está disponible en {1}; seleccionado {2}.</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">No se pudo crear la fuente de video.</sys:String>

@@ -263,6 +263,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">インスタント リプレイの回復</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">インスタント リプレイを回復できませんでした</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">リプレイは一時的に利用できません</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">アプリ音声のキャプチャを復旧しています。リプレイ録画は継続します。</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">アプリ音声のキャプチャが復旧しました。</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">音声ルーティングを調整しました</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">関連するアプリが異なるトラックを使用しています。音声の重複を避けるため、Captail は子アプリを優先しました。</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">{0} 秒後に再試行してください。</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} {1} 秒後に再試行します。</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">キャプチャが開始されませんでした</sys:String>
@@ -308,6 +312,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">キャプチャ モニターが見つかりません。</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">ビデオ サブシステムの起動に失敗しました: コード {0}。</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">オーディオ サブシステムの起動に失敗しました。</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">アプリ別の高度な音声ルーティングには Windows 10 バージョン 2004 以降が必要です。</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">高度なアプリ音声ソースを利用できません。Captail を再インストールまたは更新してください。</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">互換性のあるハードウェアビデオエンコーダが見つかりません。グラフィックドライバーを更新してください。</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">{0} は {1} では利用できません。 {2} を選択しました。</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">ビデオソースを作成できませんでした。</sys:String>

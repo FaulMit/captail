@@ -263,6 +263,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">Відновлення миттєвого повтору</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">Не вдалося відновити миттєвий повтор</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Повтор тимчасово недоступний</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">Захоплення звуку програми відновлюється. Запис повтору триває.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">Захоплення звуку програми відновлено.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">Маршрутизацію звуку скориговано</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">Пов’язані програми використовують різні доріжки. Captail вибрав дочірню програму, щоб не дублювати звук.</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">Повторіть через {0} с.</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} Повторна спроба через {1} сек.</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">Захоплення не почалося</sys:String>
@@ -308,6 +312,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">Монітор захоплення не знайдено.</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">Не вдалося запустити підсистему відео: код {0}.</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">Не вдалося запустити аудіопідсистему.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">Для розширеної маршрутизації звуку програм потрібна Windows 10 версії 2004 або новіша.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">Джерело розширеного звуку програм недоступне. Перевстановіть або оновіть Captail.</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">Не знайдено сумісного апаратного відеокодера. Оновити графічний драйвер.</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">{0} недоступний на {1}; вибрано {2}.</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">Не вдалося створити джерело відео.</sys:String>

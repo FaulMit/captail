@@ -15,11 +15,12 @@ internal static class Program
             Run("normalized executable matching", NormalizedExecutableMatching);
             Run("independent same-name roots", IndependentSameNameRoots);
             Run("same-name descendant deduplication", SameNameDescendantDeduplication);
-            Run("global ancestor-wins deduplication", GlobalAncestorWins);
+            Run("same-track ancestor deduplication", SameTrackAncestorDeduplication);
             Run("PID reuse parent validation", PidReuseBreaksParentEdge);
             Run("reconciler restart lifecycle", ReconcilerRestartLifecycle);
             Run("reconciler overlapping roots", ReconcilerOverlappingRoots);
             Run("reconciler failure isolation", ReconcilerFailureIsolation);
+            Run("native failure visibility and recovery", NativeFailureVisibilityAndRecovery);
             Run("reconciler thread ownership", ReconcilerThreadOwnership);
             Run("reconciler clean shutdown", ReconcilerCleanShutdown);
             Run("advanced config normalization", AdvancedConfigNormalization);
@@ -29,7 +30,9 @@ internal static class Program
             Run("mixer bits and encoder continuity", MixerBitsAndEncoderContinuity);
             Run("simple audio topology regression", SimpleAudioTopologyRegression);
             Run("polling reacquisition cadence", PollingReacquisitionCadence);
+            Run("process audio health notifications", ProcessAudioHealthNotifications);
             Run("advanced capability model", AdvancedCapabilityModel);
+            Run("advanced unavailable reasons", AdvancedUnavailableReasons);
             Run("advanced diagnostics privacy", AdvancedDiagnosticsPrivacy);
             Console.WriteLine($"PASS {_passed} process audio foundation tests");
             return 0;
@@ -71,7 +74,7 @@ internal static class Program
         SequenceEqual([10u], roots.Select(root => root.Identity.ProcessId));
     }
 
-    private static void GlobalAncestorWins()
+    private static void SameTrackAncestorDeduplication()
     {
         ProcessSnapshot snapshot = Snapshot(
             Node(10, 100, 1, "launcher.exe"),
@@ -138,6 +141,40 @@ internal static class Program
         Equal(20u, reconciler.ActiveIdentities.Single().ProcessId);
     }
 
+    private static void NativeFailureVisibilityAndRecovery()
+    {
+        ProcessAudioSourceStatus status = new(
+            ProcessAudioSourceState.Capturing,
+            0);
+        using var reconciler = new ProcessAudioReconciler(
+            (identity, _) => checked((nint)identity.ProcessId),
+            _ => { },
+            readSourceStatus: _ => status);
+        ProcessSnapshot snapshot = Snapshot(Node(10, 100, 1, "game.exe"));
+
+        ProcessAudioReconcileResult healthy = reconciler.Reconcile(
+            snapshot,
+            [Target("game.exe", 1)]);
+        Equal(0, healthy.RuntimeFailedSources);
+
+        status = new ProcessAudioSourceStatus(
+            ProcessAudioSourceState.ActivationFailed,
+            unchecked((int)0x80004005));
+        ProcessAudioReconcileResult failed = reconciler.Reconcile(
+            snapshot,
+            [Target("game.exe", 1)]);
+        Equal(1, failed.RuntimeFailedSources);
+        Equal(unchecked((int)0x80004005), failed.LastErrorCode);
+
+        status = new ProcessAudioSourceStatus(
+            ProcessAudioSourceState.Capturing,
+            0);
+        ProcessAudioReconcileResult recovered = reconciler.Reconcile(
+            snapshot,
+            [Target("game.exe", 1)]);
+        Equal(1, recovered.RecoveredSources);
+    }
+
     private static void ReconcilerOverlappingRoots()
     {
         using var reconciler = new ProcessAudioReconciler(
@@ -149,8 +186,8 @@ internal static class Program
                 Node(11, 110, 10, "game.exe")),
             [Target("launcher.exe", 2), Target("game.exe", 5)]);
         Equal(1, result.ActiveSources);
-        Equal(10u, reconciler.ActiveIdentities.Single().ProcessId);
-        Equal(2, reconciler.ActiveTracks.Single().Value);
+        Equal(11u, reconciler.ActiveIdentities.Single().ProcessId);
+        Equal(5, reconciler.ActiveTracks.Single().Value);
     }
 
     private static void ReconcilerThreadOwnership()
@@ -374,6 +411,34 @@ internal static class Program
         Equal(TimeSpan.FromMilliseconds(250), cadence.NextInterval);
     }
 
+    private static void ProcessAudioHealthNotifications()
+    {
+        var health = new ProcessAudioHealthTracker();
+        var failed = Result(desired: 1) with
+        {
+            RuntimeFailedSources = 1,
+            LastErrorCode = unchecked((int)0x80004005),
+        };
+
+        Equal(0, health.Observe(failed).Count);
+        Equal(0, health.Observe(failed).Count);
+        ProcessAudioMonitorEvent failure = health.Observe(failed).Single();
+        Equal(ProcessAudioMonitorEventKind.PersistentFailure, failure.Kind);
+        Equal(1, failure.Count);
+        Equal(0, health.Observe(failed).Count);
+
+        ProcessAudioMonitorEvent recovered = health.Observe(
+            Result(desired: 1) with { RecoveredSources = 1 }).Single();
+        Equal(ProcessAudioMonitorEventKind.Recovered, recovered.Kind);
+
+        var conflict = Result(desired: 2) with { ConflictingSources = 1 };
+        ProcessAudioMonitorEvent conflictEvent = health.Observe(conflict).Single();
+        Equal(ProcessAudioMonitorEventKind.RoutingConflict, conflictEvent.Kind);
+        Equal(0, health.Observe(conflict).Count);
+        Equal(0, health.Observe(Result(desired: 2)).Count);
+        Equal(1, health.Observe(conflict).Count);
+    }
+
     private static void AdvancedCapabilityModel()
     {
         Equal(
@@ -407,6 +472,19 @@ internal static class Program
         {
             throw new InvalidOperationException(
                 "Advanced audio was enabled without its OBS source.");
+        }
+    }
+
+    private static void AdvancedUnavailableReasons()
+    {
+        string unsupported = new AdvancedProcessAudioUnavailableException(
+            AdvancedProcessAudioAvailability.UnsupportedWindowsVersion).Message;
+        string missing = new AdvancedProcessAudioUnavailableException(
+            AdvancedProcessAudioAvailability.SourceUnavailable).Message;
+        if (string.Equals(unsupported, missing, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Advanced audio availability reasons were collapsed into one message.");
         }
     }
 

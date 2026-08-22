@@ -263,6 +263,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">Recuperando Replay Instantâneo</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">Não foi possível recuperar o Instant Replay</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Replay temporariamente indisponível</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">A captura de áudio do aplicativo está se recuperando. A gravação do replay continua.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">A captura de áudio do aplicativo foi recuperada.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">Roteamento de áudio ajustado</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">Aplicativos relacionados usam faixas diferentes. O Captail priorizou o aplicativo filho para evitar áudio duplicado.</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">Tente novamente em {0} segundos.</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} Tentando novamente em {1} segundos.</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">A captura não começou</sys:String>
@@ -308,6 +312,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">Monitor de captura não encontrado.</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">Falha ao iniciar o subsistema de vídeo: código {0}.</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">O subsistema de áudio não pôde ser iniciado.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">O roteamento avançado de áudio por aplicativo requer o Windows 10 versão 2004 ou posterior.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">A fonte avançada de áudio de aplicativos não está disponível. Reinstale ou atualize o Captail.</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">Nenhum codificador de vídeo de hardware compatível encontrado. Atualize o driver gráfico.</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">{0} não está disponível em {1}; selecionado {2}.</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">Não foi possível criar a fonte de vídeo.</sys:String>

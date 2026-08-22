@@ -2038,6 +2038,18 @@ public partial class SettingsWindow : Window
             });
     }
 
+    public void ClearError(string message)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ClearError(message));
+            return;
+        }
+
+        if (string.Equals(NoticeMessageText.Text, message, StringComparison.Ordinal))
+            HideNotice();
+    }
+
     private void HideNotice()
     {
         var fade = new DoubleAnimation(NoticeBanner.Opacity, 0, TimeSpan.FromMilliseconds(140));

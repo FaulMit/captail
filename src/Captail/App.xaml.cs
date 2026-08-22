@@ -1563,7 +1563,8 @@ public partial class App : Application
                     ProcessSnapshot.Capture,
                     snapshot => RunOnObsThreadAsync(
                         () => engine.ReconcileProcessAudio(snapshot)),
-                    Log.Write);
+                    Log.Write,
+                    OnProcessAudioMonitorEvent);
             }
             if (!string.Equals(
                     requestedCodec,
@@ -1649,6 +1650,62 @@ public partial class App : Application
         _processAudioMonitor = null;
         if (monitor is not null)
             await monitor.DisposeAsync();
+    }
+
+    private void OnProcessAudioMonitorEvent(ProcessAudioMonitorEvent status)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => OnProcessAudioMonitorEvent(status));
+            return;
+        }
+
+        switch (status.Kind)
+        {
+            case ProcessAudioMonitorEventKind.PersistentFailure:
+                string failure = Localization.Text(
+                    "L.Notify.ProcessAudioRecovering");
+                Log.Write(
+                    $"Process audio recovery remains active " +
+                    $"(sources={status.Count}, HRESULT=" +
+                    $"0x{unchecked((uint)status.ErrorCode):X8}).");
+                ShowOverlayNotification(
+                    "↻",
+                    Localization.Text("L.Notify.RecoveryTitle"),
+                    failure,
+                    OverlayTone.Warning);
+                _pendingUiError = failure;
+                _settingsWindow?.ShowError(
+                    Localization.Text("L.Notify.RecoveryTitle"),
+                    failure);
+                break;
+
+            case ProcessAudioMonitorEventKind.Recovered:
+                string previousFailure = Localization.Text(
+                    "L.Notify.ProcessAudioRecovering");
+                if (string.Equals(
+                        _pendingUiError,
+                        previousFailure,
+                        StringComparison.Ordinal))
+                {
+                    _pendingUiError = null;
+                }
+                _settingsWindow?.ClearError(previousFailure);
+                ShowOverlayNotification(
+                    "✓",
+                    Localization.Text("L.Notify.RecoveredTitle"),
+                    Localization.Text("L.Notify.ProcessAudioRecovered"),
+                    OverlayTone.Success);
+                break;
+
+            case ProcessAudioMonitorEventKind.RoutingConflict:
+                ShowOverlayNotification(
+                    "!",
+                    Localization.Text("L.Notify.ProcessAudioConflictTitle"),
+                    Localization.Text("L.Notify.ProcessAudioConflict"),
+                    OverlayTone.Warning);
+                break;
+        }
     }
 
     private void StartHealthMonitor()

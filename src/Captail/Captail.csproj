@@ -83,8 +83,7 @@
   </Target>
 
   <Target Name="AcquireObsPluginSdk"
-          BeforeTargets="PrepareForBuild"
-          Condition="!Exists('$(ObsPluginSdkRoot)\include\obs-module.h')">
+          BeforeTargets="PrepareForBuild">
     <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\AcquireObsPluginSdk.ps1&quot;" />
   </Target>
 

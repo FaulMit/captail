@@ -14,9 +14,19 @@ internal enum AdvancedProcessAudioAvailability
 
 internal sealed class AdvancedProcessAudioUnavailableException(
     AdvancedProcessAudioAvailability availability)
-    : InvalidOperationException(Localization.Text("L.Engine.AudioFailed"))
+    : InvalidOperationException(GetMessage(availability))
 {
     internal AdvancedProcessAudioAvailability Availability { get; } = availability;
+
+    private static string GetMessage(AdvancedProcessAudioAvailability availability) =>
+        availability switch
+        {
+            AdvancedProcessAudioAvailability.UnsupportedWindowsVersion =>
+                Localization.Text("L.Engine.ProcessAudioUnsupportedWindows"),
+            AdvancedProcessAudioAvailability.SourceUnavailable =>
+                Localization.Text("L.Engine.ProcessAudioSourceUnavailable"),
+            _ => Localization.Text("L.Engine.AudioFailed"),
+        };
 }
 
 [SuppressMessage(
@@ -1259,7 +1269,8 @@ public sealed class ObsReplayEngine : IDisposable
         _processAudioReconciler ??= new ProcessAudioReconciler(
             CreateProcessAudioSource,
             DestroyProcessAudioSource,
-            Log.Write);
+            Log.Write,
+            ReadProcessAudioStatus);
         return _processAudioReconciler.Reconcile(
             snapshot,
             _config.ProcessAudioRoutes.Select(route =>
@@ -1283,7 +1294,7 @@ public sealed class ObsReplayEngine : IDisposable
                 0);
             if (source == 0)
                 return 0;
-            if (!HasProcessAudioStatus(source))
+            if (!TryReadProcessAudioStatus(source, out _))
             {
                 ObsNative.obs_source_remove(source);
                 ObsNative.obs_source_release(source);
@@ -1315,8 +1326,21 @@ public sealed class ObsReplayEngine : IDisposable
         ObsNative.obs_source_release(source);
     }
 
-    private static bool HasProcessAudioStatus(nint source)
+    private static ProcessAudioSourceStatus ReadProcessAudioStatus(nint source)
     {
+        if (!TryReadProcessAudioStatus(source, out ProcessAudioSourceStatus status))
+        {
+            throw new InvalidOperationException(
+                "Could not read process audio source status.");
+        }
+        return status;
+    }
+
+    private static bool TryReadProcessAudioStatus(
+        nint source,
+        out ProcessAudioSourceStatus status)
+    {
+        status = default;
         nint handler = ObsNative.obs_source_get_proc_handler(source);
         if (handler == 0)
             return false;
@@ -1334,12 +1358,25 @@ public sealed class ObsReplayEngine : IDisposable
                 Capacity = stackSize,
                 Fixed = true,
             };
-            return ObsNative.proc_handler_call(handler, "get_status", ref callData) &&
-                   ObsNative.calldata_get_data(
-                       ref callData,
-                       "state",
-                       out long _,
-                       sizeof(long));
+            if (!ObsNative.proc_handler_call(handler, "get_status", ref callData) ||
+                !ObsNative.calldata_get_data(
+                    ref callData,
+                    "state",
+                    out long state,
+                    sizeof(long)) ||
+                !ObsNative.calldata_get_data(
+                    ref callData,
+                    "error_code",
+                    out long errorCode,
+                    sizeof(long)) ||
+                !Enum.IsDefined((ProcessAudioSourceState)state))
+            {
+                return false;
+            }
+            status = new ProcessAudioSourceStatus(
+                (ProcessAudioSourceState)state,
+                errorCode);
+            return true;
         }
         finally
         {

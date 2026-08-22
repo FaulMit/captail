@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
@@ -15,6 +14,12 @@ internal sealed record ProcessNode(
 {
     internal ProcessIdentity? ParentIdentity { get; init; }
 }
+
+internal sealed record RoutedProcessRoot(ProcessNode Node, int Track);
+
+internal sealed record RoutedProcessSelection(
+    IReadOnlyList<RoutedProcessRoot> Roots,
+    int ConflictingSources);
 
 internal sealed class ProcessSnapshot
 {
@@ -130,12 +135,50 @@ internal sealed class ProcessSnapshot
         return selected;
     }
 
-    internal static string NormalizeExecutable(string? value)
+    internal RoutedProcessSelection SelectRoutedRoots(
+        IReadOnlyDictionary<string, int> executableTargets)
     {
-        if (string.IsNullOrWhiteSpace(value))
-            return "";
-        return Path.GetFileName(value.Trim()).Trim();
+        var targets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach ((string executable, int track) in executableTargets)
+        {
+            string normalized = NormalizeExecutable(executable);
+            if (normalized.Length > 0 && track is >= 1 and <= 6)
+                targets.TryAdd(normalized, track);
+        }
+
+        RoutedProcessRoot[] candidates = _nodes.Values
+            .Where(node => targets.ContainsKey(node.Executable))
+            .Select(node => new RoutedProcessRoot(node, targets[node.Executable]))
+            .ToArray();
+        if (candidates.Length == 0)
+            return new RoutedProcessSelection([], 0);
+
+        RoutedProcessRoot[] eligible = candidates
+            .Where(candidate => !candidates.Any(other =>
+                other.Track != candidate.Track &&
+                HasAncestor(other.Node, candidate.Node.Identity)))
+            .OrderBy(candidate => NodeDepth(candidate.Node))
+            .ThenBy(candidate => candidate.Node.Identity.CreationTime)
+            .ThenBy(candidate => candidate.Node.Identity.ProcessId)
+            .ToArray();
+
+        var selectedIdentities = new HashSet<ProcessIdentity>();
+        var selected = new List<RoutedProcessRoot>();
+        foreach (RoutedProcessRoot candidate in eligible)
+        {
+            if (HasSelectedAncestor(candidate.Node, selectedIdentities))
+                continue;
+            selected.Add(candidate);
+            selectedIdentities.Add(candidate.Node.Identity);
+        }
+
+        return new RoutedProcessSelection(
+            selected,
+            candidates.Length - eligible.Length);
     }
+
+    internal static string NormalizeExecutable(string? value) =>
+        global::Captail.Config.NormalizeExecutableName(value);
 
     private static void TryAddProcess(
         ProcessNative.ProcessEntry32 entry,
@@ -200,6 +243,23 @@ internal sealed class ProcessSnapshot
             if (!visited.Add(parent))
                 return false;
             if (selected.Contains(parent))
+                return true;
+            if (!_nodes.TryGetValue(parent, out ProcessNode? parentNode))
+                return false;
+            parentIdentity = parentNode.ParentIdentity;
+        }
+        return false;
+    }
+
+    private bool HasAncestor(ProcessNode node, ProcessIdentity ancestor)
+    {
+        var visited = new HashSet<ProcessIdentity> { node.Identity };
+        ProcessIdentity? parentIdentity = node.ParentIdentity;
+        while (parentIdentity is ProcessIdentity parent)
+        {
+            if (!visited.Add(parent))
+                return false;
+            if (parent == ancestor)
                 return true;
             if (!_nodes.TryGetValue(parent, out ProcessNode? parentNode))
                 return false;

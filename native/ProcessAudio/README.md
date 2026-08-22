@@ -20,3 +20,7 @@ later. Captail's repository `LICENSE` contains the applicable GPL text.
 The build generates a minimal `obs.lib` from `Obs.def`, containing only the
 libobs exports used by this source. It links against Captail's existing bundled
 `obs.dll`; libobs and `win-wasapi` are not rebuilt or replaced.
+
+A catch-all "everything else" route is intentionally not implemented. Mixing
+the system loopback with routed process sources would record routed applications
+twice. A safe catch-all needs an exclusion-capable mixer before it can be added.

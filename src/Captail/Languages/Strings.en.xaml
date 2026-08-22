@@ -266,6 +266,10 @@
   <sys:String x:Key="L.Notify.RecoveryTitle">Recovering Instant Replay</sys:String>
   <sys:String x:Key="L.Notify.RecoveryFailedTitle">Could not recover Instant Replay</sys:String>
   <sys:String x:Key="L.Notify.RecoveryUnavailableTitle">Replay temporarily unavailable</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovering">Application audio capture is recovering. Replay recording continues.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioRecovered">Application audio capture recovered.</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflictTitle">Audio routing adjusted</sys:String>
+  <sys:String x:Key="L.Notify.ProcessAudioConflict">Related applications use different tracks. Captail prioritized the child application to prevent duplicated audio.</sys:String>
   <sys:String x:Key="L.Notify.RetryIn">Retry in {0} sec.</sys:String>
   <sys:String x:Key="L.Notify.ReasonRetry">{0} Retrying in {1} sec.</sys:String>
   <sys:String x:Key="L.Notify.CaptureFailed">Capture did not start</sys:String>
@@ -310,6 +314,8 @@
   <sys:String x:Key="L.Engine.MonitorMissing">Capture monitor not found.</sys:String>
   <sys:String x:Key="L.Engine.VideoFailed">Video subsystem failed to start: code {0}.</sys:String>
   <sys:String x:Key="L.Engine.AudioFailed">Audio subsystem failed to start.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioUnsupportedWindows">Advanced application audio routing requires Windows 10 version 2004 or newer.</sys:String>
+  <sys:String x:Key="L.Engine.ProcessAudioSourceUnavailable">Advanced application audio source is unavailable. Reinstall or update Captail.</sys:String>
   <sys:String x:Key="L.Engine.NoEncoder">No compatible hardware video encoder found. Update graphics driver.</sys:String>
   <sys:String x:Key="L.Engine.CodecFallback">{0} is unavailable on {1}; selected {2}.</sys:String>
   <sys:String x:Key="L.Engine.VideoSourceFailed">Could not create video source.</sys:String>
