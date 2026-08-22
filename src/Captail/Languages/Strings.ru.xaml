@@ -330,6 +330,32 @@
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">Буфер повтора неожиданно остановился.</sys:String>
   <sys:String x:Key="L.Engine.BufferError">Буфер повтора: {0}</sys:String>
 
+  <sys:String x:Key="L.Audio.PerAppRouting">По приложениям</sys:String>
+  <sys:String x:Key="L.Audio.ConfigureRouting">Настроить</sys:String>
+  <sys:String x:Key="L.Audio.NoAppsSelected">Приложения не выбраны</sys:String>
+  <sys:String x:Key="L.Audio.RoutingSummary">Приложений: {0} · дорожек: {1}</sys:String>
+  <sys:String x:Key="L.Audio.ApplicationAudio">Звук приложений</sys:String>
+  <sys:String x:Key="L.Help.AdvancedRouting">Распределяйте звук каждого приложения по отдельным дорожкам записи.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Title">Маршрутизация звука приложений</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Search">Найти приложение или процесс</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.TrackFormat">Дорожка {0}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.FormatSummary">{0} · {1} · до {2} дорожек</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectionSummary">Приложений: {0} · дорожек: {1}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Selected">ВЫБРАНО</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Available">ВОСПРОИЗВОДЯТ ЗВУК</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Loading">Ищем приложения со звуком...</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Аудиосессии не найдены</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Включите звук в приложении — оно появится здесь.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableTitle">Аудиосессии недоступны</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableDetail">Проверьте службу звука Windows и повторите попытку.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneEnabled">Выберите дорожку для микрофона</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneDisabled">Включите микрофон в настройках для маршрутизации</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnassignedHint">Неотмеченные приложения не записываются.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectAtLeastOne">Выберите приложение или включите микрофон.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.ProcessCount">Процессов: {0}</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioTitle">Звук приложений</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioEmpty">Перед сохранением выберите приложение или включите микрофон.</sys:String>
+
   <sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} мин</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} ГБ</sys:String>

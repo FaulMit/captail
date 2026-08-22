@@ -34,6 +34,7 @@ internal static class Program
             Run("advanced capability model", AdvancedCapabilityModel);
             Run("advanced unavailable reasons", AdvancedUnavailableReasons);
             Run("advanced diagnostics privacy", AdvancedDiagnosticsPrivacy);
+            Run("audio routing format limits", AudioRoutingFormatLimits);
             Console.WriteLine($"PASS {_passed} process audio foundation tests");
             return 0;
         }
@@ -139,6 +140,21 @@ internal static class Program
         Equal(1, result.ActiveSources);
         Equal(1, result.FailedSources);
         Equal(20u, reconciler.ActiveIdentities.Single().ProcessId);
+    }
+
+    private static void AudioRoutingFormatLimits()
+    {
+        AudioRoutingFormatCapabilities aac =
+            AudioRoutingFormatCapabilities.For("aac");
+        Equal("aac", aac.AudioCodec);
+        Equal("MP4", aac.Container);
+        Equal(6, aac.MaxTracks);
+
+        AudioRoutingFormatCapabilities opus =
+            AudioRoutingFormatCapabilities.For("opus");
+        Equal("opus", opus.AudioCodec);
+        Equal("MKV", opus.Container);
+        Equal(6, opus.MaxTracks);
     }
 
     private static void NativeFailureVisibilityAndRecovery()

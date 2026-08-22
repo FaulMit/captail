@@ -74,6 +74,14 @@ public partial class App : Application
         try
         {
             _uiOnly = e.Args.Contains("--ui-only", StringComparer.OrdinalIgnoreCase);
+            _processAudioAvailability =
+                ObsReplayEngine.DetectProcessAudioAvailability(
+                    Environment.OSVersion.Version,
+                    File.Exists(Path.Combine(
+                        AppContext.BaseDirectory,
+                        "obs-plugins",
+                        "64bit",
+                        "captail-process-audio.dll")));
 #if DEBUG
             bool faultTest = e.Args.Contains(
                 "--qa-fault-recovery",
@@ -122,6 +130,9 @@ public partial class App : Application
                 StringComparer.OrdinalIgnoreCase);
             bool recordingIndicatorGameTest = e.Args.Contains(
                 "--qa-recording-indicator-game",
+                StringComparer.OrdinalIgnoreCase);
+            bool audioRoutingUiTest = e.Args.Contains(
+                "--qa-audio-routing-ui",
                 StringComparer.OrdinalIgnoreCase);
             string? clipEditorTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
@@ -176,6 +187,7 @@ public partial class App : Application
             const bool audioMixTest = false;
             const bool previewGeometryTest = false;
             const bool trimOverwriteTest = false;
+            const bool audioRoutingUiTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
                     "--background",
@@ -193,7 +205,7 @@ public partial class App : Application
                     clipEditorTest || replayPlayerTest || audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
                     automaticCapturePolicyTest || replayRoutingTest ||
-                    localizationTest))
+                    localizationTest || audioRoutingUiTest))
             {
                 Shutdown();
                 return;
@@ -346,6 +358,12 @@ public partial class App : Application
                         recordingIndicatorTestPosition ?? "top-right");
                     _recordingIndicator.SetGameDetected(recordingIndicatorGameTest);
                     _recordingIndicator.SetState(ReplayIndicatorState.Active);
+                }
+                if (audioRoutingUiTest)
+                {
+                    _ = Dispatcher.BeginInvoke(
+                        DispatcherPriority.ApplicationIdle,
+                        () => _settingsWindow?.OpenAudioRoutingForQa());
                 }
 #endif
                 return;
@@ -2096,6 +2114,7 @@ public partial class App : Application
             SetAudioSourcesAsync,
             ApplySettingsAsync,
             capabilities,
+            _processAudioAvailability,
             CheckForUpdatesAsync,
             PrepareAndLaunchUpdateAsync);
         _settingsWindow.Closed += (_, _) =>

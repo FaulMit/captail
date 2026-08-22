@@ -328,6 +328,32 @@
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">Буфер повтору несподівано зупинився.</sys:String>
   <sys:String x:Key="L.Engine.BufferError">Буфер повтору: {0}</sys:String>
 
+  <sys:String x:Key="L.Audio.PerAppRouting">За застосунками</sys:String>
+  <sys:String x:Key="L.Audio.ConfigureRouting">Налаштувати</sys:String>
+  <sys:String x:Key="L.Audio.NoAppsSelected">Застосунки не вибрано</sys:String>
+  <sys:String x:Key="L.Audio.RoutingSummary">Застосунків: {0} · доріжок: {1}</sys:String>
+  <sys:String x:Key="L.Audio.ApplicationAudio">Звук застосунків</sys:String>
+  <sys:String x:Key="L.Help.AdvancedRouting">Розподіляйте звук кожного застосунку між окремими доріжками запису.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Title">Маршрутизація звуку застосунків</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Search">Знайти застосунок або процес</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.TrackFormat">Доріжка {0}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.FormatSummary">{0} · {1} · до {2} доріжок</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectionSummary">Застосунків: {0} · доріжок: {1}</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Selected">ВИБРАНО</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Available">ВІДТВОРЮЮТЬ ЗВУК</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.Loading">Шукаємо застосунки зі звуком...</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyTitle">Аудіосесій не знайдено</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.EmptyDetail">Увімкніть звук у застосунку — він з’явиться тут.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableTitle">Аудіосесії недоступні</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnavailableDetail">Перевірте службу звуку Windows і спробуйте ще раз.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneEnabled">Виберіть доріжку для мікрофона</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.MicrophoneDisabled">Увімкніть мікрофон у налаштуваннях для маршрутизації</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.UnassignedHint">Невибрані застосунки не записуються.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.SelectAtLeastOne">Виберіть застосунок або ввімкніть мікрофон.</sys:String>
+  <sys:String x:Key="L.AdvancedAudio.ProcessCount">Процесів: {0}</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioTitle">Звук застосунків</sys:String>
+  <sys:String x:Key="L.Error.AdvancedAudioEmpty">Перед збереженням виберіть застосунок або ввімкніть мікрофон.</sys:String>
+
   <sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} хв</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} ГБ</sys:String>
