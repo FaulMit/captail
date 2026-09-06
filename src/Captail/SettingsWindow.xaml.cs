@@ -367,6 +367,26 @@ public partial class SettingsWindow : Window
             UpdateCaptureSourceState();
     }
 
+    private void UpdateCaptureModeState()
+    {
+        bool recording = string.Equals(
+            GetSelectedRadioTag(DashboardCaptureModeOptions, "replay"),
+            "recording",
+            StringComparison.Ordinal);
+        ReplayOnlySettings.Visibility = recording
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        ReplayToggleHotkeySettings.Visibility = recording
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        CaptureEnabledLabel.Text = Localization.Text(
+            recording ? "L.Capture.RecordingEnabled" : "L.Replay.Instant");
+        PrimaryHotkeyLabel.Text = Localization.Text(
+            recording ? "L.Hotkey.ToggleRecording" : "L.Hotkey.SaveReplay");
+        PrimaryHotkeyHint.Text = Localization.Text(
+            recording ? "L.Hotkey.ToggleRecordingHint" : "L.Hotkey.SaveHint");
+    }
+
     private void UpdateCaptureSourceState()
     {
         bool game = GetSelectedTag(CaptureSourceBox, "desktop") == "game";
@@ -382,6 +402,7 @@ public partial class SettingsWindow : Window
         _updatingUi = true;
         try
         {
+            SelectRadioByTag(DashboardCaptureModeOptions, _config.CaptureMode);
             SelectRadioByTag(BufferOptions, _config.BufferSeconds.ToString());
             SelectByTag(ReplaySizeLimitBox, _config.MaxReplaySizeMb.ToString());
             SelectRadioByTag(FpsOptions, _config.FrameRate.ToString());
@@ -418,6 +439,7 @@ public partial class SettingsWindow : Window
             MicVolumeSlider.Value = Math.Clamp(_config.MicrophoneVolume, 0, 100);
             MicBoostSlider.Value = Math.Clamp(_config.MicrophoneBoostDb, 0, 20);
             OrganizeByGameBox.IsChecked = _config.OrganizeReplaysByGame;
+            SelectRadioByTag(AccentColorOptions, _config.AccentColor);
 
             _pendingSaveHotkey = _config.Hotkey;
             _pendingToggleHotkey = _config.ToggleReplayHotkey;
@@ -430,6 +452,7 @@ public partial class SettingsWindow : Window
             UpdateCaptureSourceState();
             UpdateAudioRoutingState();
             UpdateHardwareEncoderText();
+            UpdateCaptureModeState();
         }
         finally
         {
@@ -449,6 +472,7 @@ public partial class SettingsWindow : Window
         else if (!active)
             _availableReplaySeconds = 0;
         _updatingUi = true;
+        SelectRadioByTag(DashboardCaptureModeOptions, _config.CaptureMode);
         ReplayToggle.IsChecked = active;
         SettingsReplayToggle.IsChecked = active;
         _updatingUi = false;
@@ -477,18 +501,35 @@ public partial class SettingsWindow : Window
             _ => Localization.Text("L.Audio.VideoOnly"),
         };
 
+        bool recordingMode = string.Equals(
+            _config.CaptureMode,
+            "recording",
+            StringComparison.Ordinal);
         StatusTitleText.Text = Localization.Text(
-            active ? "L.Status.Enabled" : "L.Status.Disabled");
+            active
+                ? recordingMode ? "L.Status.Recording" : "L.Status.Enabled"
+                : recordingMode
+                    ? "L.Status.RecordingDisabled"
+                    : "L.Status.Disabled");
         StatusDetailText.Text = active
-            ? Localization.Format(
-                "L.Status.Detail",
-                FormatDuration(_config.BufferSeconds),
-                LocalizedCaptureSource(activeCaptureSource),
-                audio)
-            : Localization.Text("L.Status.Idle");
+            ? recordingMode
+                ? Localization.Format(
+                    "L.Status.RecordingDetail",
+                    LocalizedCaptureSource(activeCaptureSource),
+                    audio)
+                : Localization.Format(
+                    "L.Status.Detail",
+                    FormatDuration(_config.BufferSeconds),
+                    LocalizedCaptureSource(activeCaptureSource),
+                    audio)
+            : Localization.Text(
+                recordingMode
+                    ? "L.Status.RecordingIdle"
+                    : "L.Status.Idle");
         StatusRing.Stroke = FindBrush(active ? "AccentBrush" : "RingIdleBrush");
         StatusDot.Fill = FindBrush(active ? "AccentBrush" : "RingIdleBrush");
-        SaveReplayButton.IsEnabled = active && _availableReplaySeconds > 0;
+        SaveReplayButton.IsEnabled = recordingMode ||
+                                     (active && _availableReplaySeconds > 0);
         AnimateRecordingState(active);
 
         SystemSourceChip.IsChecked = hasPrimaryAudio;
@@ -512,12 +553,15 @@ public partial class SettingsWindow : Window
         string codec = FormatCodec(activeCodec ?? _config.Codec);
         CodecSummaryText.Text = $"{codec} · {FormatResolution(_config.RecordingResolution)}";
         FpsSummaryText.Text = $"{_config.FrameRate} FPS";
-        SaveButtonText.Text = Localization.Format(
-            "L.Save.Duration",
-            FormatDuration(
-                active && _availableReplaySeconds > 0
-                    ? Math.Max(1, _availableReplaySeconds)
-                    : _config.BufferSeconds));
+        SaveButtonText.Text = recordingMode
+            ? Localization.Text(
+                active ? "L.Capture.StopRecording" : "L.Capture.StartRecording")
+            : Localization.Format(
+                "L.Save.Duration",
+                FormatDuration(
+                    active && _availableReplaySeconds > 0
+                        ? Math.Max(1, _availableReplaySeconds)
+                        : _config.BufferSeconds));
         HotkeySummaryText.Text = _config.Hotkey;
         OutputFolderSummaryText.Text = _config.OutputDirectory;
     }
@@ -979,6 +1023,9 @@ public partial class SettingsWindow : Window
     private Config CreatePendingConfig()
     {
         Config candidate = _config.Clone();
+        candidate.CaptureMode = GetSelectedRadioTag(
+            DashboardCaptureModeOptions,
+            "replay");
         candidate.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
         candidate.WarnWhenGameStartsWithReplayOff = WarnGameOffBox.IsChecked == true;
         candidate.ShowRecordingIndicator = RecordingIndicatorBox.IsChecked == true;
@@ -1015,12 +1062,16 @@ public partial class SettingsWindow : Window
             candidate.CaptureSystemAudio = false;
         candidate.OutputDirectory = _outputDirectory;
         candidate.OrganizeReplaysByGame = OrganizeByGameBox.IsChecked == true;
+        candidate.AccentColor = GetSelectedRadioTag(
+            AccentColorOptions,
+            _config.AccentColor);
         candidate.Hotkey = _pendingSaveHotkey;
         candidate.ToggleReplayHotkey = _pendingToggleHotkey;
         return candidate;
     }
 
     private static bool SettingsValuesEqual(Config left, Config right) =>
+        string.Equals(left.CaptureMode, right.CaptureMode, StringComparison.Ordinal) &&
         left.ReplayEnabled == right.ReplayEnabled &&
         left.WarnWhenGameStartsWithReplayOff == right.WarnWhenGameStartsWithReplayOff &&
         left.ShowRecordingIndicator == right.ShowRecordingIndicator &&
@@ -1067,6 +1118,7 @@ public partial class SettingsWindow : Window
             right.OutputDirectory,
             StringComparison.OrdinalIgnoreCase) &&
         left.OrganizeReplaysByGame == right.OrganizeReplaysByGame &&
+        string.Equals(left.AccentColor, right.AccentColor, StringComparison.Ordinal) &&
         string.Equals(left.Hotkey, right.Hotkey, StringComparison.Ordinal) &&
         string.Equals(
             left.ToggleReplayHotkey,
@@ -1315,6 +1367,7 @@ public partial class SettingsWindow : Window
         UpdateLanguageMenuSelection();
         _ = RunUiActionAsync(LoadDeviceListsAsync);
         ApplyHardwareCapabilities();
+        UpdateCaptureModeState();
         UpdateCaptureSourceState();
         UpdateAudioRoutingState();
         UpdateRuntimeState(_runtimeActive);
@@ -1323,15 +1376,11 @@ public partial class SettingsWindow : Window
         _ = RefreshReplayLibraryAsync();
     }
 
-    private void GitHub_Click(object sender, RoutedEventArgs e)
+    private async void GitHub_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = UpdateService.RepositoryUrl,
-                UseShellExecute = true,
-            });
+            await ExternalLinkLauncher.OpenAsync(UpdateService.RepositoryUrl);
             AnimatePress(GitHubButton);
             AboutPopup.IsOpen = false;
         }
@@ -1341,15 +1390,12 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void ReportBug_Click(object sender, RoutedEventArgs e)
+    private async void ReportBug_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = BugReportInfo.BuildUrl(_config, _capabilities),
-                UseShellExecute = true,
-            });
+            await ExternalLinkLauncher.OpenAsync(
+                BugReportInfo.BuildUrl(_config, _capabilities));
             AnimatePress(ReportBugButton);
             AboutPopup.IsOpen = false;
         }
@@ -1359,15 +1405,11 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void FeatureRequest_Click(object sender, RoutedEventArgs e)
+    private async void FeatureRequest_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = UpdateService.FeatureRequestUrl,
-                UseShellExecute = true,
-            });
+            await ExternalLinkLauncher.OpenAsync(UpdateService.FeatureRequestUrl);
             AnimatePress(FeatureRequestButton);
             AboutPopup.IsOpen = false;
         }
@@ -1684,10 +1726,66 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void SaveReplay_Click(object sender, RoutedEventArgs e)
+    private async void SaveReplay_Click(object sender, RoutedEventArgs e)
     {
         AnimatePress(SaveReplayButton);
+        if (string.Equals(
+                _config.CaptureMode,
+                "recording",
+                StringComparison.Ordinal))
+        {
+            bool active = await _setReplayEnabled(!_runtimeActive);
+            UpdateRuntimeState(active);
+            return;
+        }
         _saveReplay();
+    }
+
+    private async void DashboardCaptureMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_updatingUi)
+            return;
+
+        string requestedMode = GetSelectedRadioTag(
+            DashboardCaptureModeOptions,
+            _config.CaptureMode);
+        if (string.Equals(requestedMode, _config.CaptureMode, StringComparison.Ordinal))
+            return;
+
+        if (!TryBeginAction())
+        {
+            UpdateRuntimeState(_runtimeActive);
+            return;
+        }
+
+        try
+        {
+            Config candidate = _config.Clone();
+            candidate.CaptureMode = requestedMode;
+            candidate.ReplayEnabled = false;
+            if (!await _applySettings(
+                    candidate,
+                    AutostartBox.IsChecked == true))
+            {
+                UpdateRuntimeState(_runtimeActive);
+                return;
+            }
+
+            Applied = true;
+            UpdateCaptureModeState();
+            UpdateRuntimeState(false);
+            if (sender is FrameworkElement element)
+                AnimatePress(element);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Capture mode switch", exception);
+            UpdateRuntimeState(_runtimeActive);
+        }
+        finally
+        {
+            EndAction();
+        }
     }
 
     private async void SourceChip_Click(object sender, RoutedEventArgs e)
@@ -1846,17 +1944,19 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void Window_Deactivated(object? sender, EventArgs e)
-    {
-        if (AboutPopup.IsOpen)
-            AboutPopup.IsOpen = false;
-    }
-
     private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
-        if (!AboutPopup.IsOpen ||
-            FindAncestor<ToggleButton>(e.OriginalSource as DependencyObject) ==
-                AboutButton)
+        if (!AboutPopup.IsOpen)
+        {
+            return;
+        }
+
+        DependencyObject? source = e.OriginalSource as DependencyObject;
+        // Popup is rendered in its own HWND. Treat controls inside its panel as
+        // internal clicks; closing during PreviewMouseDown used to prevent the
+        // Button Click event from ever firing.
+        if (source is not null &&
+            (AboutButton.IsAncestorOf(source) || AboutPopupPanel.IsAncestorOf(source)))
         {
             return;
         }
@@ -1994,8 +2094,14 @@ public partial class SettingsWindow : Window
 
     private void BrowseOutput_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new Microsoft.Win32.OpenFolderDialog { InitialDirectory = _outputDirectory };
-        if (dialog.ShowDialog() != true)
+        string initialDirectory = Directory.Exists(_outputDirectory)
+            ? _outputDirectory
+            : Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            InitialDirectory = initialDirectory,
+        };
+        if (dialog.ShowDialog(this) != true)
             return;
 
         _outputDirectory = dialog.FolderName;
@@ -2152,6 +2258,9 @@ public partial class SettingsWindow : Window
             return;
         }
         Config candidate = _config.Clone();
+        candidate.CaptureMode = GetSelectedRadioTag(
+            DashboardCaptureModeOptions,
+            "replay");
         candidate.ReplayEnabled = SettingsReplayToggle.IsChecked == true;
         candidate.WarnWhenGameStartsWithReplayOff = WarnGameOffBox.IsChecked == true;
         candidate.ShowRecordingIndicator =
@@ -2197,6 +2306,9 @@ public partial class SettingsWindow : Window
             candidate.AdvancedMicrophoneTrack = _pendingAdvancedMicrophoneTrack;
             candidate.OutputDirectory = _outputDirectory;
             candidate.OrganizeReplaysByGame = OrganizeByGameBox.IsChecked == true;
+            candidate.AccentColor = GetSelectedRadioTag(
+                AccentColorOptions,
+                _config.AccentColor);
             candidate.Hotkey = _pendingSaveHotkey;
             candidate.ToggleReplayHotkey = _pendingToggleHotkey;
             candidate.Normalize();
@@ -2240,6 +2352,7 @@ public partial class SettingsWindow : Window
             return false;
 
         ReplayToggle.IsEnabled = false;
+        DashboardCaptureModeOptions.IsEnabled = false;
         SystemSourceChip.IsEnabled = false;
         MicSourceChip.IsEnabled = false;
         foreach (ToggleButton button in _dashboardAudioButtons.Values)
@@ -2254,6 +2367,7 @@ public partial class SettingsWindow : Window
     {
         Interlocked.Exchange(ref _actionInProgress, 0);
         ReplayToggle.IsEnabled = true;
+        DashboardCaptureModeOptions.IsEnabled = true;
         SystemSourceChip.IsEnabled = !string.Equals(
             _config.AudioRoutingMode,
             "advanced",
@@ -2467,7 +2581,9 @@ public partial class SettingsWindow : Window
             {
                 Log.Write($"Trimmed replay saved: {savedPath}");
                 _ = RefreshReplayLibraryAsync();
-            })
+            },
+            initialVolumePercent: _config.PlayerVolume,
+            onVolumeChanged: PersistPlayerVolume)
         {
             Owner = this,
         };
@@ -2487,11 +2603,31 @@ public partial class SettingsWindow : Window
                 Log.Write($"Trimmed replay saved: {savedPath}");
                 _ = RefreshReplayLibraryAsync();
             },
-            ClipWindowMode.Preview)
+            ClipWindowMode.Preview,
+            _config.PlayerVolume,
+            PersistPlayerVolume)
         {
             Owner = this,
         };
         player.ShowDialog();
+        _ = RefreshReplayLibraryAsync();
+    }
+
+    private void PersistPlayerVolume(int volumePercent)
+    {
+        int normalized = Math.Clamp(volumePercent, 0, 100);
+        if (_config.PlayerVolume == normalized)
+            return;
+
+        _config.PlayerVolume = normalized;
+        try
+        {
+            _config.Save();
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Player volume save failed: {exception.Message}");
+        }
     }
 
     private void RequestDeleteReplay_Click(object sender, RoutedEventArgs e)

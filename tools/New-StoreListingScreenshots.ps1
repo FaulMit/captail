@@ -18,6 +18,7 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
 
 $screenshots = @(
     "captail-main.png",
+    "captail-feature-recording.png",
     "captail-settings-video.png",
     "captail-settings-audio.png",
     "captail-audio-routing.png",

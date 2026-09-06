@@ -84,9 +84,57 @@ function Find-AutomationElement {
 function Invoke-AutomationElement {
     param([System.Windows.Automation.AutomationElement]$Element)
 
-    $pattern = $Element.GetCurrentPattern(
-        [System.Windows.Automation.InvokePattern]::Pattern)
-    ([System.Windows.Automation.InvokePattern]$pattern).Invoke()
+    $pattern = $null
+    if ($Element.TryGetCurrentPattern(
+            [System.Windows.Automation.InvokePattern]::Pattern,
+            [ref]$pattern)) {
+        ([System.Windows.Automation.InvokePattern]$pattern).Invoke()
+        return
+    }
+    if ($Element.TryGetCurrentPattern(
+            [System.Windows.Automation.SelectionItemPattern]::Pattern,
+            [ref]$pattern)) {
+        $point = $Element.GetClickablePoint()
+        [NativeMethods]::SetCursorPos(
+            [int][Math]::Round($point.X),
+            [int][Math]::Round($point.Y)) | Out-Null
+        [NativeMethods]::mouse_event(
+            [NativeMethods]::MouseEventfLeftDown,
+            0,
+            0,
+            0,
+            [IntPtr]::Zero)
+        [NativeMethods]::mouse_event(
+            [NativeMethods]::MouseEventfLeftUp,
+            0,
+            0,
+            0,
+            [IntPtr]::Zero)
+        return
+    }
+    if ($Element.TryGetCurrentPattern(
+            [System.Windows.Automation.TogglePattern]::Pattern,
+            [ref]$pattern)) {
+        $point = $Element.GetClickablePoint()
+        [NativeMethods]::SetCursorPos(
+            [int][Math]::Round($point.X),
+            [int][Math]::Round($point.Y)) | Out-Null
+        [NativeMethods]::mouse_event(
+            [NativeMethods]::MouseEventfLeftDown,
+            0,
+            0,
+            0,
+            [IntPtr]::Zero)
+        [NativeMethods]::mouse_event(
+            [NativeMethods]::MouseEventfLeftUp,
+            0,
+            0,
+            0,
+            [IntPtr]::Zero)
+        return
+    }
+
+    throw "Automation element '$($Element.Current.AutomationId)' has no supported activation pattern."
 }
 
 function Set-SettingsScrollPercent {
@@ -433,6 +481,8 @@ public static class NativeMethods
     public const uint SwpNoActivate = 0x0010;
     public const uint Srccopy = 0x00CC0020;
     public const uint CaptureBlt = 0x40000000;
+    public const uint MouseEventfLeftDown = 0x0002;
+    public const uint MouseEventfLeftUp = 0x0004;
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
@@ -488,6 +538,14 @@ public static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll")]
+    public static extern void mouse_event(
+        uint dwFlags,
+        uint dx,
+        uint dy,
+        uint dwData,
+        IntPtr dwExtraInfo);
 }
 "@
 
@@ -513,6 +571,7 @@ $originalConfigBackup = if ($hadConfigBackup) { [System.IO.File]::ReadAllBytes($
 $originalCursor = New-Object System.Drawing.Point
 [System.Windows.Forms.Cursor]::Position | ForEach-Object { $originalCursor = $_ }
 $automationProcess = $null
+$generatedRecordingPaths = @()
 
 try {
     Stop-CaptailInstance -Executable $CaptailExe
@@ -547,8 +606,6 @@ try {
     Start-Sleep -Seconds 4
 
     if (-not $EditorOnly) {
-        Capture-Window -Root $root -Path (Join-Path $OutputDirectory "captail-main.png")
-
         $settingsButton = Find-AutomationElement -Root $root -AutomationId "SettingsButton"
         Invoke-AutomationElement -Element $settingsButton
         Find-AutomationElement -Root $root -AutomationId "DoneButton" | Out-Null
@@ -571,6 +628,46 @@ try {
             -Path (Join-Path $OutputDirectory "captail-audio-routing.png")
         Close-AutomationWindow -Window $routingRoot
         Start-Sleep -Milliseconds 500
+
+        $doneButton = Find-AutomationElement -Root $root -AutomationId "DoneButton"
+        Invoke-AutomationElement -Element $doneButton
+        Start-Sleep -Seconds 3
+        Capture-Window -Root $root -Path (Join-Path $OutputDirectory "captail-main.png")
+
+        $recordingDirectory = if ($null -ne $resolvedReplay) {
+            Split-Path -Parent $resolvedReplay
+        }
+        else {
+            $originalOutputDirectory
+        }
+        $recordingsBefore = @(
+            Get-ChildItem -LiteralPath $recordingDirectory -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.BaseName.StartsWith("Recording_", [StringComparison]::OrdinalIgnoreCase) } |
+                Select-Object -ExpandProperty FullName
+        )
+        $recordingModeButton = Find-AutomationElement -Root $root `
+            -AutomationId "DashboardRecordingModeButton"
+        Invoke-AutomationElement -Element $recordingModeButton
+        Start-Sleep -Seconds 2
+        $captureToggle = Find-AutomationElement -Root $root -AutomationId "ReplayToggle"
+        Invoke-AutomationElement -Element $captureToggle
+        Start-Sleep -Seconds 6
+        Capture-Window -Root $root `
+            -Path (Join-Path $OutputDirectory "captail-feature-recording.png")
+        Invoke-AutomationElement -Element $captureToggle
+        Start-Sleep -Seconds 3
+        $generatedRecordingPaths = @(
+            Get-ChildItem -LiteralPath $recordingDirectory -File -ErrorAction SilentlyContinue |
+                Where-Object {
+                    $_.BaseName.StartsWith("Recording_", [StringComparison]::OrdinalIgnoreCase) -and
+                    $_.FullName -notin $recordingsBefore
+                } |
+                Select-Object -ExpandProperty FullName
+        )
+        $replayModeButton = Find-AutomationElement -Root $root `
+            -AutomationId "DashboardReplayModeButton"
+        Invoke-AutomationElement -Element $replayModeButton
+        Start-Sleep -Seconds 2
     }
 
     if (-not $SkipEditor) {
@@ -580,11 +677,6 @@ try {
         Assert-ShowcaseReplay -Path $resolvedReplay -Executable $CaptailExe `
             -AllowMismatch $AllowNonShowcaseReplay.IsPresent
 
-        if (-not $EditorOnly) {
-            $doneButton = Find-AutomationElement -Root $root -AutomationId "DoneButton"
-            Invoke-AutomationElement -Element $doneButton
-            Start-Sleep -Seconds 3
-        }
         $editorProcess = Get-Process -Id $automationProcess.Id
         Open-FirstReplayAction -Root $root -ReplayPath $resolvedReplay -Action Preview
         $playerRoot = Find-CaptailChildWindow -Process $editorProcess `
@@ -609,6 +701,10 @@ finally {
     }
     catch {
         Write-Warning "Captail shutdown during cleanup failed: $($_.Exception.Message)"
+    }
+
+    foreach ($generatedRecordingPath in $generatedRecordingPaths) {
+        Remove-Item -LiteralPath $generatedRecordingPath -Force -ErrorAction SilentlyContinue
     }
 
     New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null

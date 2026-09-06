@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
@@ -17,12 +18,18 @@ public sealed class MpvHost : HwndHost
 {
     private const string HostWindowClass = "CaptailMpvHostWindow";
     private const int ErrorClassAlreadyExists = 1410;
-    private const int BlackBrush = 4;
     private const uint WsChild = 0x40000000;
     private const uint WsVisible = 0x10000000;
+    private const uint WsClipChildren = 0x02000000;
+    private const uint WsClipSiblings = 0x04000000;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
+    private const uint WmEraseBackground = 0x0014;
+    private const uint WmLButtonDown = 0x0201;
+    private const uint WmMouseWheel = 0x020A;
+    private const uint WmParentNotify = 0x0210;
     private static readonly object HostClassLock = new();
+    private static readonly ConcurrentDictionary<nint, WeakReference<MpvHost>> Hosts = new();
     private static readonly NativeWindowProcedure HostWindowProcedure = HostWindowProc;
     private static bool _hostClassRegistered;
 
@@ -38,9 +45,15 @@ public sealed class MpvHost : HwndHost
     private double _lastPosition;
     private int _videoTrackId;
     private int[] _audioTrackIds = [];
+    private int _volumePercent = 100;
     private (int Width, int Height) _requestedSize;
+    private string? _lastNativeLog;
+    private DateTime _lastNativeLogUtc;
 
     public bool IsReady => !_disposed && _fileLoaded && _mpvHandle != 0;
+    public int VolumePercent => _volumePercent;
+    public event Action<int>? NativeMouseWheel;
+    public event Action? NativeMouseLeftButton;
 
     public bool IsBuffering => IsReady &&
         (string.Equals(
@@ -55,6 +68,31 @@ public sealed class MpvHost : HwndHost
 #if DEBUG
     internal int DetectedAudioTrackCount => _audioTrackIds.Length;
 
+    internal bool TryValidateAudioMix(int expectedTrackCount, out string details)
+    {
+        string graph = MpvNative.GetPropertyStringValue(
+            _mpvHandle,
+            "lavfi-complex") ?? string.Empty;
+        int[] expectedIds = _audioTrackIds.Take(expectedTrackCount).ToArray();
+        bool hasInputs = expectedIds.All(id => graph.Contains(
+            $"[aid{id}]",
+            StringComparison.Ordinal));
+        bool hasOutput = graph.Contains("[ao]", StringComparison.Ordinal);
+        details = string.IsNullOrEmpty(graph)
+            ? "audioMix=<none>"
+            : $"audioMix={string.Join('+', expectedIds.Select(id => $"aid{id}"))}";
+        return expectedTrackCount > 1 && hasInputs && hasOutput;
+    }
+
+    internal void RaiseNativeMouseWheelForQa(int delta)
+    {
+        long wheelParameter = (long)(ushort)(short)delta << 16;
+        HostWindowProc(_hostHandle, WmMouseWheel, (nint)wheelParameter, 0);
+    }
+
+    internal void RaiseNativeMouseLeftButtonForQa() =>
+        HostWindowProc(_hostHandle, WmParentNotify, (nint)WmLButtonDown, 0);
+
     internal bool TryValidateVideoOutput(out string details)
     {
         string Value(string name) =>
@@ -63,11 +101,15 @@ public sealed class MpvHost : HwndHost
         string codec = Value("video-codec");
         string hardwareDecoder = Value("hwdec-current");
         string videoOutput = Value("current-vo");
+        string frameRate = Value("estimated-vf-fps");
+        string decoderDrops = Value("decoder-frame-drop-count");
+        string outputDrops = Value("frame-drop-count");
         bool hasWidth = TryGetInt64("video-out-params/w", out long width) && width > 0;
         bool hasHeight = TryGetInt64("video-out-params/h", out long height) && height > 0;
         details =
             $"vid={videoId}, codec={codec}, hwdec={hardwareDecoder}, " +
-            $"vo={videoOutput}, size={width}x{height}";
+            $"vo={videoOutput}, size={width}x{height}, fps={frameRate}, " +
+            $"drops={decoderDrops}/{outputDrops}";
         return videoId != "no" && codec != "<none>" &&
                videoOutput != "<none>" && hasWidth && hasHeight;
     }
@@ -121,7 +163,7 @@ public sealed class MpvHost : HwndHost
             0,
             HostWindowClass,
             "",
-            WsChild | WsVisible,
+            WsChild | WsVisible | WsClipChildren | WsClipSiblings,
             0,
             0,
             1,
@@ -132,6 +174,7 @@ public sealed class MpvHost : HwndHost
             0);
         if (_hostHandle == 0)
             throw new InvalidOperationException("Could not create embedded preview host.");
+        Hosts[_hostHandle] = new WeakReference<MpvHost>(this);
 
         try
         {
@@ -149,6 +192,7 @@ public sealed class MpvHost : HwndHost
     protected override void DestroyWindowCore(HandleRef hwnd)
     {
         Shutdown();
+        Hosts.TryRemove(hwnd.Handle, out _);
         if (hwnd.Handle != 0)
             DestroyWindow(hwnd.Handle);
         _hostHandle = 0;
@@ -178,6 +222,12 @@ public sealed class MpvHost : HwndHost
             throw new FileNotFoundException("Replay file is unavailable.", path);
         EnsureInitialized();
 
+        // Drain EndFile from previous item before installing completion for next.
+        // Otherwise replacement event can clear next file's pending load and leave
+        // preview black until timeout.
+        if (IsReady)
+            await StopAsync(cancellationToken);
+
         var completion = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         lock (_stateLock)
@@ -186,6 +236,10 @@ public sealed class MpvHost : HwndHost
             _fileLoadedCompletion = completion;
         }
 
+        // lavfi-complex survives loadfile replacement. If next replay exposes a
+        // different audio-track count, mpv tries to bind old aid labels before
+        // FileLoaded and aborts with disconnected-pad errors.
+        SetProperty("lavfi-complex", "");
         SetProperty("pause", "yes");
         SetProperty("start", Seconds(start));
         Command("loadfile", path, "replace");
@@ -239,6 +293,18 @@ public sealed class MpvHost : HwndHost
             "speed",
             normalized.ToString("0.##", CultureInfo.InvariantCulture));
     }
+
+    public void SetVolumePercent(int volumePercent)
+    {
+        if (!IsReady)
+            return;
+        _volumePercent = Math.Clamp(volumePercent, 0, 100);
+        SetProperty(
+            "volume",
+            _volumePercent.ToString(CultureInfo.InvariantCulture));
+    }
+
+    internal void RefreshVideoLayout() => ResizeVideoWindow();
 
     public void Seek(double positionSeconds, bool exact)
     {
@@ -371,8 +437,14 @@ public sealed class MpvHost : HwndHost
             SetOption("vo", "gpu-next");
             SetOption("gpu-api", "d3d11");
             SetOption("gpu-context", "d3d11");
-            SetOption("hwdec", "auto-safe");
+            // Prefer direct D3D11 decode without a system-memory copy-back.
+            // Safe auto fallback retains playback where interop is unavailable.
+            SetOption("hwdec", "d3d11va,auto-safe");
             SetOption("video-sync", "audio");
+            // Instant replays can be 144/240 FPS while the display or a running
+            // game leaves less presentation budget. Skipping already-late decode
+            // work keeps playback current instead of accumulating visible stalls.
+            SetOption("framedrop", "decoder");
             SetOption("interpolation", "no");
             SetOption("hr-seek", "yes");
             SetOption("hr-seek-framedrop", "yes");
@@ -383,6 +455,9 @@ public sealed class MpvHost : HwndHost
 
             int result = MpvNative.Initialize(_mpvHandle);
             ThrowOnError(result, "Could not initialize libmpv");
+            // Keep native decoder failures actionable instead of surfacing only
+            // generic "loading failed" EndFile errors to the UI.
+            _ = MpvNative.RequestLogMessages(_mpvHandle, "error");
             _eventCancellation = new CancellationTokenSource();
             _eventTask = Task.Factory.StartNew(
                 () => ProcessEvents(_eventCancellation.Token),
@@ -408,6 +483,10 @@ public sealed class MpvHost : HwndHost
             MpvEvent playerEvent = Marshal.PtrToStructure<MpvEvent>(eventPointer);
             switch (playerEvent.EventId)
             {
+                case MpvEventId.LogMessage:
+                    HandleLogMessage(playerEvent.Data);
+                    break;
+
                 case MpvEventId.FileLoaded:
                     lock (_stateLock)
                     {
@@ -447,8 +526,8 @@ public sealed class MpvHost : HwndHost
                 _fileLoadedCompletion?.TrySetException(
                     new InvalidOperationException(
                         $"libmpv could not load replay: {MpvNative.ErrorText(end.Error)}"));
+                _fileLoadedCompletion = null;
             }
-            _fileLoadedCompletion = null;
         }
     }
 
@@ -575,6 +654,12 @@ public sealed class MpvHost : HwndHost
         nint videoWindow = FindWindowExW(_hostHandle, 0, null, null);
         if (videoWindow != 0)
         {
+            if (GetClientRect(videoWindow, out NativeRect videoRect) &&
+                videoRect.Right - videoRect.Left == width &&
+                videoRect.Bottom - videoRect.Top == height)
+            {
+                return;
+            }
             SetWindowPos(
                 videoWindow,
                 0,
@@ -617,7 +702,7 @@ public sealed class MpvHost : HwndHost
                 Size = (uint)Marshal.SizeOf<WindowClassEx>(),
                 WindowProcedure = HostWindowProcedure,
                 Instance = GetModuleHandleW(null),
-                BackgroundBrush = GetStockObject(BlackBrush),
+                BackgroundBrush = 0,
                 ClassName = HostWindowClass,
             };
             ushort atom = RegisterClassExW(ref windowClass);
@@ -631,8 +716,57 @@ public sealed class MpvHost : HwndHost
         }
     }
 
-    private static nint HostWindowProc(nint window, uint message, nint wParam, nint lParam) =>
-        DefWindowProcW(window, message, wParam, lParam);
+    private static nint HostWindowProc(
+        nint window,
+        uint message,
+        nint wParam,
+        nint lParam)
+    {
+        if (message == WmEraseBackground)
+            return 1;
+
+        if (message == WmMouseWheel &&
+            Hosts.TryGetValue(window, out WeakReference<MpvHost>? reference) &&
+            reference.TryGetTarget(out MpvHost? host))
+        {
+            int delta = unchecked((short)(((long)wParam >> 16) & 0xFFFF));
+            host.Dispatcher.BeginInvoke(() => host.NativeMouseWheel?.Invoke(delta));
+            return 0;
+        }
+
+        if (message == WmParentNotify &&
+            ((uint)(long)wParam & 0xFFFF) == WmLButtonDown &&
+            Hosts.TryGetValue(window, out WeakReference<MpvHost>? clickReference) &&
+            clickReference.TryGetTarget(out MpvHost? clickHost))
+        {
+            clickHost.Dispatcher.BeginInvoke(
+                () => clickHost.NativeMouseLeftButton?.Invoke());
+            return 0;
+        }
+
+        return DefWindowProcW(window, message, wParam, lParam);
+    }
+
+    private void HandleLogMessage(nint data)
+    {
+        if (data == 0)
+            return;
+        MpvEventLogMessage message = Marshal.PtrToStructure<MpvEventLogMessage>(data);
+        string prefix = Marshal.PtrToStringUTF8(message.Prefix) ?? "mpv";
+        string text = Marshal.PtrToStringUTF8(message.Text) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+        text = text.Trim();
+        DateTime now = DateTime.UtcNow;
+        if (string.Equals(_lastNativeLog, text, StringComparison.Ordinal) &&
+            now - _lastNativeLogUtc < TimeSpan.FromSeconds(1))
+        {
+            return;
+        }
+        _lastNativeLog = text;
+        _lastNativeLogUtc = now;
+        Log.Write($"libmpv {prefix}: {text}");
+    }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct WindowClassEx
@@ -679,9 +813,19 @@ public sealed class MpvHost : HwndHost
         public readonly int PlaylistInsertCount;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private readonly struct MpvEventLogMessage
+    {
+        public readonly nint Prefix;
+        public readonly nint Level;
+        public readonly nint Text;
+        public readonly int LogLevel;
+    }
+
     private enum MpvEventId
     {
         None = 0,
+        LogMessage = 2,
         Shutdown = 1,
         EndFile = 7,
         FileLoaded = 8,
@@ -712,6 +856,11 @@ public sealed class MpvHost : HwndHost
 
         [DllImport(Library, EntryPoint = "mpv_initialize", CallingConvention = CallingConvention.Cdecl)]
         internal static extern int Initialize(nint handle);
+
+        [DllImport(Library, EntryPoint = "mpv_request_log_messages", CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int RequestLogMessages(
+            nint handle,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string minLevel);
 
         [DllImport(Library, EntryPoint = "mpv_terminate_destroy", CallingConvention = CallingConvention.Cdecl)]
         internal static extern void TerminateDestroy(nint handle);
@@ -829,6 +978,4 @@ public sealed class MpvHost : HwndHost
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandleW(string? moduleName);
 
-    [DllImport("gdi32.dll")]
-    private static extern nint GetStockObject(int objectIndex);
 }

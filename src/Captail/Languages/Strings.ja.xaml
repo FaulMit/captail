@@ -142,7 +142,7 @@
   <sys:String x:Key="L.Audio.Separate">別々のトラック</sys:String>
   <sys:String x:Key="L.Audio.Codec">オーディオコーデック</sys:String>
   <sys:String x:Key="L.Help.MicBoost">エンコード前にマイクゲインを上げます。音量を 100% にしても静かなときに使用してください。ブーストが多すぎるとノイズが発生し、大音量の音声が歪む可能性があります。</sys:String>
-  <sys:String x:Key="L.Help.AudioTracks">ミックストラックはどこでも再生され、共有するのが最も簡単です。個別のトラックでは、ゲーム/システム オーディオとマイクを独立して編集できます。一部のプレーヤーは一度に 1 つのトラックだけを再生します。</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">ミックス音声は共有に便利です。分離モードは、すべての出力デバイスからシステム音、検出したゲーム音、マイク音を個別のトラックに録音します。ゲーム音はシステムトラックに含まれません。ゲームが未検出の場合、ゲームトラックは無音です。</sys:String>
   <sys:String x:Key="L.Help.ApplicationAudio">Captail で録音するアプリを選び、それぞれにトラックを割り当てます。未選択のアプリは録音されません。利用できるトラック数は選択した音声コーデックによって変わります。</sys:String>
   <sys:String x:Key="L.Help.AudioCodec">AAC は MP4 として保存され、ほぼすべてのプレーヤーやエディターで動作します。 Opus は効率的で、低ビットレートでも優れたサウンドを実現しますが、MKV を使用するため、最新のエディタが必要になる場合があります。</sys:String>
 
@@ -204,6 +204,8 @@
   <sys:String x:Key="L.Library.ShortcutSeekHint">5秒戻る / 進む</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeed">再生速度</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeedHint">下で遅く · 上で速く</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolume">音量</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolumeHint">小さく / 大きく</sys:String>
   <sys:String x:Key="L.Library.ShortcutFullscreenHint">プレーヤー表示を切り替えます</sys:String>
   <sys:String x:Key="L.Library.ShortcutCloseHint">全画面を終了または閉じます</sys:String>
   <sys:String x:Key="L.Library.Overwrite">上書き</sys:String>
@@ -329,7 +331,41 @@
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">リプレイバッファが予期せず停止しました。</sys:String>
   <sys:String x:Key="L.Engine.BufferError">リプレイバッファ: {0}</sys:String>
 
-  <sys:String x:Key="L.Unit.Seconds">{0}秒</sys:String>
+
+  <sys:String x:Key="L.Capture.Mode">キャプチャモード</sys:String>
+  <sys:String x:Key="L.Capture.ModeHint">インスタントリプレイまたは連続録画を選択</sys:String>
+  <sys:String x:Key="L.Capture.Replay">インスタントリプレイ</sys:String>
+  <sys:String x:Key="L.Capture.Recording">録画</sys:String>
+  <sys:String x:Key="L.Capture.RecordingEnabled">録画中</sys:String>
+  <sys:String x:Key="L.Capture.StartRecording">録画を開始</sys:String>
+  <sys:String x:Key="L.Capture.StopRecording">録画を停止</sys:String>
+  <sys:String x:Key="L.Status.Recording">録画中</sys:String>
+  <sys:String x:Key="L.Status.RecordingDetail">{0} · {1}</sys:String>
+  <sys:String x:Key="L.Status.RecordingDisabled">録画はオフです</sys:String>
+  <sys:String x:Key="L.Status.RecordingIdle">録画していません</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedTitle">録画を開始しました</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedDetail">Captail は連続録画を保存しています。</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedTitle">録画を保存しました</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedDetail">連続録画を保存しました。</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameTitle">録画はオフです</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameDetail">{0} を検出しました。録画を開始して保存してください。</sys:String>
+  <sys:String x:Key="L.Engine.ReplayUnavailableWhileRecording">録画モードではリプレイを保存できません。</sys:String>
+  <sys:String x:Key="L.Tray.Recording">Captail · 録画中</sys:String>
+  <sys:String x:Key="L.Tray.ToggleRecording">録画を開始 / 停止</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecording">録画を開始 / 停止</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecordingHint">連続録画を切り替えます</sys:String>
+  <sys:String x:Key="L.Section.Appearance">外観</sys:String>
+  <sys:String x:Key="L.Appearance.Accent">アクセントカラー</sys:String>
+  <sys:String x:Key="L.Appearance.AccentHint">Captail 全体に適用されます</sys:String>
+  <sys:String x:Key="L.Appearance.Mint">ミント</sys:String>
+  <sys:String x:Key="L.Appearance.Blue">ブルー</sys:String>
+  <sys:String x:Key="L.Appearance.Violet">バイオレット</sys:String>
+  <sys:String x:Key="L.Appearance.Rose">レッド</sys:String>
+  <sys:String x:Key="L.Appearance.Amber">アンバー</sys:String>
+  <sys:String x:Key="L.Library.PreviousReplay">前のリプレイ</sys:String>
+  <sys:String x:Key="L.Library.NextReplay">次のリプレイ</sys:String>
+  <sys:String x:Key="L.Library.AllClips">すべてのクリップ</sys:String>
+  <sys:String x:Key="L.Library.RecentReplays">最近のリプレイ</sys:String><sys:String x:Key="L.Unit.Seconds">{0}秒</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0}分</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} GB</sys:String>
   <sys:String x:Key="L.Audio.PerAppRouting">アプリ別</sys:String>
@@ -358,4 +394,16 @@
   <sys:String x:Key="L.AdvancedAudio.ProcessCount">{0} プロセス</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioTitle">アプリ音声</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioEmpty">保存する前にアプリを選択するか、マイクを有効にしてください。</sys:String>
+  <sys:String x:Key="L.Library.AllGames">すべてのゲーム</sys:String>
+  <sys:String x:Key="L.Library.NoGame">ゲームなし</sys:String>
+  <sys:String x:Key="L.Library.AllModes">すべての録画モード</sys:String>
+  <sys:String x:Key="L.Library.ModeReplay">インスタントリプレイ</sys:String>
+  <sys:String x:Key="L.Library.ModeRecording">録画</sys:String>
+  <sys:String x:Key="L.Library.ModeUnknown">不明なモード</sys:String>
+  <sys:String x:Key="L.Library.SelectAll">すべて選択 / 解除</sys:String>
+  <sys:String x:Key="L.Library.SelectClip">クリップを選択</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelected">選択項目を削除 ({0})</sys:String>
+  <sys:String x:Key="L.Library.SelectedCount">選択したクリップ: {0}</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionTitle">選択したクリップを削除しますか？</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionMessage">選択したファイルはごみ箱に移動されます。</sys:String>
 </ResourceDictionary>

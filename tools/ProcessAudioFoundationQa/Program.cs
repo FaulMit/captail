@@ -8,10 +8,16 @@ internal static class Program
 {
     private static int _passed;
 
-    private static int Main()
+    [STAThread]
+    private static int Main(string[] args)
     {
         try
         {
+            if (args.Contains("--overlay-accent"))
+            {
+                Run("notification uses selected accent", NotificationUsesSelectedAccent);
+                return 0;
+            }
             Run("normalized executable matching", NormalizedExecutableMatching);
             Run("independent same-name roots", IndependentSameNameRoots);
             Run("same-name descendant deduplication", SameNameDescendantDeduplication);
@@ -29,6 +35,9 @@ internal static class Program
             Run("routing across tracks", RoutingAcrossTracks);
             Run("mixer bits and encoder continuity", MixerBitsAndEncoderContinuity);
             Run("simple audio topology regression", SimpleAudioTopologyRegression);
+            Run("detected game audio routing", DetectedGameAudioRouting);
+            Run("separate game identity restriction", SeparateGameIdentityRestriction);
+            Run("replay recording mode classification", ReplayRecordingModeClassification);
             Run("polling reacquisition cadence", PollingReacquisitionCadence);
             Run("process audio health notifications", ProcessAudioHealthNotifications);
             Run("advanced capability model", AdvancedCapabilityModel);
@@ -38,6 +47,9 @@ internal static class Program
             Run("audio process group priority", AudioProcessGroupPriority);
             Run("audio route view refresh stability", AudioRouteViewRefreshStability);
             Run("process icon loading and caching", ProcessIconLoadingAndCaching);
+            Run("game catalog matching", GameCatalogMatching);
+            Run("ambiguous game executable fallback", AmbiguousGameExecutableFallback);
+            Run("friendly replay game folders", FriendlyReplayGameFolders);
             Run("replay audio labels come from file metadata", ReplayAudioLabelsComeFromMetadata);
             Console.WriteLine($"PASS {_passed} process audio foundation tests");
             return 0;
@@ -144,6 +156,65 @@ internal static class Program
         Equal(1, result.ActiveSources);
         Equal(1, result.FailedSources);
         Equal(20u, reconciler.ActiveIdentities.Single().ProcessId);
+    }
+
+    private static void SeparateGameIdentityRestriction()
+    {
+        ProcessSnapshot snapshot = Snapshot(
+            Node(10, 100, 0, "game.exe"),
+            Node(11, 110, 10, "helper.exe"),
+            Node(20, 200, 0, "game.exe"));
+        var created = new List<ProcessIdentity>();
+        using var reconciler = new ProcessAudioReconciler(
+            (identity, _) => { created.Add(identity); return (nint)identity.ProcessId; },
+            _ => { });
+        var target = new ProcessAudioTarget("game.exe", 2) { Identity = new ProcessIdentity(10, 100) };
+        Equal(1, reconciler.Reconcile(snapshot, [target]).ActiveSources);
+        SequenceEqual([10u], created.Select(identity => identity.ProcessId));
+        ProcessSnapshot restarted = Snapshot(Node(10, 300, 0, "game.exe"));
+        Equal(0, reconciler.Reconcile(restarted, [target]).ActiveSources);
+        Equal(1, reconciler.Reconcile(restarted,
+            [target with { Identity = new ProcessIdentity(10, 300) }]).ActiveSources);
+        var config = new Config { CaptureSystemAudio = true, SeparateAudioTracks = true };
+        Equal(false, ObsReplayEngine.IsAudioRoutingAvailable(config, AdvancedProcessAudioAvailability.SourceUnavailable));
+        config.SeparateAudioTracks = false;
+        Equal(true, ObsReplayEngine.IsAudioRoutingAvailable(config, AdvancedProcessAudioAvailability.SourceUnavailable));
+    }
+
+    private static void ReplayRecordingModeClassification()
+    {
+        var clip = new ReplayClip("unused.mp4", "Recording_2026-09-06.mp4", null,
+            DateTime.MinValue, 1, TimeSpan.FromSeconds(1), null);
+        Equal("recording", clip.RecordingMode);
+        Equal("replay", (clip with { Name = "Replay_2026-09-06_trimmed.mp4" }).RecordingMode);
+        Equal("unknown", (clip with { Name = "renamed.mp4" }).RecordingMode);
+    }
+
+    private static void NotificationUsesSelectedAccent()
+    {
+        var application = new System.Windows.Application();
+        ThemeManager.ApplyAccent("violet");
+        var overlay = new OverlayNotificationWindow();
+        try
+        {
+            foreach (OverlayTone tone in new[] { OverlayTone.Success, OverlayTone.Neutral })
+            {
+                overlay.ShowNotification("✓", "Accent QA", "Violet", tone);
+                var expected = ((System.Windows.Media.SolidColorBrush)application.Resources["AccentBrush"]).Color;
+                var icon = (System.Windows.Controls.TextBlock)overlay.FindName("IconText");
+                var actual = ((System.Windows.Media.SolidColorBrush)icon.Foreground).Color;
+                Equal(expected, actual);
+                ThemeManager.ApplyAccent("blue");
+                expected = ((System.Windows.Media.SolidColorBrush)application.Resources["AccentBrush"]).Color;
+                actual = ((System.Windows.Media.SolidColorBrush)icon.Foreground).Color;
+                Equal(expected, actual);
+            }
+        }
+        finally
+        {
+            overlay.ClosePermanently();
+            application.Shutdown();
+        }
     }
 
     private static void AudioRoutingFormatLimits()
@@ -426,7 +497,6 @@ internal static class Program
             throw new InvalidOperationException("A normalized clone changed the pipeline.");
         if (ReferenceEquals(source.ProcessAudioRoutes, clone.ProcessAudioRoutes))
             throw new InvalidOperationException("Route lists were not deep-copied.");
-
         clone.ProcessAudioRoutes[0].Track = 6;
         if (source.PipelineEquals(clone))
             throw new InvalidOperationException("A route change did not restart the pipeline.");
@@ -457,7 +527,7 @@ internal static class Program
         Equal("simple", config.AudioRoutingMode);
         Equal(0, config.ProcessAudioRoutes.Count);
         Equal(1, config.AdvancedMicrophoneTrack);
-        Equal(2, ObsReplayEngine.AudioTrackCount(config));
+        Equal(3, ObsReplayEngine.AudioTrackCount(config));
 
         config.ProcessAudioRoutes = null!;
         Config copied = config.Clone();
@@ -542,7 +612,16 @@ internal static class Program
         config.CaptureMicrophone = true;
         Equal(1, ObsReplayEngine.AudioTrackCount(config));
         config.SeparateAudioTracks = true;
+        Equal(3, ObsReplayEngine.AudioTrackCount(config));
+        Equal("System", ObsReplayEngine.BuildAudioTrackName(config, 1));
+        Equal("Game", ObsReplayEngine.BuildAudioTrackName(config, 2));
+        Equal("Microphone", ObsReplayEngine.BuildAudioTrackName(config, 3));
+        config.CaptureMicrophone = false;
         Equal(2, ObsReplayEngine.AudioTrackCount(config));
+        config.CaptureSystemAudio = false;
+        config.CaptureMicrophone = true;
+        Equal(1, ObsReplayEngine.AudioTrackCount(config));
+        Equal("Microphone", ObsReplayEngine.BuildAudioTrackName(config, 1));
     }
 
     private static void PollingReacquisitionCadence()
@@ -563,6 +642,74 @@ internal static class Program
 
         cadence.Observe(Result(desired: 0, destroyed: 1));
         Equal(TimeSpan.FromMilliseconds(250), cadence.NextInterval);
+    }
+
+    private static void DetectedGameAudioRouting()
+    {
+        var config = new Config
+        {
+            CaptureSource = "game",
+            CaptureSystemAudio = true,
+            CaptureMicrophone = true,
+            SeparateAudioTracks = true,
+            AudioRoutingMode = "simple",
+        };
+        Equal(
+            true,
+            ObsReplayEngine.UsesDetectedGameAudio(
+                config,
+                AdvancedProcessAudioAvailability.Available));
+        Equal(
+            true,
+            ObsReplayEngine.ShouldMonitorProcessAudio(
+                config,
+                AdvancedProcessAudioAvailability.Available));
+        ProcessAudioTarget target = ObsReplayEngine.BuildProcessAudioTargets(
+                config,
+                "peak.exe",
+                AdvancedProcessAudioAvailability.Available)
+            .Single();
+        Equal("peak.exe", target.Executable);
+        Equal(2, target.Track);
+
+        config.CaptureSource = "desktop";
+        Equal(
+            true,
+            ObsReplayEngine.UsesDetectedGameAudio(
+                config,
+                AdvancedProcessAudioAvailability.Available));
+        Equal(
+            1,
+            ObsReplayEngine.BuildProcessAudioTargets(
+                    config,
+                    "peak.exe",
+                    AdvancedProcessAudioAvailability.Available)
+                .Count);
+
+        config.CaptureSource = "game";
+        Equal(
+            false,
+            ObsReplayEngine.UsesDetectedGameAudio(
+                config,
+                AdvancedProcessAudioAvailability.SourceUnavailable));
+
+        config.AudioRoutingMode = "advanced";
+        config.ProcessAudioRoutes =
+        [
+            new ProcessAudioRoute
+            {
+                Executable = "Discord.exe",
+                Track = 3,
+            },
+        ];
+        ProcessAudioTarget advancedTarget =
+            ObsReplayEngine.BuildProcessAudioTargets(
+                    config,
+                    "peak.exe",
+                    AdvancedProcessAudioAvailability.Available)
+                .Single();
+        Equal("Discord.exe", advancedTarget.Executable);
+        Equal(3, advancedTarget.Track);
     }
 
     private static void ProcessAudioHealthNotifications()
@@ -662,6 +809,37 @@ internal static class Program
             throw new InvalidOperationException(
                 "Advanced diagnostics exposed a configured executable.");
         }
+    }
+
+    private static void GameCatalogMatching()
+    {
+        Equal("PEAK", GameCatalog.ExactNameForExecutable(
+            @"C:\Games\PEAK\peak.exe"));
+        if (GameCatalog.Count < 10_000)
+        {
+            throw new InvalidOperationException(
+                $"Expected full game catalog; found {GameCatalog.Count} entries.");
+        }
+    }
+
+    private static void AmbiguousGameExecutableFallback()
+    {
+        Equal<string?>(null, GameCatalog.ExactNameForExecutable("game.exe"));
+    }
+
+    private static void FriendlyReplayGameFolders()
+    {
+        var config = new Config
+        {
+            OrganizeReplaysByGame = true,
+            OutputDirectory = @"C:\Captail",
+        };
+        Equal(
+            @"C:\Captail\PEAK",
+            ReplayPaths.CaptureDirectory(config, @"C:\Games\PEAK\peak.exe"));
+        Equal(
+            @"C:\Captail\game",
+            ReplayPaths.CaptureDirectory(config, @"C:\Games\Unknown\game.exe"));
     }
 
     private static ProcessAudioReconcileResult Result(

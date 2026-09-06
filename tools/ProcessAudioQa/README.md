@@ -36,6 +36,13 @@ PID-aware example:
 `--creation-time-offset 1` deliberately supplies a stale identity and verifies
 that the native source refuses to activate or retarget the PID.
 
+`--exclude-target true` verifies the complementary system capture used by
+Separate mode. Run two independent Target/Child executables at distinct
+frequencies (for example 3137 and 6173 Hz), watch only Target, and compare
+include/exclude reports in different output directories. Include must retain
+the watched tone; exclude must retain the other tone and suppress the watched
+tone. This validates native audio separation independently of game hooking.
+
 All reports, recordings, and OBS configuration are written below
 `.qa/process-audio`, which is ignored by Git.
 

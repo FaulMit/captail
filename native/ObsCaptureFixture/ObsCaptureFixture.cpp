@@ -20,11 +20,13 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lp
 int WINAPI wWinMain(
     _In_ HINSTANCE instance,
     _In_opt_ HINSTANCE,
-    _In_ PWSTR,
+    _In_ PWSTR command_line,
     _In_ int show)
 {
-    constexpr int client_width = 2560;
-    constexpr int client_height = 1440;
+    const int client_width = GetSystemMetrics(SM_CXSCREEN);
+    const int client_height = GetSystemMetrics(SM_CYSCREEN);
+    const bool stretched_back_buffer =
+        command_line && wcsstr(command_line, L"--stretched") != nullptr;
     constexpr DWORD window_style = WS_POPUP;
 
     WNDCLASSW window_class{};
@@ -57,6 +59,11 @@ int WINAPI wWinMain(
 
     DXGI_SWAP_CHAIN_DESC swap_desc{};
     swap_desc.BufferCount = 2;
+    if (stretched_back_buffer) {
+        swap_desc.BufferDesc.Width = 1280;
+        swap_desc.BufferDesc.Height = 1024;
+        swap_desc.BufferDesc.Scaling = DXGI_MODE_SCALING_STRETCHED;
+    }
     swap_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swap_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swap_desc.OutputWindow = window;

@@ -1,7 +1,4 @@
-<ResourceDictionary
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
   <sys:String x:Key="L.Brand">Captail</sys:String>
   <sys:String x:Key="L.LanguageCode">RU</sys:String>
@@ -145,7 +142,7 @@
   <sys:String x:Key="L.Audio.Separate">Раздельные</sys:String>
   <sys:String x:Key="L.Audio.Codec">Аудиокодек</sys:String>
   <sys:String x:Key="L.Help.MicBoost">Усиливает микрофон до кодирования. Используйте, если даже на 100% голос тихий. Слишком высокое усиление также поднимает шум и может перегружать громкую речь.</sys:String>
-  <sys:String x:Key="L.Help.AudioTracks">Общая дорожка работает почти везде и удобна для просмотра. Раздельные сохраняют игру/систему и микрофон отдельно для монтажа; некоторые плееры воспроизводят только одну дорожку за раз.</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">Смешанный звук удобнее для обмена. Раздельный режим записывает систему, обнаруженную игру и микрофон на отдельные дорожки. Захватывается звук со всех устройств вывода. Игра исключается из системной дорожки; без обнаруженной игры игровая дорожка остаётся пустой.</sys:String>
   <sys:String x:Key="L.Help.ApplicationAudio">Выберите приложения, звук которых Captail будет записывать, и назначьте им дорожки. Неотмеченные приложения не записываются. Количество дорожек зависит от выбранного аудиокодека.</sys:String>
   <sys:String x:Key="L.Help.AudioCodec">AAC сохраняется в MP4 и работает почти со всеми плеерами и редакторами. Opus эффективнее на низком битрейте, но использует MKV и может потребовать современный редактор.</sys:String>
 
@@ -207,6 +204,8 @@
   <sys:String x:Key="L.Library.ShortcutSeekHint">Назад или вперёд на 5 секунд</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeed">Скорость воспроизведения</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeedHint">Вниз медленнее · вверх быстрее</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolume">Громкость</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolumeHint">Тише или громче</sys:String>
   <sys:String x:Key="L.Library.ShortcutFullscreenHint">Переключить вид плеера</sys:String>
   <sys:String x:Key="L.Library.ShortcutCloseHint">Выйти из полного экрана или закрыть</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Перезаписать</sys:String>
@@ -287,7 +286,8 @@
   <sys:String x:Key="L.Notify.DriverUnavailable">Видеодрайвер временно недоступен. Повторная попытка через {0} сек.</sys:String>
   <sys:String x:Key="L.Recovery.ModuleStopped">Модуль записи остановлен.</sys:String>
   <sys:String x:Key="L.Recovery.NoFrames">Новые кадры не поступают.</sys:String>
-  <sys:String x:Key="L.App.StartError">Не удалось запустить Captail:&#x0A;{0}</sys:String>
+  <sys:String x:Key="L.App.StartError">Не удалось запустить Captail:
+{0}</sys:String>
   <sys:String x:Key="L.App.ExecutablePathError">Не удалось определить путь Captail.</sys:String>
 
   <sys:String x:Key="L.Hotkey.MustDiffer">Бинды сохранения и включения повтора должны отличаться.</sys:String>
@@ -358,7 +358,53 @@
   <sys:String x:Key="L.Error.AdvancedAudioTitle">Звук приложений</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioEmpty">Перед сохранением выберите приложение или включите микрофон.</sys:String>
 
-  <sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
+
+  <sys:String x:Key="L.Capture.Mode">Режим захвата</sys:String>
+  <sys:String x:Key="L.Capture.ModeHint">Выберите мгновенный повтор или непрерывную запись</sys:String>
+  <sys:String x:Key="L.Capture.Replay">Мгновенный повтор</sys:String>
+  <sys:String x:Key="L.Capture.Recording">Запись</sys:String>
+  <sys:String x:Key="L.Capture.RecordingEnabled">Запись включена</sys:String>
+  <sys:String x:Key="L.Capture.StartRecording">Начать запись</sys:String>
+  <sys:String x:Key="L.Capture.StopRecording">Остановить запись</sys:String>
+  <sys:String x:Key="L.Status.Recording">Идёт запись</sys:String>
+  <sys:String x:Key="L.Status.RecordingDetail">{0} · {1}</sys:String>
+  <sys:String x:Key="L.Status.RecordingDisabled">Запись выключена</sys:String>
+  <sys:String x:Key="L.Status.RecordingIdle">Запись не ведётся</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedTitle">Запись началась</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedDetail">Captail сохраняет непрерывную запись.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedTitle">Запись сохранена</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedDetail">Непрерывная запись сохранена.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameTitle">Запись выключена</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameDetail">Обнаружена игра {0}. Включите запись, чтобы сохранить её.</sys:String>
+  <sys:String x:Key="L.Engine.ReplayUnavailableWhileRecording">Сохранение повтора недоступно в режиме записи.</sys:String>
+  <sys:String x:Key="L.Tray.Recording">Captail · Идёт запись</sys:String>
+  <sys:String x:Key="L.Tray.ToggleRecording">Начать / остановить запись</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecording">Начать / остановить запись</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecordingHint">Переключает непрерывную запись</sys:String>
+  <sys:String x:Key="L.Section.Appearance">ВНЕШНИЙ ВИД</sys:String>
+  <sys:String x:Key="L.Appearance.Accent">Акцентный цвет</sys:String>
+  <sys:String x:Key="L.Appearance.AccentHint">Применяется во всём Captail</sys:String>
+  <sys:String x:Key="L.Appearance.Mint">Мятный</sys:String>
+  <sys:String x:Key="L.Appearance.Blue">Синий</sys:String>
+  <sys:String x:Key="L.Appearance.Violet">Фиолетовый</sys:String>
+  <sys:String x:Key="L.Appearance.Rose">Красный</sys:String>
+  <sys:String x:Key="L.Appearance.Amber">Янтарный</sys:String>
+  <sys:String x:Key="L.Library.PreviousReplay">Предыдущий повтор</sys:String>
+  <sys:String x:Key="L.Library.NextReplay">Следующий повтор</sys:String>
+  <sys:String x:Key="L.Library.AllClips">Все клипы</sys:String>
+  <sys:String x:Key="L.Library.RecentReplays">Последние повторы</sys:String><sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} мин</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} ГБ</sys:String>
+  <sys:String x:Key="L.Library.AllGames">Все игры</sys:String>
+  <sys:String x:Key="L.Library.NoGame">Без игры</sys:String>
+  <sys:String x:Key="L.Library.AllModes">Все режимы записи</sys:String>
+  <sys:String x:Key="L.Library.ModeReplay">Мгновенный повтор</sys:String>
+  <sys:String x:Key="L.Library.ModeRecording">Запись</sys:String>
+  <sys:String x:Key="L.Library.ModeUnknown">Неизвестный режим</sys:String>
+  <sys:String x:Key="L.Library.SelectAll">Выбрать / снять все</sys:String>
+  <sys:String x:Key="L.Library.SelectClip">Выбрать клип</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelected">Удалить выбранные ({0})</sys:String>
+  <sys:String x:Key="L.Library.SelectedCount">Выбрано клипов: {0}</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionTitle">Удалить выбранные клипы?</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionMessage">Выбранные файлы будут перемещены в корзину.</sys:String>
 </ResourceDictionary>

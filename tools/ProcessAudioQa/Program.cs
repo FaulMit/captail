@@ -72,6 +72,7 @@ internal sealed class Options
     internal required IReadOnlyList<double> Frequencies { get; init; }
     internal required IReadOnlyList<string> WatchedExecutables { get; init; }
     internal long CreationTimeOffset { get; init; }
+    internal bool ExcludeTarget { get; init; }
     internal string? ProcessAudioPluginPath { get; init; }
     internal string? LogBridgePath { get; init; }
 
@@ -88,6 +89,7 @@ internal sealed class Options
         string? bridgePath = null;
         string? processAudioPluginPath = null;
         long creationTimeOffset = 0;
+        bool excludeTarget = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -128,6 +130,9 @@ internal sealed class Options
                 case "--creation-time-offset":
                     creationTimeOffset = long.Parse(value, CultureInfo.InvariantCulture);
                     break;
+                case "--exclude-target":
+                    excludeTarget = bool.Parse(value);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown argument: {args[i - 1]}");
             }
@@ -153,6 +158,7 @@ internal sealed class Options
             Frequencies = frequencies.Distinct().Order().ToArray(),
             WatchedExecutables = watchedExecutables,
             CreationTimeOffset = creationTimeOffset,
+            ExcludeTarget = excludeTarget,
             ProcessAudioPluginPath = processAudioPluginPath,
             LogBridgePath = bridgePath,
         };
@@ -323,6 +329,7 @@ internal sealed class ObsSession : IDisposable
             {
                 sourceId = "captail_process_audio_capture";
                 ObsNative.obs_data_set_int(settings, "target_pid", identity.ProcessId);
+                ObsNative.obs_data_set_bool(settings, "exclude_target", _options.ExcludeTarget);
                 ObsNative.obs_data_set_int(
                     settings,
                     "target_creation_time",
@@ -931,6 +938,12 @@ internal static class ObsNative
         nint data,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_data_set_bool(
+        nint data,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
+        [MarshalAs(UnmanagedType.I1)] bool value);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_data_set_int(

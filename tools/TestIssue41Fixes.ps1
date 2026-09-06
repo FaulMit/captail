@@ -43,10 +43,10 @@ Assert-Contains $theme '<Style x:Key="FooterAboutButton"[\s\S]*?<Setter Property
     'Issue #41.1: About button needs vertical footer inset.'
 Assert-Contains $settingsXaml '<Popup x:Name="AboutPopup"[\s\S]*?StaysOpen="True"' `
     'Issue #41.1: About popup must not auto-close before its toggle click is processed.'
-Assert-Contains $settingsXaml 'Deactivated="Window_Deactivated"' `
-    'Issue #41.1: explicitly managed About popup must close when the window deactivates.'
-Assert-Contains $settingsCode 'Window_Deactivated[\s\S]*?AboutPopup\.IsOpen = false' `
-    'Issue #41.1: About popup deactivation close handler is missing.'
+Assert-NotContains $settingsXaml 'Deactivated="Window_Deactivated"' `
+    'Issue #41.1: window deactivation closes the popup before link clicks are delivered.'
+Assert-NotContains $settingsCode 'Window_Deactivated[\s\S]*?AboutPopup\.IsOpen = false' `
+    'Issue #41.1: About popup must not close from the window-deactivation event.'
 
 Assert-Contains $notificationXaml '<Border x:Name="Card"[\s\S]*?Margin="12"' `
     'Issue #41.2: notification shadow needs transparent inset around the rounded card.'

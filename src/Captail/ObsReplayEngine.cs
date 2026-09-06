@@ -36,6 +36,8 @@ internal sealed class AdvancedProcessAudioUnavailableException(
 public sealed class ObsReplayEngine : IDisposable
 {
     private const string RequiredObsVersion = "32.1.2";
+    private const float ObsSdrWhiteLevel = 300.0f;
+    private const float ObsHdrNominalPeakLevel = 1000.0f;
     private const int AutomaticHookStableChecks = 2;
     private const int AutomaticFallbackStableChecks = 3;
     // Game Capture still needs occasional video ticks to discover a newly launched game.
@@ -43,7 +45,6 @@ public sealed class ObsReplayEngine : IDisposable
     private const int GameCaptureIdleFrameRate = 2;
     private const int GameCaptureIdleReleaseSeconds = 10;
     private const int GameCaptureDetectorStartupSeconds = 8;
-    private const int Windows11InitialBuild = 22000;
     private const int ProcessLoopbackMinimumBuild = 19041;
     private const long MonitorCaptureMethodAuto = 0;
     private const long MonitorCaptureMethodWgc = 2;
@@ -88,10 +89,14 @@ public sealed class ObsReplayEngine : IDisposable
     private readonly Dictionary<nint, nint> _processAudioSceneItems = [];
     private ProcessAudioReconciler? _processAudioReconciler;
     private int _processAudioSourceNumber;
+    private nint _separateSystemSource;
+    private ProcessIdentity? _separateSystemIdentity;
 
     private nint _videoSource;
     private nint _desktopVideoSource;
     private nint _gameVideoSource;
+    private nint _gameVideoScene;
+    private nint _gameVideoOutputSource;
     private nint _videoEncoder;
     private nint _output;
     private nint _outputSignals;
@@ -119,6 +124,7 @@ public sealed class ObsReplayEngine : IDisposable
     private bool _gameOutputPaused;
     private DateTime _gameHookLostUtc;
     private string _activeGameExecutable = "";
+    private string _recordingGameExecutable = "";
     private string _pendingAutomaticGameExecutable = "";
     private int _automaticHookStableChecks;
     private string _lastRejectedAutomaticExecutable = "";
@@ -137,8 +143,14 @@ public sealed class ObsReplayEngine : IDisposable
         get;
         private set;
     } = AdvancedProcessAudioAvailability.SourceUnavailable;
+    internal bool RequiresProcessAudioMonitoring =>
+        ShouldMonitorProcessAudio(
+            _config,
+            ProcessAudioAvailability);
     public bool IsGameCapture { get; }
     public bool IsAutomaticCapture { get; }
+    public bool IsContinuousRecording { get; }
+    public string RecordingPath { get; private set; } = "";
     internal bool IsGameCaptureDetectorActive => _gameCaptureDetectorShowing;
     public bool IsActive =>
         _started &&
@@ -199,6 +211,10 @@ public sealed class ObsReplayEngine : IDisposable
             "hooked");
 
     public string ActiveGameExecutable => _activeGameExecutable;
+    public string RecordingGameExecutable =>
+        IsContinuousRecording && IsAutomaticCapture
+            ? _recordingGameExecutable
+            : _activeGameExecutable;
 
     internal static bool IsAutomaticCaptureCandidate(string executable)
     {
@@ -208,10 +224,7 @@ public sealed class ObsReplayEngine : IDisposable
     }
 
     internal static long RecommendedMonitorCaptureMethod(Version osVersion) =>
-        osVersion.Major > 10 ||
-        (osVersion.Major == 10 && osVersion.Build >= Windows11InitialBuild)
-            ? MonitorCaptureMethodWgc
-            : MonitorCaptureMethodAuto;
+        MonitorCaptureMethodAuto;
 
     internal static bool ShouldUseAutomaticGameCapture(
         string hookedExecutable,
@@ -310,7 +323,8 @@ public sealed class ObsReplayEngine : IDisposable
     {
         get
         {
-            if (!IsActive || _replayWindowStartedUtc == default)
+            if (IsContinuousRecording || !IsActive ||
+                _replayWindowStartedUtc == default)
                 return 0;
 
             int elapsed = (int)Math.Floor(
@@ -359,6 +373,7 @@ public sealed class ObsReplayEngine : IDisposable
             if (validHook)
             {
                 _activeGameExecutable = executable;
+                RememberContinuousRecordingGame(executable);
                 _lastRejectedAutomaticExecutable = "";
                 _gameHookLostUtc = default;
                 ResumeOrStartGameReplayBuffer();
@@ -425,6 +440,7 @@ public sealed class ObsReplayEngine : IDisposable
             if (_automaticGameActive)
             {
                 _activeGameExecutable = executable;
+                RememberContinuousRecordingGame(executable);
                 return changed;
             }
 
@@ -493,7 +509,9 @@ public sealed class ObsReplayEngine : IDisposable
         if (useGame == _automaticGameActive)
             return false;
 
-        nint target = useGame ? _gameVideoSource : _desktopVideoSource;
+        nint target = useGame
+            ? _gameVideoOutputSource
+            : _desktopVideoSource;
         ObsNative.obs_set_output_source(0, target);
         _videoSource = target;
         _automaticGameActive = useGame;
@@ -502,6 +520,8 @@ public sealed class ObsReplayEngine : IDisposable
             : _automaticDesktopFallbackActive
                 ? _activeGameExecutable
                 : "";
+        if (useGame)
+            RememberContinuousRecordingGame(executable);
         Log.Write(
             useGame
                 ? $"Automatic capture switched to Game Capture: " +
@@ -523,12 +543,22 @@ public sealed class ObsReplayEngine : IDisposable
 
         _automaticDesktopFallbackActive = active;
         _activeGameExecutable = active ? executable : "";
+        if (active)
+            RememberContinuousRecordingGame(executable);
         Log.Write(
             active
                 ? $"Automatic capture identified game but kept Desktop Capture: " +
                   $"{Path.GetFileName(executable)}"
                 : "Automatic Desktop fallback returned to normal Desktop Capture.");
         return true;
+    }
+
+    private void RememberContinuousRecordingGame(string executable)
+    {
+        if (!IsContinuousRecording || string.IsNullOrWhiteSpace(executable))
+            return;
+
+        _recordingGameExecutable = executable;
     }
 
     private bool AdvanceAutomaticCandidate(string executable, int requiredChecks)
@@ -565,6 +595,10 @@ public sealed class ObsReplayEngine : IDisposable
             "game",
             StringComparison.OrdinalIgnoreCase);
         IsAutomaticCapture = !IsGameCapture;
+        IsContinuousRecording = string.Equals(
+            config.CaptureMode,
+            "recording",
+            StringComparison.OrdinalIgnoreCase);
         _savedCallback = OnReplaySaved;
         _stoppedCallback = OnOutputStopped;
     }
@@ -597,7 +631,7 @@ public sealed class ObsReplayEngine : IDisposable
             EnsureConfiguredCodecIsSupported();
             CreateSources();
             CreateEncoders();
-            CreateReplayBuffer();
+            CreateOutput();
             _started = true;
 
             Log.Write(
@@ -652,6 +686,9 @@ public sealed class ObsReplayEngine : IDisposable
     public ReplaySaveOperation BeginSaveReplay(
         CancellationToken cancellationToken = default)
     {
+        if (IsContinuousRecording)
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.ReplayUnavailableWhileRecording"));
         if (IsAutomaticCapture)
             RefreshCaptureState();
         if (IsGameCapture && _gameOutputPaused)
@@ -728,6 +765,9 @@ public sealed class ObsReplayEngine : IDisposable
 
     public void ResetReplayWindow()
     {
+        if (IsContinuousRecording)
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.ReplayUnavailableWhileRecording"));
         if (!IsActive)
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.BufferStopped"));
@@ -913,6 +953,9 @@ public sealed class ObsReplayEngine : IDisposable
                 throw new InvalidOperationException(
                     Localization.Format("L.Engine.VideoFailed", result));
             }
+            ObsNative.obs_set_video_levels(
+                ObsSdrWhiteLevel,
+                ObsHdrNominalPeakLevel);
             _videoFrameRate = frameRate;
             if (_videoEncoder != 0)
             {
@@ -1069,6 +1112,8 @@ public sealed class ObsReplayEngine : IDisposable
         {
             _desktopVideoSource = CreateMonitorSource(monitor);
             _gameVideoSource = CreateGameSource(desktopFallback: true);
+            _gameVideoOutputSource = CreateStretchedGameOutput(
+                _gameVideoSource);
             _videoSource = _desktopVideoSource;
 
             // Game Capture stops looking for a target when it is not visible.
@@ -1080,7 +1125,9 @@ public sealed class ObsReplayEngine : IDisposable
         else
         {
             _gameVideoSource = CreateGameSource(desktopFallback: false);
-            _videoSource = _gameVideoSource;
+            _gameVideoOutputSource = CreateStretchedGameOutput(
+                _gameVideoSource);
+            _videoSource = _gameVideoOutputSource;
             // Detector stays dormant until a plausible foreground game appears.
             // This prevents hooks into unrelated fullscreen applications and
             // leaves GPU nearly idle while no game is running.
@@ -1090,25 +1137,39 @@ public sealed class ObsReplayEngine : IDisposable
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.VideoSourceFailed"));
 
-        // Captail always has one video source. Connecting it directly avoids an
-        // extra scene-composition pass, which matters at 144/240 FPS.
+        // Desktop Capture already matches the selected monitor. Game Capture
+        // can expose a different in-game resolution (for example stretched
+        // 1280x1024 on a 2560x1440 display), so its scene expands the native
+        // game frame to the full recording canvas.
         ObsNative.obs_set_output_source(0, _videoSource);
 
-        if (IsAdvancedAudioRouting)
+        bool usesDetectedGameAudio = UsesDetectedGameAudio(
+            _config,
+            ProcessAudioAvailability);
+        if (UsesSeparateGameAudio(_config) &&
+            ProcessAudioAvailability != AdvancedProcessAudioAvailability.Available)
+            throw new AdvancedProcessAudioUnavailableException(ProcessAudioAvailability);
+        if (IsAdvancedAudioRouting || usesDetectedGameAudio)
         {
             _processAudioScene = ObsNative.obs_scene_create(
                 "Captail Process Audio Mixer");
             if (_processAudioScene == 0)
             {
                 throw new InvalidOperationException(
-                    "Could not create the advanced process audio mixer.");
+                    "Could not create the process audio mixer.");
             }
             nint sceneSource = ObsNative.obs_scene_get_source(_processAudioScene);
             ObsNative.obs_source_set_audio_mixers(sceneSource, 0x3Fu);
             ObsNative.obs_set_output_source(1, sceneSource);
+            if (usesDetectedGameAudio)
+                Log.Write("Detected game audio routing enabled.");
+            if (UsesSeparateGameAudio(_config))
+                ReconcileSeparateSystemAudio(null);
         }
 
-        if (!IsAdvancedAudioRouting && _config.CaptureSystemAudio)
+        if (!IsAdvancedAudioRouting &&
+            !usesDetectedGameAudio &&
+            _config.CaptureSystemAudio)
         {
             nint system = CreateAudioSource(
                 "wasapi_output_capture",
@@ -1125,7 +1186,7 @@ public sealed class ObsReplayEngine : IDisposable
             uint micMix = IsAdvancedAudioRouting
                 ? MixerBit(_config.AdvancedMicrophoneTrack)
                 : _config.SeparateAudioTracks && _config.CaptureSystemAudio
-                    ? 2u
+                    ? MixerBit(3)
                     : 1u;
             nint microphone = CreateAudioSource(
                 "wasapi_input_capture",
@@ -1183,10 +1244,9 @@ public sealed class ObsReplayEngine : IDisposable
         nint settings = ObsNative.obs_data_create();
         try
         {
-            // Windows 10 shows an unavoidable system border around WGC display
-            // capture. OBS Auto prefers DXGI there and retains WGC fallback for
-            // displays DXGI cannot access. Windows 11 keeps forced WGC for its
-            // stronger recovery behavior and borderless modern capture path.
+            // Auto prefers borderless DXGI duplication and retains WGC as a
+            // compatibility fallback. Forced WGC can show a Windows system
+            // border when borderless consent or package capability is absent.
             long captureMethod =
                 RecommendedMonitorCaptureMethod(Environment.OSVersion.Version);
             ObsNative.obs_data_set_int(
@@ -1199,7 +1259,9 @@ public sealed class ObsReplayEngine : IDisposable
                 $"Windows {Environment.OSVersion.Version}");
             ObsNative.obs_data_set_string(settings, "monitor_id", monitor.DeviceId);
             ObsNative.obs_data_set_bool(settings, "capture_cursor", true);
-            ObsNative.obs_data_set_bool(settings, "force_sdr", false);
+            // Captail currently records SDR (NV12/Rec. 709). Request an SDR
+            // capture surface so HDR desktops remain visible in SDR output.
+            ObsNative.obs_data_set_bool(settings, "force_sdr", true);
             nint source = ObsNative.obs_source_create(
                 "monitor_capture",
                 "Captail Display Capture",
@@ -1271,20 +1333,68 @@ public sealed class ObsReplayEngine : IDisposable
             DestroyProcessAudioSource,
             Log.Write,
             ReadProcessAudioStatus);
-        return _processAudioReconciler.Reconcile(
-            snapshot,
-            _config.ProcessAudioRoutes
-                .Where(route => route.Enabled)
-                .Select(route =>
-                new ProcessAudioTarget(route.Executable, route.Track)));
+        IReadOnlyList<ProcessAudioTarget> targets = BuildProcessAudioTargets(
+            _config, _activeGameExecutable, ProcessAudioAvailability);
+        if (UsesSeparateGameAudio(_config))
+        {
+            // Use the same independent root for inclusion and exclusion. Multiple
+            // same-name instances must never duplicate audio between tracks.
+            ProcessIdentity? identity = snapshot.SelectIndependentRoots(
+                    targets.Select(target => target.Executable))
+                .OrderBy(node => node.Identity.CreationTime)
+                .ThenBy(node => node.Identity.ProcessId)
+                .Select(node => (ProcessIdentity?)node.Identity)
+                .FirstOrDefault();
+            ReconcileSeparateSystemAudio(identity);
+            targets = identity is null ? [] : targets.Select(target => target with { Identity = identity }).ToArray();
+        }
+        ProcessAudioReconcileResult result = _processAudioReconciler.Reconcile(snapshot, targets);
+        if (_separateSystemSource != 0)
+        {
+            ProcessAudioSourceStatus status = ReadProcessAudioStatus(_separateSystemSource);
+            bool failed = status.State is ProcessAudioSourceState.ActivationFailed or ProcessAudioSourceState.CaptureFailed;
+            result = result with
+            {
+                DesiredSources = result.DesiredSources + 1,
+                ActiveSources = result.ActiveSources + 1,
+                RuntimeFailedSources = result.RuntimeFailedSources + (failed ? 1 : 0),
+                LastErrorCode = failed ? status.ErrorCode : result.LastErrorCode,
+            };
+        }
+        return result;
     }
 
-    private nint CreateProcessAudioSource(ProcessIdentity identity, int track)
+    private void ReconcileSeparateSystemAudio(ProcessIdentity? gameIdentity)
+    {
+        using var current = System.Diagnostics.Process.GetCurrentProcess();
+        ProcessIdentity identity = gameIdentity ?? new ProcessIdentity(
+            checked((uint)current.Id), current.StartTime.ToFileTimeUtc());
+        if (_separateSystemSource != 0 && _separateSystemIdentity == identity &&
+            ReadProcessAudioStatus(_separateSystemSource).State is not
+                (ProcessAudioSourceState.TargetExited or ProcessAudioSourceState.Stopped))
+            return;
+        if (_separateSystemSource != 0)
+        {
+            DestroyProcessAudioSource(_separateSystemSource);
+            _separateSystemSource = 0;
+        }
+        _separateSystemIdentity = null;
+        _separateSystemSource = CreateProcessAudioSource(identity, 1, excludeTarget: true);
+        if (_separateSystemSource == 0)
+            throw new InvalidOperationException("Could not create separate system audio capture.");
+        _separateSystemIdentity = identity;
+    }
+
+    private nint CreateProcessAudioSource(ProcessIdentity identity, int track) =>
+        CreateProcessAudioSource(identity, track, excludeTarget: false);
+
+    private nint CreateProcessAudioSource(ProcessIdentity identity, int track, bool excludeTarget)
     {
         nint settings = ObsNative.obs_data_create();
         try
         {
             ObsNative.obs_data_set_int(settings, "target_pid", identity.ProcessId);
+            ObsNative.obs_data_set_bool(settings, "exclude_target", excludeTarget);
             ObsNative.obs_data_set_int(
                 settings,
                 "target_creation_time",
@@ -1304,6 +1414,12 @@ public sealed class ObsReplayEngine : IDisposable
             }
 
             ObsNative.obs_source_set_audio_mixers(source, MixerBit(track));
+            if (UsesDetectedGameAudio(_config, ProcessAudioAvailability))
+            {
+                ObsNative.obs_source_set_volume(
+                    source,
+                    NormalizeVolume(_config.SystemAudioVolume));
+            }
             nint sceneItem = ObsNative.obs_scene_add(_processAudioScene, source);
             if (sceneItem == 0)
             {
@@ -1336,6 +1452,37 @@ public sealed class ObsReplayEngine : IDisposable
                 "Could not read process audio source status.");
         }
         return status;
+    }
+
+    private nint CreateStretchedGameOutput(nint gameSource)
+    {
+        _gameVideoScene = ObsNative.obs_scene_create(
+            "Captail Stretched Game Capture");
+        if (_gameVideoScene == 0)
+        {
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.VideoSourceFailed"));
+        }
+
+        nint sceneItem = ObsNative.obs_scene_add(
+            _gameVideoScene,
+            gameSource);
+        if (sceneItem == 0)
+        {
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.VideoSourceFailed"));
+        }
+
+        ObsNative.obs_sceneitem_set_bounds_type(
+            sceneItem,
+            ObsNative.BoundsType.Stretch);
+        var bounds = new ObsNative.Vec2
+        {
+            X = _baseWidth,
+            Y = _baseHeight,
+        };
+        ObsNative.obs_sceneitem_set_bounds(sceneItem, ref bounds);
+        return ObsNative.obs_scene_get_source(_gameVideoScene);
     }
 
     private static bool TryReadProcessAudioStatus(
@@ -1625,6 +1772,8 @@ public sealed class ObsReplayEngine : IDisposable
 
     private void ResumeOrStartGameReplayBuffer()
     {
+        if (IsContinuousRecording)
+            return;
         if (_output == 0)
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.BufferUnavailable"));
@@ -1661,6 +1810,8 @@ public sealed class ObsReplayEngine : IDisposable
 
     private void SuspendOrReleaseGameReplayBuffer()
     {
+        if (IsContinuousRecording)
+            return;
         if (_output == 0 || !ObsNative.obs_output_active(_output))
         {
             _gameHookLostUtc = default;
@@ -1760,6 +1911,66 @@ public sealed class ObsReplayEngine : IDisposable
         _gameCaptureDetectorShowing = showing;
     }
 
+    private void CreateOutput()
+    {
+        if (IsContinuousRecording)
+            CreateRecordingOutput();
+        else
+            CreateReplayBuffer();
+    }
+
+    private void CreateRecordingOutput()
+    {
+        string captureDirectory = _config.OutputDirectory;
+        Directory.CreateDirectory(captureDirectory);
+        bool opus = string.Equals(
+            _config.AudioCodec,
+            "opus",
+            StringComparison.OrdinalIgnoreCase);
+        string extension = opus ? "mkv" : "mp4";
+        RecordingPath = Path.Combine(
+            captureDirectory,
+            $"Recording_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.{extension}");
+
+        nint settings = ObsNative.obs_data_create();
+        try
+        {
+            ObsNative.obs_data_set_string(settings, "path", RecordingPath);
+            if (!opus)
+            {
+                ObsNative.obs_data_set_string(
+                    settings,
+                    "muxer_settings",
+                    "movflags=frag_keyframe+empty_moov+delay_moov");
+            }
+            _output = ObsNative.obs_output_create(
+                "ffmpeg_muxer",
+                "Captail Recording",
+                settings,
+                0);
+        }
+        finally
+        {
+            ObsNative.obs_data_release(settings);
+        }
+
+        if (_output == 0)
+            throw new InvalidOperationException(
+                Localization.Text("L.Engine.BufferUnavailable"));
+
+        ConfigureOutputEncodersAndSignals(connectSavedSignal: false);
+        if (!ObsNative.obs_output_start(_output))
+        {
+            string error = PtrToString(
+                ObsNative.obs_output_get_last_error(_output));
+            throw new InvalidOperationException(
+                string.IsNullOrWhiteSpace(error)
+                    ? Localization.Text("L.Engine.BufferStartFailed")
+                    : error);
+        }
+        Log.Write($"Continuous recording started: {RecordingPath}");
+    }
+
     private void CreateReplayBuffer()
     {
         // Game target is discovered at runtime. Save to root first, then move
@@ -1811,26 +2022,7 @@ public sealed class ObsReplayEngine : IDisposable
             throw new InvalidOperationException(
                 Localization.Text("L.Engine.BufferUnavailable"));
 
-        ObsNative.obs_output_set_video_encoder(_output, _videoEncoder);
-        for (int index = 0; index < _audioEncoders.Count; index++)
-        {
-            ObsNative.obs_output_set_audio_encoder(
-                _output,
-                _audioEncoders[index],
-                (nuint)index);
-        }
-
-        _outputSignals = ObsNative.obs_output_get_signal_handler(_output);
-        ObsNative.signal_handler_connect(
-            _outputSignals,
-            "saved",
-            _savedCallback,
-            0);
-        ObsNative.signal_handler_connect(
-            _outputSignals,
-            "stop",
-            _stoppedCallback,
-            0);
+        ConfigureOutputEncodersAndSignals(connectSavedSignal: true);
 
         if (IsGameCapture)
         {
@@ -1849,6 +2041,34 @@ public sealed class ObsReplayEngine : IDisposable
                     : error);
         }
         _replayWindowStartedUtc = DateTime.UtcNow;
+    }
+
+    private void ConfigureOutputEncodersAndSignals(bool connectSavedSignal)
+    {
+        ObsNative.obs_output_set_video_encoder(_output, _videoEncoder);
+        for (int index = 0; index < _audioEncoders.Count; index++)
+        {
+            ObsNative.obs_output_set_audio_encoder(
+                _output,
+                _audioEncoders[index],
+                (nuint)index);
+        }
+
+        _outputSignals = ObsNative.obs_output_get_signal_handler(_output);
+        if (connectSavedSignal)
+        {
+            ObsNative.signal_handler_connect(
+                _outputSignals,
+                "saved",
+                _savedCallback,
+                0);
+        }
+        ObsNative.signal_handler_connect(
+            _outputSignals,
+            "stop",
+            _stoppedCallback,
+            0);
+
     }
 
     private int AudioTrackCount()
@@ -1881,7 +2101,72 @@ public sealed class ObsReplayEngine : IDisposable
                       (config.CaptureMicrophone ? 1 : 0);
         if (enabled == 0)
             return 1;
-        return config.SeparateAudioTracks && enabled > 1 ? 2 : 1;
+        if (UsesSeparateGameAudio(config))
+            return config.CaptureMicrophone ? 3 : 2;
+        return 1;
+    }
+
+    internal static bool UsesSeparateGameAudio(Config config) =>
+        config.SeparateAudioTracks && config.CaptureSystemAudio &&
+        !string.Equals(config.AudioRoutingMode, "advanced", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool UsesDetectedGameAudio(
+        Config config,
+        AdvancedProcessAudioAvailability processAudioAvailability)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return config.CaptureSystemAudio &&
+               (UsesSeparateGameAudio(config) || string.Equals(
+                   config.CaptureSource,
+                   "game",
+                   StringComparison.OrdinalIgnoreCase)) &&
+               !string.Equals(
+                   config.AudioRoutingMode,
+                   "advanced",
+                   StringComparison.OrdinalIgnoreCase) &&
+               processAudioAvailability ==
+                   AdvancedProcessAudioAvailability.Available;
+    }
+
+    internal static bool ShouldMonitorProcessAudio(
+        Config config,
+        AdvancedProcessAudioAvailability processAudioAvailability)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        return (string.Equals(
+                    config.AudioRoutingMode,
+                    "advanced",
+                    StringComparison.OrdinalIgnoreCase) &&
+                config.ProcessAudioRoutes.Any(route => route.Enabled)) ||
+               UsesDetectedGameAudio(config, processAudioAvailability);
+    }
+
+    internal static IReadOnlyList<ProcessAudioTarget> BuildProcessAudioTargets(
+        Config config,
+        string activeGameExecutable,
+        AdvancedProcessAudioAvailability processAudioAvailability)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        if (string.Equals(
+                config.AudioRoutingMode,
+                "advanced",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return config.ProcessAudioRoutes
+                .Where(route => route.Enabled)
+                .Select(route => new ProcessAudioTarget(
+                    route.Executable,
+                    route.Track))
+                .ToArray();
+        }
+
+        if (!UsesDetectedGameAudio(config, processAudioAvailability))
+            return [];
+
+        string executable = Config.NormalizeExecutableName(activeGameExecutable);
+        return executable.Length == 0
+            ? []
+            : [new ProcessAudioTarget(executable, UsesSeparateGameAudio(config) ? 2 : 1)];
     }
 
     internal static string BuildAudioTrackName(Config config, int track)
@@ -1916,11 +2201,9 @@ public sealed class ObsReplayEngine : IDisposable
             return name.Length <= 96 ? name : name[..96];
         }
 
-        if (config.SeparateAudioTracks &&
-            config.CaptureSystemAudio &&
-            config.CaptureMicrophone)
+        if (UsesSeparateGameAudio(config))
         {
-            return track == 1 ? "System / Game" : "Microphone";
+            return track switch { 1 => "System", 2 => "Game", _ => "Microphone" };
         }
         if (config.CaptureSystemAudio && !config.CaptureMicrophone)
             return "System / Game";
@@ -1949,10 +2232,10 @@ public sealed class ObsReplayEngine : IDisposable
         AdvancedProcessAudioAvailability processAudioAvailability)
     {
         ArgumentNullException.ThrowIfNull(config);
-        return !string.Equals(
+        return (!UsesSeparateGameAudio(config) && !string.Equals(
                    config.AudioRoutingMode,
                    "advanced",
-                   StringComparison.OrdinalIgnoreCase) ||
+                   StringComparison.OrdinalIgnoreCase)) ||
                processAudioAvailability == AdvancedProcessAudioAvailability.Available;
     }
 
@@ -2158,7 +2441,18 @@ public sealed class ObsReplayEngine : IDisposable
 
         _processAudioReconciler?.Dispose();
         _processAudioReconciler = null;
+        if (_separateSystemSource != 0)
+            DestroyProcessAudioSource(_separateSystemSource);
+        _separateSystemSource = 0;
+        _separateSystemIdentity = null;
         _processAudioSceneItems.Clear();
+
+        if (_gameVideoScene != 0)
+        {
+            ObsNative.obs_scene_release(_gameVideoScene);
+            _gameVideoScene = 0;
+            _gameVideoOutputSource = 0;
+        }
 
         if (_desktopVideoSource != 0)
             ObsNative.obs_source_remove(_desktopVideoSource);

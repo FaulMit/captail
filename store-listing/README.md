@@ -24,7 +24,7 @@ or diagnostic logs in listing files or screenshots.
 5. Run:
 
    ```powershell
-   ./tools/SyncStoreListing.ps1 -Version 0.2.2 -ValidateOnly
+   ./tools/SyncStoreListing.ps1 -Version 0.2.3 -ValidateOnly
    ```
 
 6. Commit listing changes with the release.

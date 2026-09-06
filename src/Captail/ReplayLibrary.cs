@@ -13,7 +13,12 @@ public sealed record ReplayClip(
     DateTime SavedAt,
     long SizeBytes,
     TimeSpan Duration,
-    string? ThumbnailPath);
+    string? ThumbnailPath)
+{
+    public string RecordingMode => Name.StartsWith("Recording_", StringComparison.OrdinalIgnoreCase)
+        ? "recording"
+        : Name.StartsWith("Replay_", StringComparison.OrdinalIgnoreCase) ? "replay" : "unknown";
+}
 
 public sealed class ReplayLibrary
 {
@@ -183,6 +188,24 @@ public sealed class ReplayLibrary
     {
         string source = ValidateClipPath(rootDirectory, clip.Path);
         return _ffmpeg.ReadVideoInfoAsync(source, cancellationToken);
+    }
+
+    public async Task<string> GetPreviewProxyAsync(
+        string rootDirectory,
+        ReplayClip clip,
+        CancellationToken cancellationToken = default)
+    {
+        string source = ValidateClipPath(rootDirectory, clip.Path);
+        string identity =
+            $"preview-proxy|{source}|{clip.SizeBytes}|{clip.SavedAt.ToUniversalTime().Ticks}";
+        string hash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
+        string path = Path.Combine(_thumbnailDirectory, $"{hash}_preview.mp4");
+        if (!File.Exists(path) || new FileInfo(path).Length == 0)
+        {
+            await _ffmpeg.CreatePreviewProxyAsync(source, path, cancellationToken);
+        }
+        return path;
     }
 
     public async Task<string?> GetAudioWaveformAsync(

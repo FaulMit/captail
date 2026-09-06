@@ -1,0 +1,41 @@
+name: Agent context
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "AGENTS.md"
+      - "docs/agent/**"
+      - "tools/GetAgentContext.ps1"
+      - "tools/TestAgentContext.ps1"
+      - ".github/workflows/agent-context.yml"
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "docs/agent/**"
+      - "tools/GetAgentContext.ps1"
+      - "tools/TestAgentContext.ps1"
+      - ".github/workflows/agent-context.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-context-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Bounded routes
+    runs-on: windows-2022
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Validate agent context
+        shell: pwsh
+        run: ./tools/TestAgentContext.ps1

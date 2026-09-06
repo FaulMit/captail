@@ -17,7 +17,8 @@ public static class ReplayPaths
             return config.OutputDirectory;
         }
 
-        string name = Path.GetFileNameWithoutExtension(gameExecutable);
+        string name = GameCatalog.ExactNameForExecutable(gameExecutable) ??
+                      Path.GetFileNameWithoutExtension(gameExecutable);
         string safeName = SanitizeFolderName(name);
         return Path.Combine(config.OutputDirectory, safeName);
     }
@@ -40,8 +41,39 @@ public static class ReplayPaths
             return source;
 
         destination = AvailableDestination(destination);
-        File.Move(source, destination);
+        MoveAcrossVolumes(source, destination);
         return destination;
+    }
+
+    private static void MoveAcrossVolumes(string source, string destination)
+    {
+        string? sourceRoot = Path.GetPathRoot(source);
+        string? destinationRoot = Path.GetPathRoot(destination);
+        if (string.Equals(
+                sourceRoot,
+                destinationRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            File.Move(source, destination);
+            return;
+        }
+
+        File.Copy(source, destination, overwrite: false);
+        try
+        {
+            File.Delete(source);
+        }
+        catch
+        {
+            try
+            {
+                File.Delete(destination);
+            }
+            catch
+            {
+            }
+            throw;
+        }
     }
 
     public static string SanitizeFolderName(string? value)

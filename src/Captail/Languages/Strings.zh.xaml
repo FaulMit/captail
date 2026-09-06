@@ -1,7 +1,4 @@
-<ResourceDictionary
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=System.Runtime">
 
   <sys:String x:Key="L.Brand">Captail</sys:String>
   <sys:String x:Key="L.LanguageCode">ZH</sys:String>
@@ -145,7 +142,7 @@
   <sys:String x:Key="L.Audio.Separate">独立音轨</sys:String>
   <sys:String x:Key="L.Audio.Codec">音频编码格式</sys:String>
   <sys:String x:Key="L.Help.MicBoost">在编码前提高麦克风增益。当音量调到 100% 仍然偏小的时候使用。增益过高也会放大噪声，并可能让大声说话时出现失真。</sys:String>
-  <sys:String x:Key="L.Help.AudioTracks">混音音轨在任何设备上都能播放，也最容易分享。独立音轨将游戏/系统音频与麦克风分开保存，便于后期编辑；部分播放器一次只能播放一条音轨。</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">混合音频便于分享。分离模式从所有输出设备将系统、检测到的游戏和麦克风录制到独立音轨。系统音轨不包含游戏声音；未检测到游戏时，游戏音轨保持静音。</sys:String>
   <sys:String x:Key="L.Help.ApplicationAudio">选择 Captail 要录制的应用，并为每个应用分配音轨。未勾选的应用不会被录制。可用音轨数量取决于所选音频编码器。</sys:String>
   <sys:String x:Key="L.Help.AudioCodec">AAC 保存为 MP4，几乎兼容所有播放器和剪辑软件。Opus 效率更高，在较低码率下音质也很好，但使用 MKV 容器，可能需要较新的剪辑软件。</sys:String>
 
@@ -207,6 +204,8 @@
   <sys:String x:Key="L.Library.ShortcutSeekHint">后退或前进 5 秒</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeed">播放速度</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeedHint">向下减速 · 向上加速</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolume">音量</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolumeHint">调低或调高音量</sys:String>
   <sys:String x:Key="L.Library.ShortcutFullscreenHint">切换播放器视图</sys:String>
   <sys:String x:Key="L.Library.ShortcutCloseHint">退出全屏或关闭播放器</sys:String>
   <sys:String x:Key="L.Library.Overwrite">覆盖</sys:String>
@@ -287,7 +286,8 @@
   <sys:String x:Key="L.Notify.DriverUnavailable">视频驱动程序暂时不可用。将在 {0} 秒后重试。</sys:String>
   <sys:String x:Key="L.Recovery.ModuleStopped">录制模块已停止。</sys:String>
   <sys:String x:Key="L.Recovery.NoFrames">未收到新帧。</sys:String>
-  <sys:String x:Key="L.App.StartError">Captail 无法启动：&#x0A;{0}</sys:String>
+  <sys:String x:Key="L.App.StartError">Captail 无法启动：
+{0}</sys:String>
   <sys:String x:Key="L.App.ExecutablePathError">无法确定 Captail 可执行文件路径。</sys:String>
 
   <sys:String x:Key="L.Hotkey.MustDiffer">保存回放和切换回放的快捷键必须不同。</sys:String>
@@ -331,7 +331,41 @@
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">回放缓冲区意外停止。</sys:String>
   <sys:String x:Key="L.Engine.BufferError">回放缓冲区：{0}</sys:String>
 
-  <sys:String x:Key="L.Unit.Seconds">{0} 秒</sys:String>
+
+  <sys:String x:Key="L.Capture.Mode">捕获模式</sys:String>
+  <sys:String x:Key="L.Capture.ModeHint">选择即时回放或连续录制</sys:String>
+  <sys:String x:Key="L.Capture.Replay">即时回放</sys:String>
+  <sys:String x:Key="L.Capture.Recording">录制</sys:String>
+  <sys:String x:Key="L.Capture.RecordingEnabled">正在录制</sys:String>
+  <sys:String x:Key="L.Capture.StartRecording">开始录制</sys:String>
+  <sys:String x:Key="L.Capture.StopRecording">停止录制</sys:String>
+  <sys:String x:Key="L.Status.Recording">正在录制</sys:String>
+  <sys:String x:Key="L.Status.RecordingDetail">{0} · {1}</sys:String>
+  <sys:String x:Key="L.Status.RecordingDisabled">录制已关闭</sys:String>
+  <sys:String x:Key="L.Status.RecordingIdle">当前未在录制</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedTitle">录制已开始</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedDetail">Captail 正在保存连续录制。</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedTitle">录制已保存</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedDetail">连续录制已保存。</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameTitle">录制已关闭</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameDetail">检测到 {0}。请开始录制以保存游戏画面。</sys:String>
+  <sys:String x:Key="L.Engine.ReplayUnavailableWhileRecording">录制模式下无法保存回放。</sys:String>
+  <sys:String x:Key="L.Tray.Recording">Captail · 正在录制</sys:String>
+  <sys:String x:Key="L.Tray.ToggleRecording">开始 / 停止录制</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecording">开始 / 停止录制</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecordingHint">切换连续录制</sys:String>
+  <sys:String x:Key="L.Section.Appearance">外观</sys:String>
+  <sys:String x:Key="L.Appearance.Accent">强调色</sys:String>
+  <sys:String x:Key="L.Appearance.AccentHint">应用于整个 Captail</sys:String>
+  <sys:String x:Key="L.Appearance.Mint">薄荷绿</sys:String>
+  <sys:String x:Key="L.Appearance.Blue">蓝色</sys:String>
+  <sys:String x:Key="L.Appearance.Violet">紫色</sys:String>
+  <sys:String x:Key="L.Appearance.Rose">玫红</sys:String>
+  <sys:String x:Key="L.Appearance.Amber">琥珀色</sys:String>
+  <sys:String x:Key="L.Library.PreviousReplay">上一个回放</sys:String>
+  <sys:String x:Key="L.Library.NextReplay">下一个回放</sys:String>
+  <sys:String x:Key="L.Library.AllClips">所有剪辑</sys:String>
+  <sys:String x:Key="L.Library.RecentReplays">最近的回放</sys:String><sys:String x:Key="L.Unit.Seconds">{0} 秒</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} 分钟</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} GB</sys:String>
   <sys:String x:Key="L.Audio.PerAppRouting">按应用分配</sys:String>
@@ -360,4 +394,16 @@
   <sys:String x:Key="L.AdvancedAudio.ProcessCount">{0} 个进程</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioTitle">应用音频</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioEmpty">保存前请选择一个应用或启用麦克风。</sys:String>
+  <sys:String x:Key="L.Library.AllGames">所有游戏</sys:String>
+  <sys:String x:Key="L.Library.NoGame">无游戏</sys:String>
+  <sys:String x:Key="L.Library.AllModes">所有录制模式</sys:String>
+  <sys:String x:Key="L.Library.ModeReplay">即时回放</sys:String>
+  <sys:String x:Key="L.Library.ModeRecording">录制</sys:String>
+  <sys:String x:Key="L.Library.ModeUnknown">未知模式</sys:String>
+  <sys:String x:Key="L.Library.SelectAll">全选 / 取消全选</sys:String>
+  <sys:String x:Key="L.Library.SelectClip">选择片段</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelected">删除所选 ({0})</sys:String>
+  <sys:String x:Key="L.Library.SelectedCount">已选片段：{0}</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionTitle">删除所选片段？</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionMessage">所选文件将移至回收站。</sys:String>
 </ResourceDictionary>

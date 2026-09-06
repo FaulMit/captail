@@ -7,6 +7,7 @@ using System.Security.Principal;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Captail.Interop;
 using H.NotifyIcon;
@@ -15,6 +16,13 @@ namespace Captail;
 
 public partial class App : Application
 {
+    private const string CaptureRecoveryParentArgument =
+        "--capture-recovery-parent=";
+    private static readonly TimeSpan PipelineRecoveryShutdownTimeout =
+        TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan RecoveryRestartLoopWindow =
+        TimeSpan.FromMinutes(1);
+    private readonly DateTime _applicationStartedUtc = DateTime.UtcNow;
     private Config? _config;
     private ObsReplayEngine? _obs;
     private HotkeyManager? _hotkeys;
@@ -60,9 +68,12 @@ public partial class App : Application
     private string? _captureDescription;
     private int _exiting;
     private bool _shutdownExistingSucceeded = true;
+    private bool _startedAfterCaptureRecovery;
     private StorePackageLifecycle? _storePackageLifecycle;
 #if DEBUG
     private bool _qaUpdateAvailable;
+    private Task? _qaRecoveryShutdownOverride;
+    private string? _qaGpuRecoveryToken;
 #endif
 
     private bool IsReplayRunning => _replayRunning;
@@ -77,6 +88,16 @@ public partial class App : Application
         try
         {
             _uiOnly = e.Args.Contains("--ui-only", StringComparer.OrdinalIgnoreCase);
+            int? captureRecoveryParent = ParseCaptureRecoveryParent(e.Args);
+            if (captureRecoveryParent.HasValue)
+            {
+                _startedAfterCaptureRecovery = true;
+                await WaitForCaptureRecoveryParentAsync(
+                    captureRecoveryParent.Value);
+                Log.Write(
+                    "Capture recovery process continuing after parent exit: " +
+                    captureRecoveryParent.Value);
+            }
             _processAudioAvailability =
                 ObsReplayEngine.DetectProcessAudioAvailability(
                     Environment.OSVersion.Version,
@@ -89,6 +110,19 @@ public partial class App : Application
             bool faultTest = e.Args.Contains(
                 "--qa-fault-recovery",
                 StringComparer.OrdinalIgnoreCase);
+            string? gpuRecoveryParentToken = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-gpu-recovery-parent=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-gpu-recovery-parent=".Length..];
+            string? gpuRecoveryChildToken = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-gpu-recovery-child=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-gpu-recovery-child=".Length..];
+            bool gpuRecoveryTest =
+                !string.IsNullOrWhiteSpace(gpuRecoveryParentToken) ||
+                !string.IsNullOrWhiteSpace(gpuRecoveryChildToken);
             bool codecTest = e.Args.Contains(
                 "--qa-codecs",
                 StringComparer.OrdinalIgnoreCase);
@@ -140,6 +174,12 @@ public partial class App : Application
             bool replayToggleTest = e.Args.Contains(
                 "--qa-replay-toggle",
                 StringComparer.OrdinalIgnoreCase);
+            bool recordingOutputTest = e.Args.Contains(
+                "--qa-recording-output",
+                StringComparer.OrdinalIgnoreCase);
+            bool fullscreenInputOverlayTest = e.Args.Contains(
+                "--qa-fullscreen-input-overlay",
+                StringComparer.OrdinalIgnoreCase);
             string? clipEditorTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-clip-editor=",
@@ -153,6 +193,13 @@ public partial class App : Application
                 ?["--qa-replay-player=".Length..];
             bool replayPlayerTest =
                 !string.IsNullOrWhiteSpace(replayPlayerTestPath);
+            string? replayNavigationTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-replay-navigation=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-replay-navigation=".Length..];
+            bool replayNavigationTest =
+                !string.IsNullOrWhiteSpace(replayNavigationTestPath);
             string? audioMixTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-audio-mix=",
@@ -178,6 +225,7 @@ public partial class App : Application
                 StringComparer.OrdinalIgnoreCase);
 #else
             const bool faultTest = false;
+            const bool gpuRecoveryTest = false;
             const bool codecTest = false;
             const bool capabilityModelTest = false;
             const bool gameCaptureTest = false;
@@ -190,11 +238,14 @@ public partial class App : Application
             const bool updateCheckTest = false;
             const bool clipEditorTest = false;
             const bool replayPlayerTest = false;
+            const bool replayNavigationTest = false;
             const bool audioMixTest = false;
             const bool previewGeometryTest = false;
             const bool trimOverwriteTest = false;
             const bool audioRoutingUiTest = false;
             const bool replayToggleTest = false;
+            const bool recordingOutputTest = false;
+            const bool fullscreenInputOverlayTest = false;
 #endif
             bool backgroundLaunch = e.Args.Contains(
                     "--background",
@@ -206,13 +257,16 @@ public partial class App : Application
             if (!AcquireSingleInstance(
                     backgroundLaunch,
                     shutdownExisting,
-                    _uiOnly || faultTest || codecTest || capabilityModelTest ||
+                    _uiOnly || faultTest || gpuRecoveryTest || codecTest ||
+                    capabilityModelTest ||
                     gameCaptureTest || gameCaptureIdleTest ||
                     replaySegmentsTest || updateCheckTest ||
-                    clipEditorTest || replayPlayerTest || audioMixTest || previewGeometryTest ||
+                    clipEditorTest || replayPlayerTest || replayNavigationTest ||
+                    audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
-                    automaticCapturePolicyTest || replayRoutingTest ||
-                    localizationTest || audioRoutingUiTest || replayToggleTest))
+                     automaticCapturePolicyTest || replayRoutingTest ||
+                     localizationTest || audioRoutingUiTest || replayToggleTest ||
+                     recordingOutputTest || fullscreenInputOverlayTest))
             {
                 Shutdown();
                 return;
@@ -228,6 +282,7 @@ public partial class App : Application
                 OnStorePackageStopping);
             _config = Config.Load();
             Localization.SetLanguage(_config.Language);
+            ThemeManager.ApplyAccent(_config.AccentColor);
             Localization.Changed += OnLanguageChanged;
 #if !DEBUG
             if (!_uiOnly && Autostart.HasEntry())
@@ -244,6 +299,16 @@ public partial class App : Application
             }
 #endif
 #if DEBUG
+            if (!string.IsNullOrWhiteSpace(gpuRecoveryParentToken))
+            {
+                RunGpuRecoveryParentTest(gpuRecoveryParentToken);
+                return;
+            }
+            if (!string.IsNullOrWhiteSpace(gpuRecoveryChildToken))
+            {
+                RunGpuRecoveryChildTest(gpuRecoveryChildToken);
+                return;
+            }
             if (faultTest)
             {
                 RunFaultRecoveryTest();
@@ -329,9 +394,24 @@ public partial class App : Application
                 await RunTrimOverwriteTestAsync(trimOverwriteTestPath!);
                 return;
             }
+            if (replayNavigationTest)
+            {
+                await RunReplayNavigationTestAsync(replayNavigationTestPath!);
+                return;
+            }
             if (replayToggleTest)
             {
                 await RunReplayToggleTestAsync();
+                return;
+            }
+            if (recordingOutputTest)
+            {
+                await RunRecordingOutputTestAsync();
+                return;
+            }
+            if (fullscreenInputOverlayTest)
+            {
+                RunFullscreenInputOverlayTest();
                 return;
             }
 #endif
@@ -393,12 +473,19 @@ public partial class App : Application
                 await TryStartPipelineAsync(showError: true))
             {
                 ShowOverlayNotification(
-                    "●",
-                    Localization.Text("L.Notify.ReadyTitle"),
-                    Localization.Format(
-                        "L.Status.BufferLast",
-                        FormatDuration(_config.BufferSeconds)),
+                    _startedAfterCaptureRecovery ? "✓" : "●",
+                    Localization.Text(
+                        _startedAfterCaptureRecovery
+                            ? "L.Notify.RecoveredTitle"
+                            : "L.Notify.ReadyTitle"),
+                    _startedAfterCaptureRecovery
+                        ? Localization.Text("L.Notify.RecoveredDetail")
+                        : Localization.Format(
+                            "L.Status.BufferLast",
+                            FormatDuration(_config.BufferSeconds)),
                     OverlayTone.Success);
+                if (_startedAfterCaptureRecovery)
+                    Log.Write("Capture recovery restart completed successfully.");
             }
         }
         catch (Exception exception)
@@ -413,6 +500,52 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private void RunFullscreenInputOverlayTest()
+    {
+        Window? fullscreen = null;
+        try
+        {
+            bool hotkeysPassed =
+                HotkeyManager.RunExtendedFunctionKeyQa(out string hotkeyDetails);
+            fullscreen = new Window
+            {
+                Left = SystemParameters.VirtualScreenLeft,
+                Top = SystemParameters.VirtualScreenTop,
+                Width = SystemParameters.PrimaryScreenWidth,
+                Height = SystemParameters.PrimaryScreenHeight,
+                WindowStyle = WindowStyle.None,
+                ResizeMode = ResizeMode.NoResize,
+                ShowActivated = false,
+                ShowInTaskbar = false,
+                Topmost = true,
+                Background = System.Windows.Media.Brushes.Black,
+            };
+            fullscreen.Show();
+            nint fullscreenHwnd = new WindowInteropHelper(fullscreen).Handle;
+
+            _overlayNotification = new OverlayNotificationWindow();
+            bool overlayPassed = _overlayNotification.RunFullscreenOverlayQa(
+                fullscreenHwnd,
+                out string overlayDetails);
+            bool passed = hotkeysPassed && overlayPassed;
+            Log.Write(
+                $"FULLSCREEN_INPUT_OVERLAY_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"hotkeys=[{hotkeyDetails}], overlay=[{overlayDetails}]");
+            _overlayNotification.ClosePermanently();
+            _overlayNotification = null;
+            fullscreen.Close();
+            Shutdown(passed ? 0 : 28);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"FULLSCREEN_INPUT_OVERLAY_TEST FAIL: {exception}");
+            _overlayNotification?.ClosePermanently();
+            _overlayNotification = null;
+            fullscreen?.Close();
+            Shutdown(28);
+        }
+    }
+
     private static void RunLocalizationTest()
     {
         var cases = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -895,6 +1028,14 @@ public partial class App : Application
             hotkeyOnlyChange.Hotkey = "Ctrl+Alt+F8";
             Config pipelineChange = invalidConfig.Clone();
             pipelineChange.FrameRate = 30;
+            Config outputFolderChange = invalidConfig.Clone();
+            outputFolderChange.OutputDirectory = Path.Combine(
+                Path.GetTempPath(),
+                "Captail",
+                "new-output");
+            Config replayOrganizationChange = invalidConfig.Clone();
+            replayOrganizationChange.OrganizeReplaysByGame =
+                !replayOrganizationChange.OrganizeReplaysByGame;
             long windows10CaptureMethod =
                 ObsReplayEngine.RecommendedMonitorCaptureMethod(
                     new Version(10, 0, 19045));
@@ -920,8 +1061,10 @@ public partial class App : Application
                 ObsReplayEngine.RecommendedNvencBFrames("h264", true) == 2 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", false) == 0 &&
                 windows10CaptureMethod == 0 &&
-                windows11CaptureMethod == 2 &&
+                windows11CaptureMethod == 0 &&
                 invalidConfig.PipelineEquals(hotkeyOnlyChange) &&
+                invalidConfig.PipelineEquals(outputFolderChange) &&
+                invalidConfig.PipelineEquals(replayOrganizationChange) &&
                 !invalidConfig.PipelineEquals(pipelineChange);
             Log.Write(
                 $"GPU_CAPABILITY_MODEL_TEST {(passed ? "PASS" : "FAIL")}: " +
@@ -1019,7 +1162,8 @@ public partial class App : Application
                     OutputDirectory = root,
                 };
                 _config.Normalize();
-                bool started = advancedAudio
+                bool routedAudio = advancedAudio || audioTracks;
+                bool started = routedAudio
                     ? await TryStartPipelineAsync(showError: false)
                     : TryStartPipeline(showError: false);
                 if (!started ||
@@ -1027,7 +1171,7 @@ public partial class App : Application
                 {
                     allPassed = false;
                     Log.Write($"OBS_CODEC_TEST {codec}: start failed");
-                    if (advancedAudio)
+                    if (routedAudio)
                         await StopPipelineCoreAsync();
                     else
                         StopPipeline();
@@ -1035,12 +1179,14 @@ public partial class App : Application
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(2));
-                bool sourceChanged = _obs!.RefreshCaptureState();
+                bool sourceChanged = routedAudio
+                    ? await RunOnObsThreadAsync(() => _obs!.RefreshCaptureState())
+                    : _obs!.RefreshCaptureState();
                 Log.Write(
-                    $"OBS_CODEC_TEST {codec}: source={_obs.Description}, " +
+                    $"OBS_CODEC_TEST {codec}: source={_obs!.Description}, " +
                     $"changed={sourceChanged}, game={_obs.ActiveGameExecutable}");
                 await Task.Delay(TimeSpan.FromSeconds(recordingSeconds));
-                Task<string> saveOperation = advancedAudio
+                Task<string> saveOperation = routedAudio
                     ? await RunOnObsThreadAsync(() => _obs!.SaveReplayAsync())
                     : _obs!.SaveReplayAsync();
                 string path = await saveOperation;
@@ -1049,7 +1195,7 @@ public partial class App : Application
                 Log.Write(
                     $"OBS_CODEC_TEST {codec}: saved={saved}, " +
                     $"frames={_obs.EncodedFrameCount}, path={path}");
-                if (advancedAudio)
+                if (routedAudio)
                     await StopPipelineCoreAsync();
                 else
                     StopPipeline();
@@ -1600,11 +1746,7 @@ public partial class App : Application
             _captureDescription = description;
             _capabilities = engine.Capabilities;
             _processAudioAvailability = engine.ProcessAudioAvailability;
-            if (string.Equals(
-                _config.AudioRoutingMode,
-                "advanced",
-                StringComparison.OrdinalIgnoreCase) &&
-                _config.ProcessAudioRoutes.Any(route => route.Enabled))
+            if (engine.RequiresProcessAudioMonitoring)
             {
                 _processAudioMonitor = new ProcessAudioMonitor(
                     ProcessSnapshot.Capture,
@@ -1673,6 +1815,8 @@ public partial class App : Application
     {
         await StopProcessAudioMonitorAsync();
         ObsReplayEngine? engine = _obs;
+        string recordingPath = engine?.RecordingPath ?? "";
+        string recordingGame = engine?.RecordingGameExecutable ?? "";
         _obs = null;
         _replayRunning = false;
         _captureDescription = null;
@@ -1684,6 +1828,16 @@ public partial class App : Application
         {
             await RunOnObsThreadAsync(engine.Dispose);
             Log.Write($"OBS pipeline stopped in {stopwatch.ElapsedMilliseconds} ms.");
+            if (!string.IsNullOrWhiteSpace(recordingPath) &&
+                File.Exists(recordingPath))
+            {
+                string routed = ReplayPaths.RouteSavedReplay(
+                    _config!,
+                    recordingPath,
+                    recordingGame);
+                Log.Write($"Continuous recording saved: {routed}");
+                _settingsWindow?.NotifyReplaySaved(routed);
+            }
         }
         catch (Exception exception)
         {
@@ -1698,6 +1852,168 @@ public partial class App : Application
         if (monitor is not null)
             await monitor.DisposeAsync();
     }
+
+    private static int? ParseCaptureRecoveryParent(IEnumerable<string> args)
+    {
+        string? argument = args.FirstOrDefault(value => value.StartsWith(
+            CaptureRecoveryParentArgument,
+            StringComparison.OrdinalIgnoreCase));
+        return argument is not null &&
+               int.TryParse(
+                   argument[CaptureRecoveryParentArgument.Length..],
+                   out int processId) &&
+               processId > 0 &&
+               processId != Environment.ProcessId
+            ? processId
+            : null;
+    }
+
+    private static async Task WaitForCaptureRecoveryParentAsync(int processId)
+    {
+        Process? parent;
+        try
+        {
+            parent = Process.GetProcessById(processId);
+        }
+        catch (ArgumentException)
+        {
+            return;
+        }
+
+        using (parent)
+        {
+            await parent.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30));
+        }
+    }
+
+#if DEBUG
+    private async Task RunReplayNavigationTestAsync(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("QA replay does not exist.", fullPath);
+
+        var ffmpeg = new FfmpegAdapter();
+        TimeSpan duration = await ffmpeg.ReadDurationAsync(fullPath);
+        var file = new FileInfo(fullPath);
+        var clip = new ReplayClip(
+            fullPath,
+            file.Name,
+            null,
+            file.LastWriteTime,
+            file.Length,
+            duration,
+            null);
+        int persistedVolume = -1;
+        var window = new ClipEditorWindow(
+            new ReplayLibrary(ffmpeg),
+            file.DirectoryName!,
+            clip,
+            _ => { },
+            ClipWindowMode.Preview,
+            64,
+            volume => persistedVolume = volume);
+        MainWindow = window;
+        window.Show();
+        try
+        {
+            (bool passed, string details) =
+                await window.RunReplayNavigationQaAsync();
+            passed &= persistedVolume == 68;
+            details += $", persistedVolume={persistedVolume}";
+            Log.Write(
+                $"REPLAY_NAVIGATION_TEST {(passed ? "PASS" : "FAIL")}: {details}");
+            window.Close();
+            Shutdown(passed ? 0 : 27);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"REPLAY_NAVIGATION_TEST FAIL: {exception}");
+            window.Close();
+            Shutdown(27);
+        }
+    }
+
+    private async void RunGpuRecoveryParentTest(string token)
+    {
+        try
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "Captail",
+                $"obs_gpu_recovery_parent_{Environment.ProcessId}");
+            _config = new Config
+            {
+                ReplayEnabled = true,
+                BufferSeconds = 5,
+                FrameRate = 30,
+                BitrateMbps = 8,
+                Codec = "h264",
+                CaptureSource = "desktop",
+                CaptureSystemAudio = false,
+                CaptureMicrophone = false,
+                OutputDirectory = root,
+            };
+            if (!await TryStartPipelineAsync(showError: false))
+                throw new InvalidOperationException(
+                    "The initial GPU recovery pipeline did not start.");
+
+            _qaGpuRecoveryToken = token;
+            _qaRecoveryShutdownOverride = new TaskCompletionSource(
+                TaskCreationOptions.RunContinuationsAsynchronously).Task;
+            Log.Write($"OBS_GPU_RECOVERY_TEST parent ready: token={token}");
+            await RecoverPipelineAsync("QA: simulated GPU device loss.");
+            throw new InvalidOperationException(
+                "Hung GPU recovery unexpectedly returned in the parent process.");
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"OBS_GPU_RECOVERY_TEST FAIL: token={token}, {exception}");
+            Shutdown(20);
+        }
+    }
+
+    private async void RunGpuRecoveryChildTest(string token)
+    {
+        try
+        {
+            string root = Path.Combine(
+                Path.GetTempPath(),
+                "Captail",
+                $"obs_gpu_recovery_child_{Environment.ProcessId}");
+            _config = new Config
+            {
+                ReplayEnabled = true,
+                BufferSeconds = 5,
+                FrameRate = 30,
+                BitrateMbps = 8,
+                Codec = "h264",
+                CaptureSource = "desktop",
+                CaptureSystemAudio = false,
+                CaptureMicrophone = false,
+                OutputDirectory = root,
+            };
+            if (!await TryStartPipelineAsync(showError: false))
+                throw new InvalidOperationException(
+                    "The recovered GPU pipeline did not start.");
+
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            Task<string> saveOperation = await RunOnObsThreadAsync(
+                () => _obs!.SaveReplayAsync());
+            string path = await saveOperation;
+            bool passed = IsReplayRunning && File.Exists(path);
+            Log.Write(
+                $"OBS_GPU_RECOVERY_TEST {(passed ? "PASS" : "FAIL")}: " +
+                $"token={token}, path={path}");
+            Shutdown(passed ? 0 : 21);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"OBS_GPU_RECOVERY_TEST FAIL: token={token}, {exception}");
+            Shutdown(21);
+        }
+    }
+#endif
 
     private async Task RunReplayToggleTestAsync()
     {
@@ -1722,6 +2038,57 @@ public partial class App : Application
         {
             Log.Write($"REPLAY_TOGGLE_TEST FAIL: {exception}");
             Shutdown(24);
+        }
+        finally
+        {
+            _config.CopyFrom(original);
+            _config.Save();
+        }
+    }
+
+    private async Task RunRecordingOutputTestAsync()
+    {
+        Config original = _config!.Clone();
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"captail-recording-qa-{Guid.NewGuid():N}");
+        try
+        {
+            Directory.CreateDirectory(root);
+            _config.CaptureMode = "recording";
+            _config.ReplayEnabled = true;
+            _config.CaptureSource = "desktop";
+            _config.Codec = "h264";
+            _config.FrameRate = 30;
+            _config.RecordingResolution = "720p";
+            _config.CaptureSystemAudio = false;
+            _config.CaptureMicrophone = false;
+            _config.AudioRoutingMode = "simple";
+            _config.OutputDirectory = root;
+            _config.OrganizeReplaysByGame = false;
+            _config.Normalize();
+
+            if (!TryStartPipeline(showError: false) || _obs is null)
+                throw new InvalidOperationException("Recording output did not start.");
+
+            string path = _obs.RecordingPath;
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            await StopPipelineCoreAsync();
+            bool saved = File.Exists(path) && new FileInfo(path).Length > 0;
+            if (!saved)
+                throw new InvalidOperationException($"Recording output was not saved: {path}");
+
+            Log.Write(
+                $"RECORDING_OUTPUT_TEST PASS: bytes={new FileInfo(path).Length}, " +
+                $"path={path}");
+            Shutdown(0);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"RECORDING_OUTPUT_TEST FAIL: {exception}");
+            if (_obs is not null)
+                await StopPipelineCoreAsync();
+            Shutdown(25);
         }
         finally
         {
@@ -1903,10 +2270,21 @@ public partial class App : Application
         _pendingReplayOffGame = "";
         _pendingReplayOffGameSamples = 0;
         string gameName = Path.GetFileNameWithoutExtension(foreground.Executable);
+        bool recordingMode = string.Equals(
+            config.CaptureMode,
+            "recording",
+            StringComparison.Ordinal);
         ShowOverlayNotification(
             "!",
-            Localization.Text("L.Notify.ReplayOffGameTitle"),
-            Localization.Format("L.Notify.ReplayOffGameDetail", gameName),
+            Localization.Text(
+                recordingMode
+                    ? "L.Notify.RecordingOffGameTitle"
+                    : "L.Notify.ReplayOffGameTitle"),
+            Localization.Format(
+                recordingMode
+                    ? "L.Notify.RecordingOffGameDetail"
+                    : "L.Notify.ReplayOffGameDetail",
+                gameName),
             OverlayTone.Warning,
             5200);
     }
@@ -2024,7 +2402,20 @@ public partial class App : Application
                 Localization.Text("L.Notify.RecoveryTitle"),
                 reason,
                 OverlayTone.Warning);
-            await StopPipelineCoreAsync();
+            Task shutdownTask;
+#if DEBUG
+            shutdownTask = _qaRecoveryShutdownOverride ?? StopPipelineCoreAsync();
+            TimeSpan shutdownTimeout = _qaRecoveryShutdownOverride is null
+                ? PipelineRecoveryShutdownTimeout
+                : TimeSpan.FromMilliseconds(500);
+#else
+            shutdownTask = StopPipelineCoreAsync();
+            TimeSpan shutdownTimeout = PipelineRecoveryShutdownTimeout;
+#endif
+            await WaitForRecoveryShutdownAsync(
+                shutdownTask,
+                shutdownTimeout,
+                reason);
 
             if (await TryStartPipelineCoreAsync(showError: false))
             {
@@ -2080,7 +2471,13 @@ public partial class App : Application
         };
 
         _saveMenuItem = CreateMenuItem(
-            Localization.Text("L.Tray.Save"),
+            Localization.Text(
+                string.Equals(
+                    _config!.CaptureMode,
+                    "recording",
+                    StringComparison.Ordinal)
+                    ? "L.Tray.ToggleRecording"
+                    : "L.Tray.Save"),
             _config!.Hotkey);
         _saveMenuItem.Click += (_, _) => SaveReplay();
         menu.Items.Add(_saveMenuItem);
@@ -2223,9 +2620,9 @@ public partial class App : Application
             return Task.FromResult<UpdateRelease?>(
                 new UpdateRelease(
                     new Version(0, 2, 2),
-                    "v0.2.2",
+                    "v0.2.3",
                     new Uri(
-                        "https://github.com/FaulMit/captail/releases/tag/v0.2.2"),
+                        "https://github.com/FaulMit/captail/releases/tag/v0.2.3"),
                     true,
                     asset,
                     asset,
@@ -2374,12 +2771,21 @@ public partial class App : Application
             {
                 _config!.ReplayEnabled = true;
                 _config.Save();
+                bool recordingMode = string.Equals(
+                    _config.CaptureMode,
+                    "recording",
+                    StringComparison.Ordinal);
                 ShowOverlayNotification(
                     "●",
-                    Localization.Text("L.Notify.EnabledTitle"),
-                    Localization.Format(
-                        "L.Status.BufferLast",
-                        FormatDuration(_config.BufferSeconds)),
+                    Localization.Text(
+                        recordingMode
+                            ? "L.Notify.RecordingStartedTitle"
+                            : "L.Notify.EnabledTitle"),
+                    recordingMode
+                        ? Localization.Text("L.Notify.RecordingStartedDetail")
+                        : Localization.Format(
+                            "L.Status.BufferLast",
+                            FormatDuration(_config.BufferSeconds)),
                     OverlayTone.Success);
             }
             return started;
@@ -2391,10 +2797,20 @@ public partial class App : Application
         _nextRecoveryUtc = DateTime.MinValue;
         _recoveryFailures = 0;
         UpdateUiState();
+        bool stoppedRecording = string.Equals(
+            _config.CaptureMode,
+            "recording",
+            StringComparison.Ordinal);
         ShowOverlayNotification(
             "■",
-            Localization.Text("L.Notify.DisabledTitle"),
-            Localization.Text("L.Notify.DisabledDetail"),
+            Localization.Text(
+                stoppedRecording
+                    ? "L.Notify.RecordingSavedTitle"
+                    : "L.Notify.DisabledTitle"),
+            Localization.Text(
+                stoppedRecording
+                    ? "L.Notify.RecordingSavedDetail"
+                    : "L.Notify.DisabledDetail"),
             OverlayTone.Neutral);
         return false;
     }
@@ -2523,6 +2939,88 @@ public partial class App : Application
         }
     }
 
+    private async Task WaitForRecoveryShutdownAsync(
+        Task shutdownTask,
+        TimeSpan timeout,
+        string reason)
+    {
+        Task completed = await Task.WhenAny(shutdownTask, Task.Delay(timeout));
+        if (ReferenceEquals(completed, shutdownTask))
+        {
+            await shutdownTask;
+            return;
+        }
+
+        Log.Write(
+            $"OBS pipeline shutdown timed out after {timeout.TotalSeconds:0.#}s " +
+            $"during recovery: {reason}");
+        if (TryRestartAfterHungCaptureRecovery(reason))
+            return;
+
+        throw new TimeoutException(
+            Localization.Text("L.Notify.RecoveryUnavailableTitle"));
+    }
+
+    private bool TryRestartAfterHungCaptureRecovery(string reason)
+    {
+        if (_startedAfterCaptureRecovery &&
+            DateTime.UtcNow - _applicationStartedUtc < RecoveryRestartLoopWindow)
+        {
+            Log.Write(
+                "Capture recovery restart suppressed to prevent a restart loop.");
+            return false;
+        }
+
+        string? executable = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(executable) ||
+            !File.Exists(executable))
+        {
+            Log.Write("Capture recovery restart executable is unavailable.");
+            return false;
+        }
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executable,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        startInfo.ArgumentList.Add(
+            CaptureRecoveryParentArgument + Environment.ProcessId);
+        startInfo.ArgumentList.Add("--background");
+#if DEBUG
+        if (!string.IsNullOrWhiteSpace(_qaGpuRecoveryToken))
+        {
+            startInfo.ArgumentList.Add(
+                "--qa-gpu-recovery-child=" + _qaGpuRecoveryToken);
+        }
+#endif
+
+        try
+        {
+            if (Process.Start(startInfo) is null)
+            {
+                Log.Write("Capture recovery restart process did not start.");
+                return false;
+            }
+        }
+        catch (Exception exception)
+        {
+            Log.Write(
+                "Capture recovery restart process failed: " +
+                exception.Message);
+            return false;
+        }
+
+        Log.Write(
+            "Capture recovery restart requested after hung OBS shutdown: " +
+            reason);
+        // Native libobs teardown is already hung. Graceful WPF shutdown would call
+        // the same worker again and prevent the replacement process from acquiring the mutex.
+        Environment.Exit(22);
+        return true;
+    }
+
     private async Task<bool> ApplySettingsAsync(
         Config candidate,
         bool autostartEnabled)
@@ -2531,6 +3029,8 @@ public partial class App : Application
         if (_uiOnly)
         {
             _config!.CopyFrom(candidate);
+            ThemeManager.ApplyAccent(_config.AccentColor);
+            _recordingIndicator?.RefreshAccent();
             _config.Save();
             UpdateUiState();
 #if DEBUG
@@ -2572,6 +3072,8 @@ public partial class App : Application
             }
 
             _config.CopyFrom(candidate);
+            ThemeManager.ApplyAccent(_config.AccentColor);
+            _recordingIndicator?.RefreshAccent();
             bool mustStart = candidate.ReplayEnabled &&
                 (!wasRunning || pipelineChanged);
             if (mustStart)
@@ -2586,13 +3088,19 @@ public partial class App : Application
             _config.Save();
             UpdateUiState();
 
+            bool recordingMode = string.Equals(
+                _config.CaptureMode,
+                "recording",
+                StringComparison.Ordinal);
             ShowOverlayNotification(
                 "✓",
                 Localization.Text("L.Notify.SettingsApplied"),
                 _config.ReplayEnabled
                     ? $"{_obs!.ActiveCodec.ToUpperInvariant()} · " +
-                      $"{_config.FrameRate} FPS · " +
-                      $"{FormatDuration(_config.BufferSeconds)}"
+                      $"{_config.FrameRate} FPS" +
+                      (recordingMode
+                          ? " · REC"
+                          : $" · {FormatDuration(_config.BufferSeconds)}")
                     : Localization.Text("L.Status.Disabled"),
                 OverlayTone.Success);
             return true;
@@ -2604,6 +3112,8 @@ public partial class App : Application
                 await StopPipelineCoreAsync();
 
             _config.CopyFrom(previous);
+            ThemeManager.ApplyAccent(_config.AccentColor);
+            _recordingIndicator?.RefreshAccent();
             SaveRollbackConfig("settings apply");
             try
             {
@@ -2666,6 +3176,10 @@ public partial class App : Application
     private void UpdateUiState()
     {
         bool active = IsReplayRunning;
+        bool recordingMode = string.Equals(
+            _config?.CaptureMode,
+            "recording",
+            StringComparison.Ordinal);
         string codec = _obs?.ActiveCodec ?? _config?.Codec ?? "h264";
         int availableReplaySeconds = active
             ? _obs?.AvailableReplaySeconds ?? _config!.BufferSeconds
@@ -2686,15 +3200,20 @@ public partial class App : Application
                 _trayActiveState = active;
             }
             _tray.ToolTipText = active
-                ? Localization.Format(
-                    "L.Tray.Active",
-                    FormatDuration(_config!.BufferSeconds))
+                ? recordingMode
+                    ? Localization.Text("L.Tray.Recording")
+                    : Localization.Format(
+                        "L.Tray.Active",
+                        FormatDuration(_config!.BufferSeconds))
                 : Localization.Text("L.Tray.Disabled");
         }
         if (_saveMenuItem is not null)
         {
+            _saveMenuItem.Header = Localization.Text(
+                recordingMode ? "L.Tray.ToggleRecording" : "L.Tray.Save");
             _saveMenuItem.InputGestureText = _config?.Hotkey ?? "";
-            _saveMenuItem.IsEnabled = active && availableReplaySeconds > 0;
+            _saveMenuItem.IsEnabled = recordingMode ||
+                                      (active && availableReplaySeconds > 0);
         }
         if (_toggleMenuItem is not null)
             _toggleMenuItem.InputGestureText =
@@ -2748,6 +3267,14 @@ public partial class App : Application
 
     private void SaveReplay()
     {
+        if (string.Equals(
+                _config?.CaptureMode,
+                "recording",
+                StringComparison.Ordinal))
+        {
+            _ = SetReplayEnabledGuardedAsync(IsReplayRunning ? false : true);
+            return;
+        }
         ObsReplayEngine? engine = _obs;
         if (engine is null || !IsReplayRunning ||
             Volatile.Read(ref _exiting) != 0)

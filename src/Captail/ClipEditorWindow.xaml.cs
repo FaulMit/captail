@@ -37,12 +37,14 @@ public partial class ClipEditorWindow : Window
     private const double FullscreenControlsHeight = 58;
     private readonly ReplayLibrary _library;
     private readonly string _rootDirectory;
-    private readonly ReplayClip _clip;
+    private ReplayClip _clip;
     private readonly Action<string> _onSaved;
+    private readonly Action<int>? _onVolumeChanged;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly DispatcherTimer _playbackTimer;
     private readonly DispatcherTimer _fullscreenUiTimer;
     private readonly DispatcherTimer _speedFeedbackTimer;
+    private readonly DispatcherTimer _volumePersistTimer;
     private readonly List<BitmapImage> _timelineImages = [];
     private double _selectionStart;
     private double _selectionEnd;
@@ -60,6 +62,8 @@ public partial class ClipEditorWindow : Window
     private Visibility _imageVisibilityBeforeOverwrite = Visibility.Visible;
     private bool _isFullscreen;
     private bool _restoreTopmost;
+    private ResizeMode _restoreResizeMode;
+    private nint _restoreWindowStyle;
     private Rect _restoreBounds;
     private WindowState _restoreWindowState;
     private NativePoint _lastCursorPosition;
@@ -68,24 +72,50 @@ public partial class ClipEditorWindow : Window
     private bool _previewMode;
     private bool _editorAssetsStarted;
     private int _playbackSpeedIndex = 3;
+    private int _playbackVolumePercent;
+    private bool _updatingVolumeSlider;
+    private bool _volumePersistPending;
     private DateTime? _bufferingSinceUtc;
+    private int _currentReplayIndex = -1;
+    private RecentReplayEntry[] _pendingDeleteReplays = [];
+    private readonly List<RecentReplayEntry> _allReplayItems = [];
+    private bool _updatingReplayFilters;
+    private bool _deletingReplays;
+    private bool _resumeAfterDeleteConfirmation;
+    private Visibility _playerVisibilityBeforeDelete = Visibility.Collapsed;
+    private Visibility _imageVisibilityBeforeDelete = Visibility.Visible;
+    private HwndSource? _windowSource;
+    private bool _interactiveResizeActive;
+    private bool _interactiveResizePlayerVisible;
+    private bool _resumeAfterInteractiveResize;
+    private Visibility _imageVisibilityBeforeInteractiveResize = Visibility.Visible;
 
     public ObservableCollection<AudioTrackRow> AudioTracks { get; } = [];
+    public ObservableCollection<RecentReplayEntry> RecentReplayItems { get; } = [];
 
     public ClipEditorWindow(
         ReplayLibrary library,
         string rootDirectory,
         ReplayClip clip,
         Action<string> onSaved,
-        ClipWindowMode mode = ClipWindowMode.Trim)
+        ClipWindowMode mode = ClipWindowMode.Trim,
+        int initialVolumePercent = 100,
+        Action<int>? onVolumeChanged = null)
     {
         _library = library;
         _rootDirectory = rootDirectory;
         _clip = clip;
         _onSaved = onSaved;
+        _onVolumeChanged = onVolumeChanged;
         _previewMode = mode == ClipWindowMode.Preview;
+        _playbackVolumePercent = Math.Clamp(initialVolumePercent, 0, 100);
         _selectionEnd = Math.Max(MinimumSelectionSeconds, clip.Duration.TotalSeconds);
+        _updatingVolumeSlider = true;
         InitializeComponent();
+        PreviewPlayer.NativeMouseWheel += PreviewPlayer_NativeMouseWheel;
+        PreviewPlayer.NativeMouseLeftButton += PreviewPlayer_NativeMouseLeftButton;
+        PreviewVolumeSlider.Value = _playbackVolumePercent;
+        _updatingVolumeSlider = false;
         DataContext = this;
         ClipNameText.Text = clip.Name;
         ApplyWindowModeLayout(adjustWindow: true);
@@ -100,15 +130,26 @@ public partial class ClipEditorWindow : Window
         _fullscreenUiTimer.Tick += (_, _) => UpdateFullscreenControls();
         _speedFeedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.25) };
         _speedFeedbackTimer.Tick += (_, _) => HidePlaybackSpeedFeedback();
+        _volumePersistTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(400),
+        };
+        _volumePersistTimer.Tick += (_, _) => PersistPlaybackVolumeNow();
         Loaded += async (_, _) => await LoadEditorAsync();
-        SourceInitialized += (_, _) => ApplyNativeCornerPreference();
+        SourceInitialized += Window_SourceInitialized;
         Closed += (_, _) =>
         {
             _playbackTimer.Stop();
             _fullscreenUiTimer.Stop();
             _speedFeedbackTimer.Stop();
+            _volumePersistTimer.Stop();
+            PersistPlaybackVolumeNow();
             Topmost = _restoreTopmost;
             _lifetimeCts.Cancel();
+            PreviewPlayer.NativeMouseWheel -= PreviewPlayer_NativeMouseWheel;
+            PreviewPlayer.NativeMouseLeftButton -= PreviewPlayer_NativeMouseLeftButton;
+            _windowSource?.RemoveHook(WindowMessageHook);
+            _windowSource = null;
             PreviewPlayer.Shutdown();
             _lifetimeCts.Dispose();
         };
@@ -116,6 +157,9 @@ public partial class ClipEditorWindow : Window
 
     private async Task LoadEditorAsync()
     {
+        Task recentTask = _previewMode
+            ? LoadRecentReplaysAsync()
+            : Task.CompletedTask;
         Task videoInfoTask = LoadVideoInfoAsync();
         Task timelineTask = _previewMode
             ? Task.CompletedTask
@@ -125,7 +169,385 @@ public partial class ClipEditorWindow : Window
         await InitializePreviewAsync();
         if (_previewMode && PreviewPlayer.IsReady)
             await StartPlaybackAsync(_selectionStart);
-        await Task.WhenAll(timelineTask, videoInfoTask);
+        await Task.WhenAll(timelineTask, videoInfoTask, recentTask);
+    }
+
+    private async Task LoadRecentReplaysAsync()
+    {
+        IReadOnlyList<ReplayClip> clips = await _library.GetRecentAsync(
+            _rootDirectory,
+            int.MaxValue,
+            _lifetimeCts.Token);
+        _allReplayItems.Clear();
+        foreach (ReplayClip clip in clips)
+        {
+            BitmapImage? thumbnail = null;
+            if (!string.IsNullOrWhiteSpace(clip.ThumbnailPath) &&
+                File.Exists(clip.ThumbnailPath))
+            {
+                thumbnail = LoadBitmap(clip.ThumbnailPath, 180);
+            }
+            _allReplayItems.Add(new RecentReplayEntry(
+                clip,
+                Path.GetFileNameWithoutExtension(clip.Name),
+                FormatTime(clip.Duration, false),
+                thumbnail));
+        }
+        _updatingReplayFilters = true;
+        GameFilter.Items.Clear();
+        GameFilter.Items.Add(new ReplayFilterOption(null, Localization.Text("L.Library.AllGames")));
+        foreach (string game in _allReplayItems.Select(item => item.Clip.Collection ?? "")
+                     .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(game => game))
+            GameFilter.Items.Add(new ReplayFilterOption(game,
+                game.Length == 0 ? Localization.Text("L.Library.NoGame") : game));
+        GameFilter.SelectedIndex = 0;
+        RecordingModeFilter.ItemsSource = new[]
+        {
+            new ReplayFilterOption(null, Localization.Text("L.Library.AllModes")),
+            new ReplayFilterOption("replay", Localization.Text("L.Library.ModeReplay")),
+            new ReplayFilterOption("recording", Localization.Text("L.Library.ModeRecording")),
+            new ReplayFilterOption("unknown", Localization.Text("L.Library.ModeUnknown")),
+        };
+        RecordingModeFilter.SelectedIndex = 0;
+        _updatingReplayFilters = false;
+        ApplyReplayFilters();
+    }
+
+    private void ReplayFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_updatingReplayFilters && IsLoaded)
+            ApplyReplayFilters();
+    }
+
+    private void ApplyReplayFilters()
+    {
+        string? game = (GameFilter.SelectedItem as ReplayFilterOption)?.Value;
+        string? mode = (RecordingModeFilter.SelectedItem as ReplayFilterOption)?.Value;
+        RecentReplayItems.Clear();
+        foreach (RecentReplayEntry item in _allReplayItems)
+        {
+            item.IsMarked = false;
+            if ((game is null || string.Equals(item.Clip.Collection ?? "", game, StringComparison.OrdinalIgnoreCase)) &&
+                (mode is null || item.Clip.RecordingMode == mode))
+                RecentReplayItems.Add(item);
+        }
+        UpdateReplayNavigationState();
+        UpdateMarkedReplayCount();
+    }
+
+    private void ReplayMarked_Click(object sender, RoutedEventArgs e) => UpdateMarkedReplayCount();
+
+    private void SelectAllReplays_Click(object sender, RoutedEventArgs e)
+    {
+        bool mark = RecentReplayItems.Any(item => !item.IsMarked);
+        foreach (RecentReplayEntry item in RecentReplayItems)
+            item.IsMarked = mark;
+        UpdateMarkedReplayCount();
+    }
+
+    private void UpdateMarkedReplayCount()
+    {
+        int count = RecentReplayItems.Count(item => item.IsMarked);
+        DeleteSelectedReplaysButton.IsEnabled = count > 0 && !_deletingReplays;
+        DeleteSelectedReplaysButton.Content = Localization.Format("L.Library.DeleteSelected", count);
+    }
+
+    private void DeleteSelectedReplays_Click(object sender, RoutedEventArgs e) =>
+        RequestDeleteReplays(RecentReplayItems.Where(item => item.IsMarked).ToArray());
+
+    private async Task LoadReplayAsync(ReplayClip clip)
+    {
+        if (!_previewMode || _playerLoading ||
+            string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _playerLoading = true;
+        PlayButton.IsEnabled = false;
+        PreviewPlayButton.IsEnabled = false;
+        try
+        {
+            PreviewPlayer.Pause();
+            _playbackTimer.Stop();
+            _playing = false;
+            _clip = clip;
+            _selectionStart = 0;
+            _selectionEnd = Math.Max(
+                MinimumSelectionSeconds,
+                clip.Duration.TotalSeconds);
+            _playbackPosition = 0;
+            _videoInfo = null;
+            ClipNameText.Text = clip.Name;
+            PreviewImage.Source = !string.IsNullOrWhiteSpace(clip.ThumbnailPath) &&
+                                  File.Exists(clip.ThumbnailPath)
+                ? LoadBitmap(clip.ThumbnailPath, 900)
+                : null;
+            PreviewImage.Visibility = Visibility.Visible;
+            PreviewLoadingOverlay.Visibility = Visibility.Visible;
+            AudioTracks.Clear();
+            await LoadAudioTracksAsync(loadWaveforms: false);
+            await LoadPreviewPlayerAsync(clip, TimeSpan.Zero);
+            PreviewPlayer.SetPlaybackSpeed(PlaybackSpeeds[_playbackSpeedIndex]);
+            PreviewImage.Visibility = Visibility.Collapsed;
+            PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
+            PreviewPlayer.Visibility = Visibility.Visible;
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+            UpdateRangeText();
+            UpdatePlayIcon();
+            await LoadVideoInfoAsync();
+            UpdateReplayNavigationState();
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Replay navigation failed: {exception}");
+            EditorStatusText.Text = exception.Message;
+            PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
+        }
+        finally
+        {
+            _playerLoading = false;
+            PlayButton.IsEnabled = PreviewPlayer.IsReady;
+            PreviewPlayButton.IsEnabled = PreviewPlayer.IsReady;
+        }
+    }
+
+    private void UpdateReplayNavigationState()
+    {
+        _currentReplayIndex = RecentReplayItems
+            .Select((item, index) => (item, index))
+            .FirstOrDefault(pair => string.Equals(
+                pair.item.Clip.Path,
+                _clip.Path,
+                StringComparison.OrdinalIgnoreCase))
+            .index;
+        if (RecentReplayItems.Count == 0 ||
+            !RecentReplayItems.Any(item => string.Equals(
+                item.Clip.Path,
+                _clip.Path,
+                StringComparison.OrdinalIgnoreCase)))
+        {
+            _currentReplayIndex = -1;
+        }
+        PreviousReplayButton.IsEnabled =
+            _currentReplayIndex >= 0 &&
+            _currentReplayIndex < RecentReplayItems.Count - 1;
+        NextReplayButton.IsEnabled = _currentReplayIndex > 0;
+        RecentReplayList.SelectedItem = _currentReplayIndex >= 0
+            ? RecentReplayItems[_currentReplayIndex]
+            : null;
+    }
+
+    private async void PreviousReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_deletingReplays || _currentReplayIndex < 0 ||
+            _currentReplayIndex >= RecentReplayItems.Count - 1)
+        {
+            return;
+        }
+        await LoadReplayAsync(RecentReplayItems[_currentReplayIndex + 1].Clip);
+    }
+
+    private async void NextReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_deletingReplays || _currentReplayIndex <= 0)
+            return;
+        await LoadReplayAsync(RecentReplayItems[_currentReplayIndex - 1].Clip);
+    }
+
+    private async void RecentReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_deletingReplays || DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
+            return;
+        if (((FrameworkElement)sender).DataContext is RecentReplayEntry entry)
+        {
+            if (string.Equals(entry.Clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase))
+                await TogglePlaybackAsync();
+            else
+                await LoadReplayAsync(entry.Clip);
+        }
+    }
+
+    private void RequestDeleteRecentReplay_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (((FrameworkElement)sender).DataContext is not RecentReplayEntry entry ||
+            DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
+        {
+            return;
+        }
+
+        RequestDeleteReplays([entry]);
+    }
+
+    private void RequestDeleteReplays(RecentReplayEntry[] entries)
+    {
+        if (entries.Length == 0 || _deletingReplays || _playerLoading ||
+            DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
+            return;
+        _pendingDeleteReplays = entries;
+        ReplayLibraryStatusText.Visibility = Visibility.Collapsed;
+        _resumeAfterDeleteConfirmation = _playing;
+        if (_playing)
+            _playbackPosition = CurrentPlaybackPosition();
+        PauseNativePlayback();
+        _playerVisibilityBeforeDelete = PreviewPlayer.Visibility;
+        _imageVisibilityBeforeDelete = PreviewImage.Visibility;
+        PreviewPlayer.Visibility = Visibility.Collapsed;
+        if (PreviewImage.Source is not null)
+            PreviewImage.Visibility = Visibility.Visible;
+        DeleteRecentReplayFileText.Text = entries.Length == 1 ? entries[0].Clip.Name :
+            Localization.Format("L.Library.SelectedCount", entries.Length);
+        DeleteRecentReplayOverlay.Visibility = Visibility.Visible;
+    }
+
+    private void CancelDeleteRecentReplay_Click(object sender, RoutedEventArgs e) =>
+        CancelDeleteRecentReplay();
+
+    private void CancelDeleteRecentReplay(bool resumePlayback = true)
+    {
+        DeleteRecentReplayOverlay.Visibility = Visibility.Collapsed;
+        PreviewPlayer.Visibility = _playerVisibilityBeforeDelete;
+        PreviewImage.Visibility = _imageVisibilityBeforeDelete;
+        bool resume = resumePlayback && _resumeAfterDeleteConfirmation &&
+                      PreviewPlayer.IsReady;
+        _pendingDeleteReplays = [];
+        _resumeAfterDeleteConfirmation = false;
+        if (resume)
+        {
+            PreviewPlayer.Play();
+            _playing = true;
+            _playbackTimer.Start();
+        }
+        UpdatePlayIcon();
+        UpdatePlaybackText(readPlayerPosition: false);
+    }
+
+    private async void ConfirmDeleteRecentReplay_Click(object sender, RoutedEventArgs e) =>
+        await ConfirmDeleteRecentReplaysAsync();
+
+    private async Task ConfirmDeleteRecentReplaysAsync()
+    {
+        RecentReplayEntry[] entries = _pendingDeleteReplays;
+        bool resumePlayback = _resumeAfterDeleteConfirmation;
+        CancelDeleteRecentReplay(resumePlayback: false);
+        if (entries.Length == 0 || _deletingReplays)
+            return;
+
+        bool deletingCurrent = entries.Any(entry => string.Equals(
+            entry.Clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase));
+        int deletedIndex = _currentReplayIndex;
+        RecentReplayEntry? replacement = deletingCurrent
+            ? RecentReplayItems
+                .Where(item => !entries.Contains(item))
+                .OrderBy(item => Math.Abs(RecentReplayItems.IndexOf(item) - deletedIndex))
+                .FirstOrDefault() ?? _allReplayItems.FirstOrDefault(item => !entries.Contains(item))
+            : null;
+
+        try
+        {
+            _deletingReplays = true;
+            RecentReplaySidebar.IsEnabled = false;
+            if (deletingCurrent)
+                await PreviewPlayer.StopAsync(_lifetimeCts.Token);
+            foreach (RecentReplayEntry entry in entries)
+            {
+                await Task.Run(
+                    () => _library.DeleteToRecycleBin(_rootDirectory, entry.Clip),
+                    _lifetimeCts.Token);
+                _allReplayItems.Remove(entry);
+                RecentReplayItems.Remove(entry);
+            }
+            if (deletingCurrent)
+            {
+                if (replacement is null)
+                {
+                    Close();
+                    return;
+                }
+                await LoadReplayAsync(replacement.Clip);
+            }
+            else
+            {
+                UpdateReplayNavigationState();
+                if (resumePlayback && PreviewPlayer.IsReady)
+                {
+                    PreviewPlayer.Play();
+                    _playing = true;
+                    _playbackTimer.Start();
+                    UpdatePlayIcon();
+                }
+            }
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Replay delete failed: {exception}");
+            EditorStatusText.Text = exception.Message;
+            ReplayLibraryStatusText.Text = exception.Message;
+            ReplayLibraryStatusText.Visibility = Visibility.Visible;
+            if (deletingCurrent && File.Exists(_clip.Path))
+            {
+                await InitializePreviewAsync();
+                if (resumePlayback && PreviewPlayer.IsReady)
+                    await StartPlaybackAsync(_playbackPosition);
+            }
+            else if (deletingCurrent)
+            {
+                RecentReplayEntry? remaining = _allReplayItems.FirstOrDefault(item => File.Exists(item.Clip.Path));
+                if (remaining is null)
+                    Close();
+                else
+                    await LoadReplayAsync(remaining.Clip);
+            }
+            else if (resumePlayback && PreviewPlayer.IsReady)
+            {
+                PreviewPlayer.Play();
+                _playing = true;
+                _playbackTimer.Start();
+                UpdatePlayIcon();
+            }
+        }
+        finally
+        {
+            _deletingReplays = false;
+            RecentReplaySidebar.IsEnabled = true;
+            UpdateReplayNavigationState();
+            UpdateMarkedReplayCount();
+        }
+    }
+
+    private void PreviewSurface_MouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        ChangePlaybackVolume(e.Delta > 0 ? 5 : -5);
+        ShowFullscreenControls();
+        e.Handled = true;
+    }
+
+    private void PreviewPlayer_NativeMouseWheel(int delta)
+    {
+        ChangePlaybackVolume(delta > 0 ? 5 : -5);
+        ShowFullscreenControls();
+    }
+
+    private async void PreviewSurface_MouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        await TogglePlaybackAsync();
+        ShowFullscreenControls();
+        e.Handled = true;
+    }
+
+    private async void PreviewPlayer_NativeMouseLeftButton()
+    {
+        await TogglePlaybackAsync();
+        ShowFullscreenControls();
     }
 
     private void ApplyWindowModeLayout(bool adjustWindow)
@@ -147,6 +569,9 @@ public partial class ClipEditorWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
         PreviewModePanel.Visibility = _previewMode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        RecentReplaySidebar.Visibility = _previewMode && !_isFullscreen
             ? Visibility.Visible
             : Visibility.Collapsed;
         NormalPlaybackBar.Visibility = _previewMode
@@ -183,6 +608,13 @@ public partial class ClipEditorWindow : Window
                 workArea.Bottom - targetHeight - 8);
         }
         Height = targetHeight;
+        if (_previewMode)
+        {
+            double targetWidth = Math.Min(
+                1120,
+                Math.Max(760, workArea.Width - 16));
+            Width = Math.Max(ActualWidth, targetWidth);
+        }
         Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
         {
             EditorWorkspace.UpdateLayout();
@@ -236,6 +668,173 @@ public partial class ClipEditorWindow : Window
     }
 
 #if DEBUG
+    internal async Task<(bool Passed, string Details)> RunReplayNavigationQaAsync()
+    {
+        DateTime readyDeadline = DateTime.UtcNow.AddSeconds(12);
+        while ((_playerLoading || !PreviewPlayer.IsReady ||
+                RecentReplayItems.Count < 2) &&
+               DateTime.UtcNow < readyDeadline)
+        {
+            await Task.Delay(50, _lifetimeCts.Token);
+        }
+
+        RecentReplayEntry? target = RecentReplayItems.FirstOrDefault(item =>
+            !string.Equals(
+                item.Clip.Path,
+                _clip.Path,
+                StringComparison.OrdinalIgnoreCase));
+        if (!PreviewPlayer.IsReady || target is null)
+            return (false, "player or second replay did not become ready");
+
+        bool allClipsPassed = RecentReplayItems.Count >= 13;
+        bool initialVolumePassed = _playbackVolumePercent == 64 &&
+                                   PreviewPlayer.VolumePercent == 64 &&
+                                   Math.Abs(PreviewVolumeSlider.Value - 64) < 0.1;
+        PreviewVolumeSlider.Value = 73;
+        await Task.Delay(500, _lifetimeCts.Token);
+        bool sliderVolumePassed = _playbackVolumePercent == 73 &&
+                                  PreviewPlayer.VolumePercent == 73;
+
+        int volumeBefore = PreviewPlayer.VolumePercent;
+        PreviewPlayer.RaiseNativeMouseWheelForQa(-120);
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool wheelPassed = PreviewPlayer.VolumePercent == volumeBefore - 5;
+
+        ReplayClip initialClip = _clip;
+        string initialPath = initialClip.Path;
+        bool switched = true;
+        for (int index = 0; index < 6; index++)
+        {
+            ReplayClip requested = index % 2 == 0 ? target.Clip : initialClip;
+            await LoadReplayAsync(requested);
+            switched &= PreviewPlayer.IsReady &&
+                        string.Equals(
+                            _clip.Path,
+                            requested.Path,
+                            StringComparison.OrdinalIgnoreCase);
+        }
+        await LoadReplayAsync(target.Clip);
+        switched &= PreviewPlayer.IsReady &&
+                    string.Equals(
+                        _clip.Path,
+                        target.Clip.Path,
+                        StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(
+                        initialPath,
+                        _clip.Path,
+                        StringComparison.OrdinalIgnoreCase);
+        double start = PreviewPlayer.PositionSeconds;
+        DateTime playbackDeadline = DateTime.UtcNow.AddSeconds(3);
+        while (PreviewPlayer.PositionSeconds < start + 0.15 &&
+               DateTime.UtcNow < playbackDeadline)
+        {
+            await Task.Delay(100, _lifetimeCts.Token);
+        }
+        bool playbackAdvanced = PreviewPlayer.PositionSeconds >= start + 0.15;
+
+        PreviewPlayer.RaiseNativeMouseLeftButtonForQa();
+        await Task.Delay(100, _lifetimeCts.Token);
+        bool clickPaused = !_playing;
+        PreviewPlayer.RaiseNativeMouseLeftButtonForQa();
+        await Task.Delay(100, _lifetimeCts.Token);
+        bool clickResumed = _playing;
+
+        bool resizeWasPlaying = _playing;
+        Visibility resizeImageVisibility = PreviewImage.Visibility;
+        BeginInteractiveResize();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool resizeSuppressed =
+            _interactiveResizeActive &&
+            PreviewPlayer.Visibility != Visibility.Visible &&
+            PreviewImage.Visibility == Visibility.Visible;
+        EndInteractiveResize();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+        bool resizeRestored =
+            !_interactiveResizeActive &&
+            PreviewPlayer.Visibility == Visibility.Visible &&
+            PreviewImage.Visibility == resizeImageVisibility &&
+            _playing == resizeWasPlaying;
+
+        var deleteButton = new Button { DataContext = target };
+        RequestDeleteRecentReplay_Click(
+            deleteButton,
+            new RoutedEventArgs(Button.ClickEvent, deleteButton));
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool deletePromptPassed =
+            DeleteRecentReplayOverlay.Visibility == Visibility.Visible &&
+            PreviewPlayer.Visibility != Visibility.Visible;
+        CancelDeleteRecentReplay();
+        bool deleteCancelPassed =
+            DeleteRecentReplayOverlay.Visibility == Visibility.Collapsed &&
+            PreviewPlayer.Visibility == Visibility.Visible;
+
+        RecentReplay_Click(deleteButton, new RoutedEventArgs());
+        await Task.Delay(150, _lifetimeCts.Token);
+        bool activeClipPaused = !_playing && _clip.Path == target.Clip.Path;
+        RecentReplay_Click(deleteButton, new RoutedEventArgs());
+        await Task.Delay(150, _lifetimeCts.Token);
+        bool activeClipResumed = _playing && _clip.Path == target.Clip.Path;
+
+        SelectAllReplays_Click(this, new RoutedEventArgs());
+        bool markedAll = RecentReplayItems.All(item => item.IsMarked) && DeleteSelectedReplaysButton.IsEnabled;
+        DeleteSelectedReplays_Click(this, new RoutedEventArgs());
+        bool bulkPrompt = _pendingDeleteReplays.Length == RecentReplayItems.Count;
+        CancelDeleteRecentReplay();
+        SelectAllReplays_Click(this, new RoutedEventArgs());
+        bool clearedAll = RecentReplayItems.All(item => !item.IsMarked) && !DeleteSelectedReplaysButton.IsEnabled;
+
+        int unfilteredCount = RecentReplayItems.Count;
+        GameFilter.SelectedIndex = 1;
+        string selectedGame = ((ReplayFilterOption)GameFilter.SelectedItem).Value!;
+        bool gameFilterPassed = RecentReplayItems.Count > 0 && RecentReplayItems.All(item =>
+            string.Equals(item.Clip.Collection ?? "", selectedGame, StringComparison.OrdinalIgnoreCase));
+        RecordingModeFilter.SelectedIndex = 2;
+        bool combinedFilterPassed = RecentReplayItems.All(item => item.Clip.RecordingMode == "recording" &&
+            string.Equals(item.Clip.Collection ?? "", selectedGame, StringComparison.OrdinalIgnoreCase));
+        GameFilter.SelectedIndex = 0;
+        RecordingModeFilter.SelectedIndex = 0;
+        bool filterResetPassed = RecentReplayItems.Count == unfilteredCount;
+
+        bool batchDeletePassed = true;
+        if (File.Exists(Path.Combine(_rootDirectory, ".captail-library-qa")))
+        {
+            RecentReplayEntry current = RecentReplayItems.Single(item => item.Clip.Path == _clip.Path);
+            RecentReplayEntry other = RecentReplayItems.First(item => item.Clip.Path != _clip.Path);
+            RequestDeleteReplays([current, other]);
+            await ConfirmDeleteRecentReplaysAsync();
+            batchDeletePassed = !File.Exists(current.Clip.Path) && !File.Exists(other.Clip.Path) &&
+                RecentReplayItems.Count == unfilteredCount - 2 && PreviewPlayer.IsReady &&
+                _clip.Path != current.Clip.Path;
+        }
+
+        EnterFullscreen();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool fullscreenPassed =
+            RecentReplaySidebar.Visibility == Visibility.Collapsed &&
+            SidebarColumn.ActualWidth == 0 &&
+            Grid.GetColumnSpan(EditorWorkspace) == 2 &&
+            EditorWorkspace.Margin == new Thickness(0);
+        ExitFullscreen();
+
+        bool passed = allClipsPassed && initialVolumePassed &&
+                      sliderVolumePassed && wheelPassed && switched &&
+                      playbackAdvanced && clickPaused && clickResumed &&
+                      resizeSuppressed && resizeRestored &&
+                      deletePromptPassed && deleteCancelPassed && fullscreenPassed &&
+                      activeClipPaused && activeClipResumed && markedAll && clearedAll && bulkPrompt &&
+                      gameFilterPassed && combinedFilterPassed && filterResetPassed && batchDeletePassed;
+        return (
+            passed,
+            $"clips={RecentReplayItems.Count}, volume={volumeBefore}->{PreviewPlayer.VolumePercent}, " +
+            $"switched={Path.GetFileName(initialPath)}->{Path.GetFileName(_clip.Path)}, " +
+            $"click={clickPaused}/{clickResumed}, resize={resizeSuppressed}/{resizeRestored}, " +
+            $"delete={deletePromptPassed}/{deleteCancelPassed}, " +
+            $"activeClip={activeClipPaused}/{activeClipResumed}, selection={markedAll}/{clearedAll}/{bulkPrompt}, " +
+            $"filters={gameFilterPassed}/{combinedFilterPassed}/{filterResetPassed}, batchDelete={batchDeletePassed}, " +
+            $"playbackAdvanced={playbackAdvanced}, fullscreen={fullscreenPassed}");
+    }
+
     internal async Task<(bool Passed, string Details)> RunPreviewGeometryQaAsync()
     {
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
@@ -290,6 +889,10 @@ public partial class ClipEditorWindow : Window
         }
         bool clockAdvanced = playbackAfter >= playbackStart + 0.2;
 
+        PreviewPlayer.SetVolumePercent(85);
+        bool volumePassed = PreviewPlayer.VolumePercent == 85;
+        PreviewPlayer.SetVolumePercent(100);
+
         PreviewPlayer.Pause();
         _playing = false;
         _playbackTimer.Stop();
@@ -309,8 +912,12 @@ public partial class ClipEditorWindow : Window
             PreviewPlayer.SetAudioTracks([allTrackIds[0]]);
         if (allTrackIds.Length > 1)
             PreviewPlayer.SetAudioTracks(allTrackIds);
+        await Task.Delay(250, _lifetimeCts.Token);
         bool tracksPassed = PreviewPlayer.IsReady &&
                             PreviewPlayer.DetectedAudioTrackCount == allTrackIds.Length;
+        string audioMix = "audio mix needs at least two tracks";
+        bool audioMixPassed = allTrackIds.Length < 2 ||
+            PreviewPlayer.TryValidateAudioMix(allTrackIds.Length, out audioMix);
 
         string geometry = "preview window is not ready";
         bool geometryPassed = PreviewPlayer.TryValidateGeometry(out geometry);
@@ -319,7 +926,8 @@ public partial class ClipEditorWindow : Window
         await PreviewPlayer.StopAsync(_lifetimeCts.Token);
         bool stopPassed = !PreviewPlayer.IsReady;
         bool passed = overwriteOverlayPassed && savingOverlayPassed &&
-                      seekPassed && tracksPassed &&
+                      clockAdvanced &&
+                      seekPassed && tracksPassed && audioMixPassed && volumePassed &&
                       geometryPassed && videoOutputPassed && stopPassed;
         string details =
             $"overlay={(overwriteOverlayPassed ? "clear" : "occluded")}, " +
@@ -328,8 +936,10 @@ public partial class ClipEditorWindow : Window
             $"{geometry}, {videoOutput}, " +
             $"clock={playbackStart:0.000}->{playbackAfter:0.000}" +
             $"{(clockAdvanced ? "" : " (startup pending)")}, " +
+            $"volume={(volumePassed ? "85%" : "failed")}, " +
             $"seek={seekPosition:0.000}/{seekTarget:0.000}, " +
             $"tracks={PreviewPlayer.DetectedAudioTrackCount}/{allTrackIds.Length}, " +
+            $"{audioMix}, " +
             $"stop={(stopPassed ? "released" : "busy")}";
         return (passed, details);
     }
@@ -467,11 +1077,9 @@ public partial class ClipEditorWindow : Window
             PreviewPlayer.Visibility = Visibility.Visible;
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
             PreviewPlayer.Visibility = Visibility.Collapsed;
-            await PreviewPlayer.LoadAsync(
-                _clip.Path,
-                TimeSpan.FromSeconds(_playbackPosition),
-                SelectedAudioTrackIds(),
-                _lifetimeCts.Token);
+            await LoadPreviewPlayerAsync(
+                _clip,
+                TimeSpan.FromSeconds(_playbackPosition));
             PreviewImage.Visibility = Visibility.Collapsed;
             PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
             PreviewPlayer.Visibility = Visibility.Visible;
@@ -526,9 +1134,12 @@ public partial class ClipEditorWindow : Window
         UpdatePlaybackText();
     }
 
-    private async void PlayPause_Click(object sender, RoutedEventArgs e)
+    private async void PlayPause_Click(object sender, RoutedEventArgs e) =>
+        await TogglePlaybackAsync();
+
+    private async Task TogglePlaybackAsync()
     {
-        if (_playerLoading)
+        if (_playerLoading || _deletingReplays || DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
             return;
         if (_playing)
         {
@@ -1215,6 +1826,35 @@ public partial class ClipEditorWindow : Window
         return Localization.Format("L.Library.AudioTrackNumber", trackNumber);
     }
 
+    private async Task LoadPreviewPlayerAsync(ReplayClip clip, TimeSpan start)
+    {
+        try
+        {
+            await PreviewPlayer.LoadAsync(
+                clip.Path,
+                start,
+                SelectedAudioTrackIds(),
+                _lifetimeCts.Token);
+        }
+        catch (InvalidOperationException) when (
+            !_lifetimeCts.IsCancellationRequested &&
+            _library is not null)
+        {
+            string proxyPath = await _library.GetPreviewProxyAsync(
+                _rootDirectory,
+                clip,
+                _lifetimeCts.Token);
+            await PreviewPlayer.LoadAsync(
+                proxyPath,
+                start,
+                [1],
+                _lifetimeCts.Token);
+            Log.Write($"Replay preview fallback proxy created for {clip.Name}");
+        }
+        PreviewPlayer.SetPlaybackSpeed(PlaybackSpeeds[_playbackSpeedIndex]);
+        PreviewPlayer.SetVolumePercent(_playbackVolumePercent);
+    }
+
     private static bool IsGenericAudioTitle(string title) =>
         string.IsNullOrWhiteSpace(title) ||
         title.StartsWith("Captail Audio", StringComparison.OrdinalIgnoreCase) ||
@@ -1238,9 +1878,26 @@ public partial class ClipEditorWindow : Window
         _restoreBounds = new Rect(Left, Top, ActualWidth, ActualHeight);
         _restoreWindowState = WindowState;
         _restoreTopmost = Topmost;
+        _restoreResizeMode = ResizeMode;
         _isFullscreen = true;
 
         WindowState = WindowState.Normal;
+        nint handle = new WindowInteropHelper(this).Handle;
+        _restoreWindowStyle = GetWindowLongPtrW(handle, GwlStyle);
+        SetWindowLongPtrW(
+            handle,
+            GwlStyle,
+            _restoreWindowStyle &
+            ~(WsThickFrame | WsBorder | WsDlgFrame));
+        ResizeMode = ResizeMode.NoResize;
+        SetWindowPos(
+            handle,
+            0,
+            0,
+            0,
+            0,
+            0,
+            SwpNoMove | SwpNoSize | SwpNoZOrder | SwpFrameChanged);
         Rect monitor = CurrentMonitorBounds();
         WindowStartupLocation = WindowStartupLocation.Manual;
         Left = monitor.Left;
@@ -1248,9 +1905,21 @@ public partial class ClipEditorWindow : Window
         Width = monitor.Width;
         Height = monitor.Height;
         Topmost = true;
+        NativeRect monitorPixels = CurrentMonitorPixelBounds();
+        SetWindowPos(
+            handle,
+            -1,
+            monitorPixels.Left,
+            monitorPixels.Top,
+            monitorPixels.Right - monitorPixels.Left,
+            monitorPixels.Bottom - monitorPixels.Top,
+            SwpNoActivate | SwpFrameChanged | SwpShowWindow);
 
         HeaderRow.Height = new GridLength(0);
         EditorHeader.Visibility = Visibility.Collapsed;
+        RecentReplaySidebar.Visibility = Visibility.Collapsed;
+        SidebarColumn.Width = new GridLength(0);
+        Grid.SetColumnSpan(EditorWorkspace, 2);
         EditorWorkspace.Margin = new Thickness(0);
         PreviewRow.Height = new GridLength(1, GridUnitType.Star);
         PlaybackRow.Height = new GridLength(FullscreenControlsHeight);
@@ -1284,8 +1953,25 @@ public partial class ClipEditorWindow : Window
         FullscreenControlBar.Visibility = Visibility.Collapsed;
         FullscreenControlBar.Opacity = 0;
 
+        nint handle = new WindowInteropHelper(this).Handle;
+        if (_restoreWindowStyle != 0)
+        {
+            SetWindowLongPtrW(handle, GwlStyle, _restoreWindowStyle);
+            SetWindowPos(
+                handle,
+                0,
+                0,
+                0,
+                0,
+                0,
+                SwpNoMove | SwpNoSize | SwpNoZOrder | SwpFrameChanged);
+        }
+        ResizeMode = _restoreResizeMode;
+
         HeaderRow.Height = new GridLength(56);
         EditorHeader.Visibility = Visibility.Visible;
+        SidebarColumn.Width = GridLength.Auto;
+        Grid.SetColumnSpan(EditorWorkspace, 1);
         EditorWorkspace.Margin = new Thickness(20, 0, 20, 20);
         PreviewRow.Height = new GridLength(390);
         PlaybackRow.Height = GridLength.Auto;
@@ -1377,6 +2063,20 @@ public partial class ClipEditorWindow : Window
     private Rect CurrentMonitorBounds()
         => CurrentMonitorArea(useWorkArea: false);
 
+    private NativeRect CurrentMonitorPixelBounds()
+    {
+        nint window = new WindowInteropHelper(this).Handle;
+        nint monitor = MonitorFromWindow(window, 2);
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        return monitor != 0 && GetMonitorInfoW(monitor, ref info)
+            ? info.Monitor
+            : new NativeRect
+            {
+                Right = (int)SystemParameters.PrimaryScreenWidth,
+                Bottom = (int)SystemParameters.PrimaryScreenHeight,
+            };
+    }
+
     private Rect CurrentMonitorWorkArea()
         => CurrentMonitorArea(useWorkArea: true);
 
@@ -1404,13 +2104,32 @@ public partial class ClipEditorWindow : Window
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (_saveInProgress)
+        if (_saveInProgress || _deletingReplays)
         {
             e.Handled = true;
             return;
         }
+        if (DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
+        {
+            if (e.Key == Key.Escape)
+            {
+                CancelDeleteRecentReplay();
+                e.Handled = true;
+            }
+            return;
+        }
+        if (GameFilter.IsKeyboardFocusWithin || RecordingModeFilter.IsKeyboardFocusWithin ||
+            Keyboard.FocusedElement is CheckBox ||
+            (e.Key == Key.Space && Keyboard.FocusedElement is ButtonBase))
+            return;
         if (e.Key == Key.Escape &&
-            OverwriteConfirmOverlay.Visibility == Visibility.Visible)
+            DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
+        {
+            CancelDeleteRecentReplay();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape &&
+                 OverwriteConfirmOverlay.Visibility == Visibility.Visible)
         {
             CancelOverwrite();
             e.Handled = true;
@@ -1460,6 +2179,18 @@ public partial class ClipEditorWindow : Window
             ChangePlaybackSpeed(-1);
             e.Handled = true;
         }
+        else if (e.Key is Key.Add or Key.OemPlus)
+        {
+            ShowFullscreenControls();
+            ChangePlaybackVolume(5);
+            e.Handled = true;
+        }
+        else if (e.Key is Key.Subtract or Key.OemMinus)
+        {
+            ShowFullscreenControls();
+            ChangePlaybackVolume(-5);
+            e.Handled = true;
+        }
     }
 
     private void ChangePlaybackSpeed(int direction)
@@ -1480,9 +2211,72 @@ public partial class ClipEditorWindow : Window
         ShowPlaybackSpeedFeedback(speed);
     }
 
+    private void ChangePlaybackVolume(int delta)
+    {
+        if (!PreviewPlayer.IsReady || delta == 0)
+            return;
+
+        int volume = Math.Clamp(
+            _playbackVolumePercent + delta,
+            0,
+            100);
+        if (volume == _playbackVolumePercent)
+            return;
+
+        SetPlaybackVolume(volume, showFeedback: true);
+    }
+
+    private void PreviewVolumeSlider_ValueChanged(
+        object sender,
+        RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_updatingVolumeSlider)
+            return;
+        SetPlaybackVolume((int)Math.Round(e.NewValue), showFeedback: false);
+    }
+
+    private void SetPlaybackVolume(int volumePercent, bool showFeedback)
+    {
+        int normalized = Math.Clamp(volumePercent, 0, 100);
+        _playbackVolumePercent = normalized;
+        if (PreviewPlayer.IsReady)
+            PreviewPlayer.SetVolumePercent(normalized);
+        if (Math.Abs(PreviewVolumeSlider.Value - normalized) > 0.1)
+        {
+            _updatingVolumeSlider = true;
+            PreviewVolumeSlider.Value = normalized;
+            _updatingVolumeSlider = false;
+        }
+        if (showFeedback)
+            ShowPlaybackFeedback($"{normalized}%");
+        SchedulePlaybackVolumePersist();
+    }
+
+    private void SchedulePlaybackVolumePersist()
+    {
+        if (_onVolumeChanged is null)
+            return;
+        _volumePersistPending = true;
+        _volumePersistTimer.Stop();
+        _volumePersistTimer.Start();
+    }
+
+    private void PersistPlaybackVolumeNow()
+    {
+        _volumePersistTimer.Stop();
+        if (!_volumePersistPending || _onVolumeChanged is null)
+            return;
+        _volumePersistPending = false;
+        _onVolumeChanged(_playbackVolumePercent);
+    }
+
     private void ShowPlaybackSpeedFeedback(double speed)
     {
-        string value = $"{speed:0.##}×";
+        ShowPlaybackFeedback($"{speed:0.##}×");
+    }
+
+    private void ShowPlaybackFeedback(string value)
+    {
         PreviewSpeedFeedbackText.Text = value;
         FullscreenSpeedFeedbackText.Text = value;
 
@@ -1536,13 +2330,85 @@ public partial class ClipEditorWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    private void Window_SourceInitialized(object? sender, EventArgs e)
+    {
+        ApplyNativeCornerPreference();
+        nint handle = new WindowInteropHelper(this).Handle;
+        _windowSource = HwndSource.FromHwnd(handle);
+        _windowSource?.AddHook(WindowMessageHook);
+    }
+
+    private nint WindowMessageHook(
+        nint window,
+        int message,
+        nint wParam,
+        nint lParam,
+        ref bool handled)
+    {
+        if (message == WmEnterSizeMove)
+            BeginInteractiveResize();
+        else if (message == WmExitSizeMove)
+            EndInteractiveResize();
+        return 0;
+    }
+
+    private void BeginInteractiveResize()
+    {
+        if (_interactiveResizeActive)
+            return;
+        _interactiveResizeActive = true;
+        _interactiveResizePlayerVisible =
+            PreviewPlayer.Visibility == Visibility.Visible;
+        _imageVisibilityBeforeInteractiveResize = PreviewImage.Visibility;
+        _resumeAfterInteractiveResize = _interactiveResizePlayerVisible && _playing;
+        if (!_interactiveResizePlayerVisible)
+            return;
+
+        if (_resumeAfterInteractiveResize)
+        {
+            PreviewPlayer.Pause();
+            _playbackTimer.Stop();
+        }
+        PreviewPlayer.Visibility = Visibility.Collapsed;
+        PreviewImage.Visibility = Visibility.Visible;
+    }
+
+    private void EndInteractiveResize()
+    {
+        if (!_interactiveResizeActive)
+            return;
+        _interactiveResizeActive = false;
+        if (!_interactiveResizePlayerVisible)
+            return;
+
+        PreviewImage.Visibility = _imageVisibilityBeforeInteractiveResize;
+        PreviewPlayer.Visibility = Visibility.Visible;
+        _ = Dispatcher.BeginInvoke(DispatcherPriority.Render, () =>
+        {
+            if (_lifetimeCts.IsCancellationRequested)
+                return;
+            PreviewPlayer.RefreshVideoLayout();
+            if (_resumeAfterInteractiveResize && _playing)
+            {
+                PreviewPlayer.Play();
+                _playbackTimer.Start();
+            }
+            _interactiveResizePlayerVisible = false;
+            _resumeAfterInteractiveResize = false;
+        });
+    }
+
     private void ApplyNativeCornerPreference()
     {
         try
         {
             nint handle = new WindowInteropHelper(this).Handle;
             int preference = 2;
-            _ = DwmSetWindowAttribute(handle, 33, ref preference, sizeof(int));
+            _ = DwmSetWindowAttribute(
+                handle,
+                DwmwaWindowCornerPreference,
+                ref preference,
+                sizeof(int));
         }
         catch
         {
@@ -1610,6 +2476,39 @@ public partial class ClipEditorWindow : Window
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint window, uint flags);
 
+    private const int GwlStyle = -16;
+    private const nint WsBorder = 0x00800000;
+    private const nint WsDlgFrame = 0x00400000;
+    private const nint WsThickFrame = 0x00040000;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoSize = 0x0001;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint SwpFrameChanged = 0x0020;
+    private const uint SwpShowWindow = 0x0040;
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int WmEnterSizeMove = 0x0231;
+    private const int WmExitSizeMove = 0x0232;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern nint GetWindowLongPtrW(nint window, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern nint SetWindowLongPtrW(
+        nint window,
+        int index,
+        nint value);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(
+        nint window,
+        nint insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetMonitorInfoW(nint monitor, ref MonitorInfo info);
@@ -1620,6 +2519,7 @@ public partial class ClipEditorWindow : Window
         int attribute,
         ref int value,
         int valueSize);
+
 }
 
 public sealed class AudioTrackRow : INotifyPropertyChanged
@@ -1666,4 +2566,29 @@ public sealed class AudioTrackRow : INotifyPropertyChanged
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+}
+
+public sealed record RecentReplayEntry(
+    ReplayClip Clip,
+    string Title,
+    string Duration,
+    ImageSource? Thumbnail) : INotifyPropertyChanged
+{
+    private bool _isMarked;
+    public bool IsMarked
+    {
+        get => _isMarked;
+        set
+        {
+            if (_isMarked == value) return;
+            _isMarked = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMarked)));
+        }
+    }
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+public sealed record ReplayFilterOption(string? Value, string Label)
+{
+    public override string ToString() => Label;
 }

@@ -19,7 +19,7 @@
         <Grid Width="18" Height="18">
             <Ellipse Stroke="#4A506067" StrokeThickness="1.5"/>
             <Ellipse x:Name="StateRing"
-                     Stroke="#FF63E0BD" StrokeThickness="2.1"
+                     Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.1"
                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                      StrokeDashArray="7 3"
                      RenderTransformOrigin="0.5,0.5">
@@ -28,11 +28,11 @@
                 </Ellipse.RenderTransform>
             </Ellipse>
             <Ellipse x:Name="CenterDot" Width="4" Height="4"
-                     Fill="#FF63E0BD"
+                     Fill="{DynamicResource AccentBrush}"
                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
             <Path x:Name="SavedGlyph" Visibility="Collapsed"
                   Data="M3.2 8.8 L6.7 12.1 L14.8 4.4"
-                  Stroke="#FF63E0BD" StrokeThickness="2.1"
+                  Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.1"
                   StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                   StrokeLineJoin="Round" Stretch="None"/>
             <Path x:Name="ErrorGlyph" Visibility="Collapsed"

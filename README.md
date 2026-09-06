@@ -27,27 +27,30 @@
   <a href="https://github.com/FaulMit/captail/issues/new/choose">Report a problem</a>
 </p>
 
-Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It keeps the latest seconds or minutes in a rolling buffer, then saves them when you press a hotkey. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
+Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It can keep the latest seconds or minutes in a rolling buffer or write a continuous recording until you stop it. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
 
 > [!WARNING]
-> Captail `v0.2.2` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+> Captail `v0.2.3` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
 
-## What's new in Captail 0.2.2?
+## What's new in Captail 0.2.3?
 
-- Route audio from individual applications to separate recording tracks. Selected apps stay first, active audio sessions follow, and every other running process remains searchable.
-- See real application icons and live level meters while assigning apps and microphone to tracks supported by the chosen audio format.
-- Toggle routed application and microphone sources directly from the main window without reopening Settings.
-- Preview every audio track found in a replay, keep or remove tracks independently, and use a taller editor layout when a file contains many tracks.
-- Recover application-audio capture without stopping the replay buffer when a routed process exits or restarts.
-- Keep the tray icon and replay-status indicator available after Windows startup, and avoid a shutdown crash caused by an already-disposed tray icon.
+- Switch between the default Instant Replay workflow and continuous Recording directly from the main dashboard.
+- Resize the replay player, browse and filter the complete clip library, move between recordings, delete one or several clips, and use a true fullscreen view with auto-hiding controls.
+- Control preview volume with the mouse wheel, slider, or keyboard while hearing every selected audio track together.
+- Choose mint, blue, violet, rose, or amber as Captail's accent color.
+- Use F13-F24 hotkeys and see Captail notifications over fullscreen applications on the active monitor.
+- Recover automatically after a hung graphics-device shutdown and preview demanding HEVC or AV1 recordings more smoothly under load.
+- Record stretched non-native game resolutions correctly and avoid black HDR Game Capture output through explicit tone mapping.
+- Open GitHub, bug-report, and feature-request links reliably from both Portable and Microsoft Store builds.
 
 ## Is Captail for me?
 
-Captail is for Windows players who want instant replay without running a full streaming suite or wondering whether recording silently stopped.
+Captail is for Windows players who want instant replay or focused continuous recording without running a full streaming suite or wondering whether capture silently stopped.
 
 It is a good fit if you want:
 
 - one hotkey to save recent gameplay;
+- an optional continuous recording mode without replay-buffer limits;
 - desktop capture that automatically switches to a fullscreen game;
 - a game-only mode that never records the desktop;
 - real high-frame-rate capture for slow motion;
@@ -62,6 +65,7 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 
 <p align="center">
   <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and recent replays" width="420">
+  <img src="docs/captail-feature-recording.png" alt="Captail main window showing active continuous Recording mode with AV1, 4K, and 240 FPS" width="420">
 </p>
 
 <p align="center">
@@ -103,9 +107,9 @@ Every Captail package includes .NET, libobs, FFmpeg, and the embedded preview pl
 ## How do I save my first replay?
 
 1. Launch Captail. It stays available from the system tray.
-2. Open Settings and choose **Desktop** or **Game Capture**.
-3. Choose buffer length, codec, resolution, FPS, and audio sources.
-4. Leave **Instant Replay** enabled.
+2. Keep **Instant Replay** selected on the main dashboard.
+3. Open Settings and choose **Desktop** or **Game Capture**.
+4. Choose buffer length, codec, resolution, FPS, and audio sources.
 5. Play normally.
 6. Press `Ctrl+Shift+F10`, or click **Save**, when something worth keeping happens.
 

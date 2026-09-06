@@ -142,7 +142,7 @@
   <sys:String x:Key="L.Audio.Separate">Окремі доріжки</sys:String>
   <sys:String x:Key="L.Audio.Codec">Аудіокодек</sys:String>
   <sys:String x:Key="L.Help.MicBoost">Збільшує посилення мікрофона перед кодуванням. Використовуйте його, коли 100% гучності все ще тихо. Занадто сильне посилення також створює шум і може призвести до спотворення голосної мови.</sys:String>
-  <sys:String x:Key="L.Help.AudioTracks">Змішана доріжка відтворюється всюди, і нею найпростіше ділитися. Окремі доріжки зберігають звук гри/системи та мікрофона незалежними для редагування; деякі медіапрогравачі відтворюють лише одну доріжку за раз.</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">Змішаний звук зручніше поширювати. Роздільний режим записує систему, виявлену гру та мікрофон на окремі доріжки з усіх пристроїв виведення. Гра виключається із системної доріжки; без виявленої гри ігрова доріжка залишається порожньою.</sys:String>
   <sys:String x:Key="L.Help.ApplicationAudio">Виберіть застосунки, звук яких Captail записуватиме, і призначте їм доріжки. Невибрані застосунки не записуються. Кількість доріжок залежить від вибраного аудіокодека.</sys:String>
   <sys:String x:Key="L.Help.AudioCodec">AAC зберігає як MP4 і працює майже з кожним програвачем і редактором. Opus ефективний і добре звучить на нижчих бітрейтах, але використовує MKV і може потребувати сучасного редактора.</sys:String>
 
@@ -204,6 +204,8 @@
   <sys:String x:Key="L.Library.ShortcutSeekHint">Назад або вперед на 5 секунд</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeed">Швидкість відтворення</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeedHint">Вниз повільніше · вгору швидше</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolume">Гучність</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolumeHint">Тихіше або гучніше</sys:String>
   <sys:String x:Key="L.Library.ShortcutFullscreenHint">Перемкнути вигляд плеєра</sys:String>
   <sys:String x:Key="L.Library.ShortcutCloseHint">Вийти з повного екрана або закрити</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Перезаписати</sys:String>
@@ -356,7 +358,53 @@
   <sys:String x:Key="L.Error.AdvancedAudioTitle">Звук застосунків</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioEmpty">Перед збереженням виберіть застосунок або ввімкніть мікрофон.</sys:String>
 
-  <sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
+
+  <sys:String x:Key="L.Capture.Mode">Режим захоплення</sys:String>
+  <sys:String x:Key="L.Capture.ModeHint">Виберіть миттєвий повтор або безперервний запис</sys:String>
+  <sys:String x:Key="L.Capture.Replay">Миттєвий повтор</sys:String>
+  <sys:String x:Key="L.Capture.Recording">Запис</sys:String>
+  <sys:String x:Key="L.Capture.RecordingEnabled">Запис увімкнено</sys:String>
+  <sys:String x:Key="L.Capture.StartRecording">Почати запис</sys:String>
+  <sys:String x:Key="L.Capture.StopRecording">Зупинити запис</sys:String>
+  <sys:String x:Key="L.Status.Recording">Триває запис</sys:String>
+  <sys:String x:Key="L.Status.RecordingDetail">{0} · {1}</sys:String>
+  <sys:String x:Key="L.Status.RecordingDisabled">Запис вимкнено</sys:String>
+  <sys:String x:Key="L.Status.RecordingIdle">Запис не ведеться</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedTitle">Запис розпочато</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedDetail">Captail зберігає безперервний запис.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedTitle">Запис збережено</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedDetail">Безперервний запис збережено.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameTitle">Запис вимкнено</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameDetail">Виявлено гру {0}. Увімкніть запис, щоб зберегти її.</sys:String>
+  <sys:String x:Key="L.Engine.ReplayUnavailableWhileRecording">Збереження повтору недоступне в режимі запису.</sys:String>
+  <sys:String x:Key="L.Tray.Recording">Captail · Триває запис</sys:String>
+  <sys:String x:Key="L.Tray.ToggleRecording">Почати / зупинити запис</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecording">Почати / зупинити запис</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecordingHint">Перемикає безперервний запис</sys:String>
+  <sys:String x:Key="L.Section.Appearance">ВИГЛЯД</sys:String>
+  <sys:String x:Key="L.Appearance.Accent">Акцентний колір</sys:String>
+  <sys:String x:Key="L.Appearance.AccentHint">Застосовується в усьому Captail</sys:String>
+  <sys:String x:Key="L.Appearance.Mint">М'ятний</sys:String>
+  <sys:String x:Key="L.Appearance.Blue">Синій</sys:String>
+  <sys:String x:Key="L.Appearance.Violet">Фіолетовий</sys:String>
+  <sys:String x:Key="L.Appearance.Rose">Червоний</sys:String>
+  <sys:String x:Key="L.Appearance.Amber">Бурштиновий</sys:String>
+  <sys:String x:Key="L.Library.PreviousReplay">Попередній повтор</sys:String>
+  <sys:String x:Key="L.Library.NextReplay">Наступний повтор</sys:String>
+  <sys:String x:Key="L.Library.AllClips">Усі кліпи</sys:String>
+  <sys:String x:Key="L.Library.RecentReplays">Останні повтори</sys:String><sys:String x:Key="L.Unit.Seconds">{0} сек</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} хв</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} ГБ</sys:String>
+  <sys:String x:Key="L.Library.AllGames">Усі ігри</sys:String>
+  <sys:String x:Key="L.Library.NoGame">Без гри</sys:String>
+  <sys:String x:Key="L.Library.AllModes">Усі режими запису</sys:String>
+  <sys:String x:Key="L.Library.ModeReplay">Миттєвий повтор</sys:String>
+  <sys:String x:Key="L.Library.ModeRecording">Запис</sys:String>
+  <sys:String x:Key="L.Library.ModeUnknown">Невідомий режим</sys:String>
+  <sys:String x:Key="L.Library.SelectAll">Вибрати / зняти всі</sys:String>
+  <sys:String x:Key="L.Library.SelectClip">Вибрати кліп</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelected">Видалити вибрані ({0})</sys:String>
+  <sys:String x:Key="L.Library.SelectedCount">Вибрано кліпів: {0}</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionTitle">Видалити вибрані кліпи?</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionMessage">Вибрані файли буде переміщено до кошика.</sys:String>
 </ResourceDictionary>

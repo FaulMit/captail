@@ -199,6 +199,49 @@ public sealed class FfmpegAdapter
             cancellationToken);
     }
 
+    public async Task CreatePreviewProxyAsync(
+        string sourcePath,
+        string destinationPath,
+        CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
+        string temporaryPath = destinationPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            // AV1 captures produced by older drivers can be accepted by FFmpeg
+            // but rejected by libmpv/dav1d. A lightweight 60 FPS H.264 proxy
+            // keeps preview/navigation usable without changing source clip.
+            await RunAsync(
+                _ffmpegPath,
+                [
+                    "-nostdin", "-hide_banner", "-loglevel", "error",
+                    "-i", sourcePath,
+                    "-map", "0:v:0",
+                    "-map", "0:a:0?",
+                    "-vf", "fps=60",
+                    "-c:v", "h264_mf",
+                    "-b:v", "12M",
+                    "-g", "120",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "aac",
+                    "-b:a", "160k",
+                    "-movflags", "+faststart",
+                    "-f", "mp4",
+                    "-y", temporaryPath,
+                ],
+                TimeSpan.FromMinutes(10),
+                cancellationToken);
+
+            if (!File.Exists(temporaryPath) || new FileInfo(temporaryPath).Length == 0)
+                throw new InvalidOperationException("FFmpeg produced an empty preview proxy.");
+            await MoveFileWithRetryAsync(temporaryPath, destinationPath, cancellationToken);
+        }
+        finally
+        {
+            TryDeleteWorkingFile(temporaryPath);
+        }
+    }
+
     public async Task CreateWaveformAsync(
         string sourcePath,
         string destinationPath,

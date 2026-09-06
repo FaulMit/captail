@@ -9,6 +9,7 @@ Every release must ship a fresh screenshot set captured from the exact release-c
 | README asset | Required state | What it must show |
 | --- | --- | --- |
 | `docs/captail-main.png` | Instant Replay active | Complete main window showing `AV1 · 4K · 240 FPS`, enabled system and microphone audio, current version, Save button, and several real recent-replay rows. |
+| `docs/captail-feature-recording.png` | Continuous Recording active | Complete main window with Recording selected, active recording status, `AV1 · 4K · 240 FPS`, audio sources, Stop recording action, current version, and real recent clips. |
 | `docs/captail-settings-video.png` | Video settings | Hardware AV1 selected at `3840 × 2160` and `240 FPS`, plus source, bitrate, quality profile, display, and resolution controls. |
 | `docs/captail-settings-audio.png` | Audio and replay settings | Enabled system audio and microphone, separate tracks, volume, microphone boost, buffer, storage, and hotkey controls where they fit naturally. Use a second real settings screenshot when one readable frame cannot contain them. |
 | `docs/captail-audio-routing.png` | Application audio routing open | Selected applications first, real application icons, live level meters, microphone assignment, track selectors, and additional running processes. |

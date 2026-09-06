@@ -142,7 +142,7 @@
   <sys:String x:Key="L.Audio.Separate">Separate Spuren</sys:String>
   <sys:String x:Key="L.Audio.Codec">Audio-Codec</sys:String>
   <sys:String x:Key="L.Help.MicBoost">Erhöht die Mikrofonverstärkung vor der Kodierung. Verwenden Sie es, wenn 100 % Lautstärke noch leise ist. Eine zu starke Anhebung erhöht auch das Rauschen und kann zu Verzerrungen bei lauter Sprache führen.</sys:String>
-  <sys:String x:Key="L.Help.AudioTracks">Eine gemischte Spur funktioniert überall und lässt sich am einfachsten teilen. Separate Spuren halten Spiel-/System-Audio und Mikrofon für die Bearbeitung getrennt; manche Player geben jeweils nur eine Spur wieder.</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">Der gemischte Ton lässt sich leicht teilen. Der getrennte Modus erfasst System, erkanntes Spiel und Mikrofon auf eigenen Spuren über alle Ausgabegeräte. Spielton fehlt auf der Systemspur. Ohne erkanntes Spiel bleibt die Spielspur stumm.</sys:String>
   <sys:String x:Key="L.Help.ApplicationAudio">Wähle, welche Apps Captail aufnimmt, und weise jeder eine Spur zu. Nicht markierte Apps werden ausgeschlossen. Die verfügbare Spuranzahl hängt vom gewählten Audio-Codec ab.</sys:String>
   <sys:String x:Key="L.Help.AudioCodec">AAC speichert als MP4 und funktioniert mit fast jedem Player und Editor. Opus ist effizient und klingt bei niedrigeren Bitraten gut, verwendet jedoch MKV und benötigt möglicherweise einen modernen Editor.</sys:String>
 
@@ -204,6 +204,8 @@
   <sys:String x:Key="L.Library.ShortcutSeekHint">5 Sekunden zurück oder vor</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeed">Wiedergabegeschwindigkeit</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeedHint">Abwärts langsamer · aufwärts schneller</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolume">Lautstärke</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolumeHint">Leiser oder lauter</sys:String>
   <sys:String x:Key="L.Library.ShortcutFullscreenHint">Playeransicht umschalten</sys:String>
   <sys:String x:Key="L.Library.ShortcutCloseHint">Vollbild verlassen oder Player schließen</sys:String>
   <sys:String x:Key="L.Library.Overwrite">Überschreiben</sys:String>
@@ -329,7 +331,41 @@
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">Der Replay-Puffer wurde unerwartet gestoppt.</sys:String>
   <sys:String x:Key="L.Engine.BufferError">Replay-Puffer: {0}</sys:String>
 
-  <sys:String x:Key="L.Unit.Seconds">{0} Sek</sys:String>
+
+  <sys:String x:Key="L.Capture.Mode">Aufnahmemodus</sys:String>
+  <sys:String x:Key="L.Capture.ModeHint">Sofortwiedergabe oder Daueraufnahme wählen</sys:String>
+  <sys:String x:Key="L.Capture.Replay">Sofortwiedergabe</sys:String>
+  <sys:String x:Key="L.Capture.Recording">Aufnahme</sys:String>
+  <sys:String x:Key="L.Capture.RecordingEnabled">Aufnahme läuft</sys:String>
+  <sys:String x:Key="L.Capture.StartRecording">Aufnahme starten</sys:String>
+  <sys:String x:Key="L.Capture.StopRecording">Aufnahme stoppen</sys:String>
+  <sys:String x:Key="L.Status.Recording">Aufnahme läuft</sys:String>
+  <sys:String x:Key="L.Status.RecordingDetail">{0} · {1}</sys:String>
+  <sys:String x:Key="L.Status.RecordingDisabled">Aufnahme ist aus</sys:String>
+  <sys:String x:Key="L.Status.RecordingIdle">Aufnahme läuft nicht</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedTitle">Aufnahme gestartet</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedDetail">Captail schreibt eine fortlaufende Aufnahme.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedTitle">Aufnahme gespeichert</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedDetail">Daueraufnahme wurde gespeichert.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameTitle">Aufnahme ist aus</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameDetail">{0} erkannt. Aufnahme starten, um das Spiel aufzuzeichnen.</sys:String>
+  <sys:String x:Key="L.Engine.ReplayUnavailableWhileRecording">Im Aufnahmemodus kann kein Replay gespeichert werden.</sys:String>
+  <sys:String x:Key="L.Tray.Recording">Captail · Aufnahme läuft</sys:String>
+  <sys:String x:Key="L.Tray.ToggleRecording">Aufnahme starten / stoppen</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecording">Aufnahme starten / stoppen</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecordingHint">Schaltet die Daueraufnahme um</sys:String>
+  <sys:String x:Key="L.Section.Appearance">DARSTELLUNG</sys:String>
+  <sys:String x:Key="L.Appearance.Accent">Akzentfarbe</sys:String>
+  <sys:String x:Key="L.Appearance.AccentHint">Wird in ganz Captail verwendet</sys:String>
+  <sys:String x:Key="L.Appearance.Mint">Mint</sys:String>
+  <sys:String x:Key="L.Appearance.Blue">Blau</sys:String>
+  <sys:String x:Key="L.Appearance.Violet">Violett</sys:String>
+  <sys:String x:Key="L.Appearance.Rose">Rot</sys:String>
+  <sys:String x:Key="L.Appearance.Amber">Bernstein</sys:String>
+  <sys:String x:Key="L.Library.PreviousReplay">Vorheriges Replay</sys:String>
+  <sys:String x:Key="L.Library.NextReplay">Nächstes Replay</sys:String>
+  <sys:String x:Key="L.Library.AllClips">Alle Clips</sys:String>
+  <sys:String x:Key="L.Library.RecentReplays">Letzte Replays</sys:String><sys:String x:Key="L.Unit.Seconds">{0} Sek</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0} Min</sys:String>
   <sys:String x:Key="L.Unit.GB">{0} GB</sys:String>
   <sys:String x:Key="L.Audio.PerAppRouting">Pro App</sys:String>
@@ -358,4 +394,16 @@
   <sys:String x:Key="L.AdvancedAudio.ProcessCount">{0} Prozesse</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioTitle">App-Audio</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioEmpty">Vor dem Speichern eine App wählen oder Mikrofon aktivieren.</sys:String>
+  <sys:String x:Key="L.Library.AllGames">Alle Spiele</sys:String>
+  <sys:String x:Key="L.Library.NoGame">Ohne Spiel</sys:String>
+  <sys:String x:Key="L.Library.AllModes">Alle Aufnahmemodi</sys:String>
+  <sys:String x:Key="L.Library.ModeReplay">Sofortwiederholung</sys:String>
+  <sys:String x:Key="L.Library.ModeRecording">Aufnahme</sys:String>
+  <sys:String x:Key="L.Library.ModeUnknown">Unbekannter Modus</sys:String>
+  <sys:String x:Key="L.Library.SelectAll">Alle auswählen / abwählen</sys:String>
+  <sys:String x:Key="L.Library.SelectClip">Clip auswählen</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelected">Auswahl löschen ({0})</sys:String>
+  <sys:String x:Key="L.Library.SelectedCount">Ausgewählte Clips: {0}</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionTitle">Ausgewählte Clips löschen?</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionMessage">Ausgewählte Dateien werden in den Papierkorb verschoben.</sys:String>
 </ResourceDictionary>

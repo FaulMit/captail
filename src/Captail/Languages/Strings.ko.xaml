@@ -142,7 +142,7 @@
   <sys:String x:Key="L.Audio.Separate">별도의 트랙</sys:String>
   <sys:String x:Key="L.Audio.Codec">오디오 코덱</sys:String>
   <sys:String x:Key="L.Help.MicBoost">인코딩하기 전에 마이크 게인을 높입니다. 볼륨 100%가 여전히 조용할 때 사용하세요. 부스트를 너무 높이면 소음이 증가하고 큰 소리가 왜곡될 수도 있습니다.</sys:String>
-  <sys:String x:Key="L.Help.AudioTracks">혼합 트랙은 어디에서나 재생되며 공유가 가장 쉽습니다. 별도의 트랙은 편집을 위해 게임/시스템 오디오 및 마이크를 독립적으로 유지합니다. 일부 플레이어는 한 번에 하나의 트랙만 재생합니다.</sys:String>
+  <sys:String x:Key="L.Help.AudioTracks">믹스된 오디오는 공유하기 쉽습니다. 분리 모드는 모든 출력 장치의 시스템, 감지된 게임, 마이크를 각각의 트랙에 녹음합니다. 게임 소리는 시스템 트랙에서 제외되며 게임이 감지되지 않으면 게임 트랙은 무음입니다.</sys:String>
   <sys:String x:Key="L.Help.ApplicationAudio">Captail이 녹음할 앱을 선택하고 각 앱에 트랙을 지정하세요. 선택하지 않은 앱은 녹음되지 않습니다. 사용 가능한 트랙 수는 선택한 오디오 코덱에 따라 달라집니다.</sys:String>
   <sys:String x:Key="L.Help.AudioCodec">AAC는 MP4로 저장되며 거의 모든 플레이어 및 편집자와 작동합니다. Opus는 효율적이고 낮은 비트 전송률에서도 좋은 소리를 내지만 MKV를 사용하므로 최신 편집기가 필요할 수 있습니다.</sys:String>
 
@@ -204,6 +204,8 @@
   <sys:String x:Key="L.Library.ShortcutSeekHint">5초 뒤로 / 앞으로</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeed">재생 속도</sys:String>
   <sys:String x:Key="L.Library.ShortcutSpeedHint">아래로 느리게 · 위로 빠르게</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolume">볼륨</sys:String>
+  <sys:String x:Key="L.Library.ShortcutVolumeHint">작게 / 크게</sys:String>
   <sys:String x:Key="L.Library.ShortcutFullscreenHint">플레이어 보기 전환</sys:String>
   <sys:String x:Key="L.Library.ShortcutCloseHint">전체 화면 종료 또는 닫기</sys:String>
   <sys:String x:Key="L.Library.Overwrite">덮어쓰기</sys:String>
@@ -329,7 +331,41 @@
   <sys:String x:Key="L.Engine.BufferUnexpectedStop">리플레이 버퍼가 예기치 않게 중지되었습니다.</sys:String>
   <sys:String x:Key="L.Engine.BufferError">리플레이 버퍼: {0}</sys:String>
 
-  <sys:String x:Key="L.Unit.Seconds">{0}초</sys:String>
+
+  <sys:String x:Key="L.Capture.Mode">캡처 모드</sys:String>
+  <sys:String x:Key="L.Capture.ModeHint">즉시 리플레이 또는 연속 녹화 선택</sys:String>
+  <sys:String x:Key="L.Capture.Replay">즉시 리플레이</sys:String>
+  <sys:String x:Key="L.Capture.Recording">녹화</sys:String>
+  <sys:String x:Key="L.Capture.RecordingEnabled">녹화 중</sys:String>
+  <sys:String x:Key="L.Capture.StartRecording">녹화 시작</sys:String>
+  <sys:String x:Key="L.Capture.StopRecording">녹화 중지</sys:String>
+  <sys:String x:Key="L.Status.Recording">녹화 중</sys:String>
+  <sys:String x:Key="L.Status.RecordingDetail">{0} · {1}</sys:String>
+  <sys:String x:Key="L.Status.RecordingDisabled">녹화가 꺼져 있습니다</sys:String>
+  <sys:String x:Key="L.Status.RecordingIdle">현재 녹화 중이 아닙니다</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedTitle">녹화를 시작했습니다</sys:String>
+  <sys:String x:Key="L.Notify.RecordingStartedDetail">Captail이 연속 녹화를 저장하고 있습니다.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedTitle">녹화가 저장되었습니다</sys:String>
+  <sys:String x:Key="L.Notify.RecordingSavedDetail">연속 녹화가 저장되었습니다.</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameTitle">녹화가 꺼져 있습니다</sys:String>
+  <sys:String x:Key="L.Notify.RecordingOffGameDetail">{0} 감지됨. 녹화를 시작하여 저장하세요.</sys:String>
+  <sys:String x:Key="L.Engine.ReplayUnavailableWhileRecording">녹화 모드에서는 리플레이를 저장할 수 없습니다.</sys:String>
+  <sys:String x:Key="L.Tray.Recording">Captail · 녹화 중</sys:String>
+  <sys:String x:Key="L.Tray.ToggleRecording">녹화 시작 / 중지</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecording">녹화 시작 / 중지</sys:String>
+  <sys:String x:Key="L.Hotkey.ToggleRecordingHint">연속 녹화를 전환합니다</sys:String>
+  <sys:String x:Key="L.Section.Appearance">모양</sys:String>
+  <sys:String x:Key="L.Appearance.Accent">강조 색상</sys:String>
+  <sys:String x:Key="L.Appearance.AccentHint">Captail 전체에 적용</sys:String>
+  <sys:String x:Key="L.Appearance.Mint">민트</sys:String>
+  <sys:String x:Key="L.Appearance.Blue">파랑</sys:String>
+  <sys:String x:Key="L.Appearance.Violet">보라</sys:String>
+  <sys:String x:Key="L.Appearance.Rose">빨강</sys:String>
+  <sys:String x:Key="L.Appearance.Amber">호박색</sys:String>
+  <sys:String x:Key="L.Library.PreviousReplay">이전 리플레이</sys:String>
+  <sys:String x:Key="L.Library.NextReplay">다음 리플레이</sys:String>
+  <sys:String x:Key="L.Library.AllClips">모든 클립</sys:String>
+  <sys:String x:Key="L.Library.RecentReplays">최근 리플레이</sys:String><sys:String x:Key="L.Unit.Seconds">{0}초</sys:String>
   <sys:String x:Key="L.Unit.Minutes">{0}분</sys:String>
   <sys:String x:Key="L.Unit.GB">{0}GB</sys:String>
   <sys:String x:Key="L.Audio.PerAppRouting">앱별 라우팅</sys:String>
@@ -358,4 +394,16 @@
   <sys:String x:Key="L.AdvancedAudio.ProcessCount">프로세스 {0}개</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioTitle">앱 오디오</sys:String>
   <sys:String x:Key="L.Error.AdvancedAudioEmpty">저장하기 전에 앱을 선택하거나 마이크를 켜세요.</sys:String>
+  <sys:String x:Key="L.Library.AllGames">모든 게임</sys:String>
+  <sys:String x:Key="L.Library.NoGame">게임 없음</sys:String>
+  <sys:String x:Key="L.Library.AllModes">모든 녹화 모드</sys:String>
+  <sys:String x:Key="L.Library.ModeReplay">인스턴트 리플레이</sys:String>
+  <sys:String x:Key="L.Library.ModeRecording">녹화</sys:String>
+  <sys:String x:Key="L.Library.ModeUnknown">알 수 없는 모드</sys:String>
+  <sys:String x:Key="L.Library.SelectAll">전체 선택 / 해제</sys:String>
+  <sys:String x:Key="L.Library.SelectClip">클립 선택</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelected">선택 항목 삭제 ({0})</sys:String>
+  <sys:String x:Key="L.Library.SelectedCount">선택한 클립: {0}</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionTitle">선택한 클립을 삭제할까요?</sys:String>
+  <sys:String x:Key="L.Library.DeleteSelectionMessage">선택한 파일을 휴지통으로 이동합니다.</sys:String>
 </ResourceDictionary>

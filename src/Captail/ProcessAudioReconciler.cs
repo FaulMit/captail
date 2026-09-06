@@ -15,7 +15,10 @@ internal sealed record ProcessAudioReconcileResult(
     internal long LastErrorCode { get; init; }
 }
 
-internal sealed record ProcessAudioTarget(string Executable, int Track);
+internal sealed record ProcessAudioTarget(string Executable, int Track)
+{
+    internal ProcessIdentity? Identity { get; init; }
+}
 
 internal enum ProcessAudioSourceState : long
 {
@@ -73,15 +76,19 @@ internal sealed class ProcessAudioReconciler : IDisposable
         EnsureOwnerThread();
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        ProcessAudioTarget[] requested = executableTargets.ToArray();
         var targets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        foreach (ProcessAudioTarget target in executableTargets)
+        foreach (ProcessAudioTarget target in requested)
         {
             if (target.Track is >= 1 and <= 6)
                 targets.TryAdd(target.Executable, target.Track);
         }
 
         RoutedProcessSelection selection = snapshot.SelectRoutedRoots(targets);
-        RoutedProcessRoot[] desiredRoots = selection.Roots.ToArray();
+        RoutedProcessRoot[] desiredRoots = selection.Roots.Where(root => requested.Any(target =>
+            string.Equals(Config.NormalizeExecutableName(target.Executable),
+                Config.NormalizeExecutableName(root.Node.Executable), StringComparison.OrdinalIgnoreCase) &&
+            (target.Identity is null || target.Identity == root.Node.Identity))).ToArray();
         var desired = desiredRoots.ToDictionary(
             root => root.Node.Identity,
             root => root.Track);

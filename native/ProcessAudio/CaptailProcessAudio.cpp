@@ -146,6 +146,7 @@ public:
 
         processId_ = static_cast<DWORD>(processId);
         creationTime_ = static_cast<uint64_t>(creationTime);
+        excludeTarget_ = obs_data_get_bool(settings, "exclude_target");
         try {
             stopEvent_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
             if (!stopEvent_)
@@ -319,7 +320,8 @@ private:
         activationParams.ActivationType = AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK;
         activationParams.ProcessLoopbackParams.TargetProcessId = processId_;
         activationParams.ProcessLoopbackParams.ProcessLoopbackMode =
-            PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE;
+            excludeTarget_ ? PROCESS_LOOPBACK_MODE_EXCLUDE_TARGET_PROCESS_TREE
+                           : PROCESS_LOOPBACK_MODE_INCLUDE_TARGET_PROCESS_TREE;
 
         PROPVARIANT parameters{};
         parameters.vt = VT_BLOB;
@@ -461,6 +463,7 @@ private:
 
     obs_source_t *source_ = nullptr;
     DWORD processId_ = 0;
+    bool excludeTarget_ = false;
     uint64_t creationTime_ = 0;
     HANDLE process_ = nullptr;
     HANDLE stopEvent_ = nullptr;

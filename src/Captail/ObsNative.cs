@@ -15,6 +15,23 @@ internal static class ObsNative
     internal enum VideoRange { Default, Partial, Full }
     internal enum ScaleType { Disable, Point, Bicubic, Bilinear, Lanczos, Area }
     internal enum SpeakerLayout { Unknown, Mono, Stereo }
+    internal enum BoundsType
+    {
+        None,
+        Stretch,
+        ScaleInner,
+        ScaleOuter,
+        ScaleToWidth,
+        ScaleToHeight,
+        MaxOnly,
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Vec2
+    {
+        internal float X;
+        internal float Y;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     internal struct VideoInfo
@@ -116,6 +133,11 @@ internal static class ObsNative
     internal static extern int obs_reset_video(ref VideoInfo videoInfo);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_set_video_levels(
+        float sdrWhiteLevel,
+        float hdrNominalPeakLevel);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern int gs_create(
         out nint graphics,
         [MarshalAs(UnmanagedType.LPUTF8Str)] string module,
@@ -160,6 +182,16 @@ internal static class ObsNative
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern nint obs_scene_add(nint scene, nint source);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_sceneitem_set_bounds_type(
+        nint sceneItem,
+        BoundsType boundsType);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_sceneitem_set_bounds(
+        nint sceneItem,
+        ref Vec2 bounds);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_sceneitem_remove(nint sceneItem);

@@ -109,6 +109,12 @@ public partial class ReplayStatusIndicatorWindow : Window
             PositionOnForegroundMonitor();
     }
 
+    internal void RefreshAccent()
+    {
+        if (_state is ReplayIndicatorState.Active or ReplayIndicatorState.Saved)
+            ApplyState(_state.Value, force: true);
+    }
+
     internal void SetGameDetected(bool gameDetected)
     {
         if (_gameDetected == gameDetected)
@@ -186,15 +192,17 @@ public partial class ReplayStatusIndicatorWindow : Window
         CenterDot.Visibility = Visibility.Visible;
         IndicatorRoot.Opacity = 1;
 
-        Color accent = state switch
+        Brush accent = state switch
         {
-            ReplayIndicatorState.Recovering => Color.FromRgb(242, 194, 66),
-            ReplayIndicatorState.Error => Color.FromRgb(255, 95, 99),
-            _ => Color.FromRgb(99, 224, 189),
+            ReplayIndicatorState.Recovering =>
+                new SolidColorBrush(Color.FromRgb(242, 194, 66)),
+            ReplayIndicatorState.Error =>
+                new SolidColorBrush(Color.FromRgb(255, 95, 99)),
+            _ => Application.Current.TryFindResource("AccentBrush") as Brush ??
+                 new SolidColorBrush(Color.FromRgb(99, 224, 189)),
         };
-        var brush = new SolidColorBrush(accent);
-        StateRing.Stroke = brush;
-        CenterDot.Fill = brush;
+        StateRing.Stroke = accent;
+        CenterDot.Fill = accent;
 
         switch (state)
         {
@@ -229,7 +237,7 @@ public partial class ReplayStatusIndicatorWindow : Window
             case ReplayIndicatorState.Saved:
                 CenterDot.Visibility = Visibility.Collapsed;
                 SavedGlyph.Visibility = Visibility.Visible;
-                SavedGlyph.Stroke = brush;
+                SavedGlyph.Stroke = accent;
                 StateRing.StrokeDashArray = null;
                 IndicatorScale.BeginAnimation(
                     ScaleTransform.ScaleXProperty,

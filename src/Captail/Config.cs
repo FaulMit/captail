@@ -20,6 +20,8 @@ public sealed class Config
     public int BitrateMbps { get; set; }
     public string Hotkey { get; set; } = "Ctrl+Shift+F10";
     public string ToggleReplayHotkey { get; set; } = "Ctrl+Shift+F9";
+    /// <summary>"replay" or "recording".</summary>
+    public string CaptureMode { get; set; } = "replay";
     public bool ReplayEnabled { get; set; } = true;
     public bool WarnWhenGameStartsWithReplayOff { get; set; } = true;
     public bool ShowRecordingIndicator { get; set; } = true;
@@ -60,6 +62,9 @@ public sealed class Config
     public string OutputDirectory { get; set; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Captail");
     public bool OrganizeReplaysByGame { get; set; }
+    /// <summary>"mint", "blue", "violet", "rose", or "amber".</summary>
+    public string AccentColor { get; set; } = "mint";
+    public int PlayerVolume { get; set; } = 100;
     [JsonIgnore]
     public static string ConfigPath => AppDataPaths.ConfigFile;
     public static Config Load()
@@ -163,6 +168,7 @@ public sealed class Config
         BitrateMbps = source.BitrateMbps;
         Hotkey = source.Hotkey;
         ToggleReplayHotkey = source.ToggleReplayHotkey;
+        CaptureMode = source.CaptureMode;
         ReplayEnabled = source.ReplayEnabled;
         WarnWhenGameStartsWithReplayOff = source.WarnWhenGameStartsWithReplayOff;
         ShowRecordingIndicator = source.ShowRecordingIndicator;
@@ -194,12 +200,16 @@ public sealed class Config
         AdvancedMicrophoneTrack = source.AdvancedMicrophoneTrack;
         OutputDirectory = source.OutputDirectory;
         OrganizeReplaysByGame = source.OrganizeReplaysByGame;
+        AccentColor = source.AccentColor;
+        PlayerVolume = source.PlayerVolume;
         Normalize();
     }
 
     public bool PipelineEquals(Config other) =>
-        BufferSeconds == other.BufferSeconds &&
-        MaxReplaySizeMb == other.MaxReplaySizeMb &&
+        string.Equals(CaptureMode, other.CaptureMode, StringComparison.Ordinal) &&
+        (string.Equals(CaptureMode, "recording", StringComparison.Ordinal) ||
+         (BufferSeconds == other.BufferSeconds &&
+          MaxReplaySizeMb == other.MaxReplaySizeMb)) &&
         FrameRate == other.FrameRate &&
         BitrateMbps == other.BitrateMbps &&
         string.Equals(Codec, other.Codec, StringComparison.Ordinal) &&
@@ -218,13 +228,12 @@ public sealed class Config
         SeparateAudioTracks == other.SeparateAudioTracks &&
         string.Equals(AudioRoutingMode, other.AudioRoutingMode, StringComparison.Ordinal) &&
         AdvancedMicrophoneTrack == other.AdvancedMicrophoneTrack &&
-        ProcessAudioRoutesEqual(ProcessAudioRoutes, other.ProcessAudioRoutes) &&
-        string.Equals(OutputDirectory, other.OutputDirectory, StringComparison.OrdinalIgnoreCase) &&
-        OrganizeReplaysByGame == other.OrganizeReplaysByGame;
+        ProcessAudioRoutesEqual(ProcessAudioRoutes, other.ProcessAudioRoutes);
 
     public void Normalize()
     {
         Language = NormalizeLanguage(Language);
+        CaptureMode = AllowedText(CaptureMode, ["replay", "recording"], "replay");
         BufferSeconds = AllowedValue(BufferSeconds, [15, 30, 60, 120, 300, 600, 900], 300);
         MaxReplaySizeMb = AllowedValue(MaxReplaySizeMb, [0, 250, 500, 1000, 2000, 5000, 10000], 0);
         FrameRate = AllowedValue(FrameRate, [30, 60, 120, 144, 240], 60);
@@ -265,6 +274,11 @@ public sealed class Config
             : 1;
         ProcessAudioRoutes = NormalizeProcessAudioRoutes(ProcessAudioRoutes);
         OutputDirectory = NormalizePath(OutputDirectory, allowEmpty: false);
+        AccentColor = AllowedText(
+            AccentColor,
+            ["mint", "blue", "violet", "rose", "amber"],
+            "mint");
+        PlayerVolume = Math.Clamp(PlayerVolume, 0, 100);
     }
 
     private static List<ProcessAudioRoute> NormalizeProcessAudioRoutes(

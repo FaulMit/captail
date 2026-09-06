@@ -4,6 +4,35 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-09-06
+
+### Added
+
+- **Continuous recording:** Switch between Instant Replay and Recording from the main dashboard. Recording mode writes a normal continuous file, keeps automatic game detection, and hides replay-only buffer controls.
+- **Replay library controls:** Filter clips by game or capture mode, select several clips, and move a selection to the Recycle Bin after one confirmation.
+- **Accent themes:** Choose mint, blue, violet, rose, or amber and use the selected accent consistently across Captail and its recording indicator.
+- **Extended hotkeys:** Bind F13-F24 keys from keyboards and macro layers, including while a fullscreen application owns input.
+
+### Improved
+
+- **Replay player:** Resize the window, browse every saved clip in the sidebar, move between clips, delete clips, control volume with the wheel, slider, or keyboard, and use a true fullscreen view with auto-hiding controls.
+- **Playback compatibility:** High-frame-rate HEVC and AV1 previews prefer D3D11 hardware decoding, drop late frames under load, fall back to a compatible preview proxy when needed, and mix every selected audio track for playback.
+- **Capture fidelity:** Non-native game resolutions stretch to the configured canvas, and HDR Game Capture initializes explicit tone-mapping levels instead of producing black frames.
+- **Capture recovery:** Captail can replace a hung capture process after graphics-device loss and rebuild the recording pipeline automatically.
+- **Game-aware audio and folders:** Detected-game audio follows the active game across output devices, and a bundled game catalog gives per-game folders friendlier names.
+- **Fullscreen feedback:** Save, recording, and recovery notifications follow the active monitor and keep their topmost position over fullscreen applications.
+- **Safer settings changes:** Changing the replay folder or per-game organization no longer restarts active capture.
+- **Borderless desktop capture:** Desktop capture uses the automatic OBS path, while the Microsoft Store package requests Windows borderless-capture capability.
+
+### Fixed
+
+- Fixed About-menu GitHub, bug-report, and feature-request links doing nothing in packaged and Portable builds.
+- Fixed clip switching leaving the embedded player black or unresponsive.
+- Fixed microphone and other selected tracks being silent during multi-track preview.
+- Removed the light native line around the borderless player and reduced flicker while resizing it.
+- Fixed Recording mode status text, game detection, notifications, tray actions, and output naming using Instant Replay wording or behavior.
+- Fixed stretched 4:3 games being recorded as a small image in one corner of the output.
+
 ## [0.2.2] - 2026-08-25
 
 ### Added

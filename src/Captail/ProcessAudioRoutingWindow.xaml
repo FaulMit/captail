@@ -29,7 +29,7 @@
                                 CornerRadius="5">
                             <Path x:Name="Check"
                                   Data="M4 9l3 3 7-7"
-                                  Stroke="{StaticResource OnAccentBrush}"
+                                  Stroke="{DynamicResource OnAccentBrush}"
                                   StrokeThickness="2"
                                   StrokeStartLineCap="Round"
                                   StrokeEndLineCap="Round"
@@ -40,15 +40,15 @@
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Box" Property="Background"
-                                        Value="{StaticResource AccentBrush}"/>
+                                        Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="Box" Property="BorderBrush"
-                                        Value="{StaticResource AccentBrush}"/>
+                                        Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="Check" Property="Visibility"
                                         Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Box" Property="BorderBrush"
-                                        Value="{StaticResource AccentDimBrush}"/>
+                                        Value="{DynamicResource AccentDimBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -89,7 +89,7 @@
             <Setter Property="Height" Value="4"/>
             <Setter Property="Maximum" Value="1"/>
             <Setter Property="Width" Value="86"/>
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="Background" Value="{StaticResource DividerBrush}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding HasAudioSession}" Value="False">
@@ -127,13 +127,13 @@
                 <Grid Width="22" Height="22" Margin="0,0,11,0"
                       VerticalAlignment="Center">
                     <Rectangle Width="3" Height="8" RadiusX="1.5" RadiusY="1.5"
-                               Fill="{StaticResource AccentBrush}"
+                               Fill="{DynamicResource AccentBrush}"
                                HorizontalAlignment="Left" VerticalAlignment="Center"/>
                     <Rectangle Width="3" Height="16" RadiusX="1.5" RadiusY="1.5"
-                               Fill="{StaticResource AccentBrush}"
+                               Fill="{DynamicResource AccentBrush}"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     <Rectangle Width="3" Height="11" RadiusX="1.5" RadiusY="1.5"
-                               Fill="{StaticResource AccentBrush}"
+                               Fill="{DynamicResource AccentBrush}"
                                HorizontalAlignment="Right" VerticalAlignment="Center"/>
                 </Grid>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
@@ -237,7 +237,7 @@
                                                Stretch="Uniform"
                                                SnapsToDevicePixels="True"/>
                                         <TextBlock Text="{Binding Initials}"
-                                                   Foreground="{StaticResource AccentBrush}"
+                                                   Foreground="{DynamicResource AccentBrush}"
                                                    FontSize="11" FontWeight="ExtraBold"
                                                    HorizontalAlignment="Center"
                                                    VerticalAlignment="Center">
@@ -329,10 +329,10 @@
                         <ColumnDefinition Width="100"/>
                     </Grid.ColumnDefinitions>
                     <Border Width="30" Height="30" CornerRadius="8"
-                            Background="{StaticResource AccentSubtleBrush}"
+                            Background="{DynamicResource AccentSubtleBrush}"
                             Margin="0,0,10,0">
                         <Path Data="{StaticResource IconMic}"
-                              Stroke="{StaticResource AccentBrush}"
+                              Stroke="{DynamicResource AccentBrush}"
                               StrokeThickness="1.7"
                               Width="15" Height="15" Stretch="Uniform"/>
                     </Border>

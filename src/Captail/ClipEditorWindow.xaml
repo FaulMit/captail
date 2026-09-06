@@ -2,16 +2,50 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Captail"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="{DynamicResource L.Library.TrimTitle}"
         Icon="pack://application:,,,/Captail;component/Assets/Captail.ico"
-        Width="900" Height="790"
+        Width="900" Height="790" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner"
-        WindowStyle="None" ResizeMode="NoResize"
+        WindowStyle="None" ResizeMode="CanResize"
         AllowsTransparency="False" Background="{StaticResource BgWindowBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
         FontFamily="{StaticResource FontUi}"
         PreviewKeyDown="Window_PreviewKeyDown">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0"
+                            ResizeBorderThickness="6"
+                            GlassFrameThickness="0"
+                            CornerRadius="0"
+                            UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
     <Window.Resources>
+        <Style x:Key="ReplayCheckBox" TargetType="CheckBox">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="Box" CornerRadius="4" BorderThickness="1"
+                                BorderBrush="{StaticResource BorderControlBrush}"
+                                Background="{StaticResource BgControlBrush}">
+                            <Path x:Name="Tick" Data="M3 8l4 4 7-8" Margin="1"
+                                  Stroke="{DynamicResource OnAccentBrush}" StrokeThickness="2" Visibility="Collapsed"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="EditorMergeCheckBox" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
             <Setter Property="Background" Value="{StaticResource BgControlBrush}"/>
@@ -39,7 +73,7 @@
                             <ContentPresenter Grid.Column="1" Margin="8,0,0,0"
                                               VerticalAlignment="Center"/>
                             <Border x:Name="FocusBorder" Grid.ColumnSpan="2" Margin="-4"
-                                    BorderBrush="{StaticResource AccentBrush}"
+                                    BorderBrush="{DynamicResource AccentBrush}"
                                     BorderThickness="1" CornerRadius="7"
                                     Visibility="Collapsed" IsHitTestVisible="False"/>
                         </Grid>
@@ -50,9 +84,9 @@
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="Box" Property="Background"
-                                        Value="{StaticResource AccentBrush}"/>
+                                        Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="Box" Property="BorderBrush"
-                                        Value="{StaticResource AccentBrush}"/>
+                                        Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
@@ -93,8 +127,8 @@
         <Style x:Key="PlaybackSpeedFeedbackBadge" TargetType="Border">
             <Setter Property="Padding" Value="9,4"/>
             <Setter Property="Margin" Value="10,0,0,0"/>
-            <Setter Property="Background" Value="{StaticResource AccentChipBgBrush}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource AccentChipBorderBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentChipBgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentChipBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -104,12 +138,17 @@
             BorderBrush="{StaticResource WindowBorderBrush}" BorderThickness="1"
             CornerRadius="0">
         <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ContentColumn" Width="*"/>
+                <ColumnDefinition x:Name="SidebarColumn" Width="Auto"/>
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition x:Name="HeaderRow" Height="56"/>
                 <RowDefinition x:Name="WorkspaceRow" Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid x:Name="EditorHeader" Margin="20,0" Background="Transparent"
+            <Grid x:Name="EditorHeader" Grid.ColumnSpan="2"
+                  Margin="20,0" Background="Transparent"
                   MouseLeftButtonDown="Header_MouseLeftButtonDown">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -118,10 +157,10 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Path x:Name="HeaderTrimIcon" Data="{StaticResource IconScissors}"
-                          Stroke="{StaticResource AccentBrush}" StrokeThickness="1.8"
+                          Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.8"
                           Width="15" Height="15" Stretch="Uniform"/>
                     <Path x:Name="HeaderPreviewIcon" Data="{StaticResource IconPlay}"
-                          Fill="{StaticResource AccentBrush}" Width="15" Height="15"
+                          Fill="{DynamicResource AccentBrush}" Width="15" Height="15"
                           Stretch="Uniform" Visibility="Collapsed"/>
                     <TextBlock x:Name="HeaderTitleText"
                                Text="{DynamicResource L.Library.TrimTitle}"
@@ -138,7 +177,8 @@
                 </Button>
             </Grid>
 
-            <Grid x:Name="EditorWorkspace" Grid.Row="1" Margin="20,0,20,20">
+            <Grid x:Name="EditorWorkspace" Grid.Row="1" Grid.Column="0"
+                  Margin="20,0,20,20">
                 <Grid.RowDefinitions>
                     <RowDefinition x:Name="PreviewRow" Height="390"/>
                     <RowDefinition x:Name="PlaybackRow" Height="Auto"/>
@@ -149,7 +189,9 @@
                 <Border x:Name="PreviewBorder" Background="#FF070A0C"
                         BorderBrush="{StaticResource DividerBrush}"
                         BorderThickness="1" CornerRadius="12" ClipToBounds="True">
-                    <Grid x:Name="PreviewSurface">
+                    <Grid x:Name="PreviewSurface"
+                          PreviewMouseWheel="PreviewSurface_MouseWheel"
+                          MouseLeftButtonUp="PreviewSurface_MouseLeftButtonUp">
                         <Image x:Name="PreviewImage" Stretch="Uniform"/>
                         <local:MpvHost x:Name="PreviewPlayer" Visibility="Collapsed"/>
                         <Grid x:Name="PreviewLoadingOverlay" Background="#D6070A0C"
@@ -263,7 +305,7 @@
                                         Visibility="Collapsed" Opacity="0">
                                     <TextBlock x:Name="FullscreenSpeedFeedbackText"
                                                Style="{StaticResource PlayerShortcutBadgeText}"
-                                               Foreground="{StaticResource AccentBrush}"/>
+                                               Foreground="{DynamicResource AccentBrush}"/>
                                 </Border>
                             </StackPanel>
                             <Button Grid.Column="2" Style="{StaticResource ClipActionButton}"
@@ -304,16 +346,16 @@
                             <Rectangle x:Name="LeftShade" Height="76" Fill="#C4070A0C"/>
                             <Rectangle x:Name="RightShade" Height="76" Fill="#C4070A0C"/>
                             <Border x:Name="SelectionBorder" Height="76"
-                                    BorderBrush="{StaticResource AccentBrush}" BorderThickness="3"
+                                    BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3"
                                     CornerRadius="8" IsHitTestVisible="False"/>
                             <Thumb x:Name="StartThumb" Width="16" Height="76" Cursor="SizeWE"
                                    Panel.ZIndex="4" DragDelta="StartThumb_DragDelta"
                                    DragCompleted="RangeThumb_DragCompleted">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
-                                        <Border Background="{StaticResource AccentBrush}" CornerRadius="8,2,2,8">
+                                        <Border Background="{DynamicResource AccentBrush}" CornerRadius="8,2,2,8">
                                             <Rectangle Width="2" Height="22" RadiusX="1" RadiusY="1"
-                                                       Fill="{StaticResource OnAccentBrush}"/>
+                                                       Fill="{DynamicResource OnAccentBrush}"/>
                                         </Border>
                                     </ControlTemplate>
                                 </Thumb.Template>
@@ -323,9 +365,9 @@
                                    DragCompleted="RangeThumb_DragCompleted">
                                 <Thumb.Template>
                                     <ControlTemplate TargetType="Thumb">
-                                        <Border Background="{StaticResource AccentBrush}" CornerRadius="2,8,8,2">
+                                        <Border Background="{DynamicResource AccentBrush}" CornerRadius="2,8,8,2">
                                             <Rectangle Width="2" Height="22" RadiusX="1" RadiusY="1"
-                                                       Fill="{StaticResource OnAccentBrush}"/>
+                                                       Fill="{DynamicResource OnAccentBrush}"/>
                                         </Border>
                                     </ControlTemplate>
                                 </Thumb.Template>
@@ -364,14 +406,14 @@
                                        VerticalAlignment="Center"/>
                             <Border x:Name="AudioTrackCountBadge" Margin="7,0,0,0"
                                     MinWidth="24" Height="18" Padding="6,0"
-                                    Background="{StaticResource AccentChipBgBrush}"
-                                    BorderBrush="{StaticResource AccentChipBorderBrush}"
+                                    Background="{DynamicResource AccentChipBgBrush}"
+                                    BorderBrush="{DynamicResource AccentChipBorderBrush}"
                                     BorderThickness="1" CornerRadius="6"
                                     Visibility="Collapsed">
                                 <TextBlock x:Name="AudioTrackCountText" Text="0"
                                            FontFamily="{StaticResource FontMono}"
                                            FontSize="10" FontWeight="Bold"
-                                           Foreground="{StaticResource AccentBrush}"
+                                           Foreground="{DynamicResource AccentBrush}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"/>
                             </Border>
@@ -403,7 +445,7 @@
                                                       Margin="4,0,0,0" VerticalAlignment="Center">
                                             <Grid Width="164">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <Ellipse Width="7" Height="7" Fill="{StaticResource AccentBrush}"
+                                                    <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentBrush}"
                                                              VerticalAlignment="Center" Margin="0,0,8,0"/>
                                                     <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"
                                                                MaxWidth="116" VerticalAlignment="Center"/>
@@ -486,7 +528,14 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal">
+                            <Button x:Name="NextReplayButton"
+                                    Style="{StaticResource ClipActionButton}"
+                                    Click="NextReplay_Click"
+                                    ToolTip="{DynamicResource L.Library.NextReplay}">
+                                <TextBlock Text="⏭" FontSize="12"/>
+                            </Button>
                             <Button Style="{StaticResource ClipActionButton}" Click="Back_Click"
+                                    Margin="7,0,0,0"
                                     ToolTip="{DynamicResource L.Library.Back5}">
                                 <Path Data="M15 5L8 12l7 7 M8 12h10"
                                       Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
@@ -506,6 +555,13 @@
                                       Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                       StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
                             </Button>
+                            <Button x:Name="PreviousReplayButton"
+                                    Style="{StaticResource ClipActionButton}"
+                                    Margin="7,0,0,0"
+                                    Click="PreviousReplay_Click"
+                                    ToolTip="{DynamicResource L.Library.PreviousReplay}">
+                                <TextBlock Text="⏮" FontSize="12"/>
+                            </Button>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal"
                                     HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -518,10 +574,17 @@
                                     Visibility="Collapsed" Opacity="0">
                                 <TextBlock x:Name="PreviewSpeedFeedbackText"
                                            Style="{StaticResource PlayerShortcutBadgeText}"
-                                           Foreground="{StaticResource AccentBrush}"/>
+                                           Foreground="{DynamicResource AccentBrush}"/>
                             </Border>
                         </StackPanel>
                         <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Slider x:Name="PreviewVolumeSlider"
+                                    Width="110" Margin="0,0,12,0"
+                                    Minimum="0" Maximum="100" TickFrequency="1"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource VolumeSlider}"
+                                    ToolTip="{DynamicResource L.Library.ShortcutVolume}"
+                                    ValueChanged="PreviewVolumeSlider_ValueChanged"/>
                             <Button Content="{DynamicResource L.Library.Trim}"
                                     Style="{StaticResource AccentButton}" Padding="16,8"
                                     Click="EnterTrimMode_Click"/>
@@ -589,9 +652,9 @@
                                     </Grid>
                                 </Border>
 
-                                <Border Grid.Row="1" Grid.ColumnSpan="2"
+                                <Border Grid.Row="1"
                                         Style="{StaticResource PlayerShortcutCell}"
-                                        BorderThickness="0,0,0,1">
+                                        BorderThickness="0,0,1,1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
@@ -605,6 +668,26 @@
                                         </StackPanel>
                                         <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
                                             <TextBlock Text="↓ / ↑" Style="{StaticResource PlayerShortcutBadgeText}"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="1" Grid.Column="1"
+                                        Style="{StaticResource PlayerShortcutCell}"
+                                        BorderThickness="0,0,0,1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutVolume}"
+                                                       Style="{StaticResource RowLabelText}"/>
+                                            <TextBlock Text="{DynamicResource L.Library.ShortcutVolumeHint}"
+                                                       Style="{StaticResource SecondaryText}"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Style="{StaticResource PlayerShortcutBadge}">
+                                            <TextBlock Text="− / +" Style="{StaticResource PlayerShortcutBadgeText}"/>
                                         </Border>
                                     </Grid>
                                 </Border>
@@ -652,7 +735,127 @@
                 </Grid>
             </Grid>
 
+            <Border x:Name="RecentReplaySidebar" Grid.Row="1" Grid.Column="1"
+                    Width="260" Margin="0,0,20,20" Padding="12,10"
+                    Visibility="Collapsed"
+                    Background="{StaticResource BgSurfaceBrush}"
+                    BorderBrush="{StaticResource DividerBrush}"
+                    BorderThickness="1" CornerRadius="12">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="{DynamicResource L.Library.AllClips}"
+                               Style="{StaticResource SectionHeaderText}"
+                               Margin="2,1,2,8"/>
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <ComboBox x:Name="GameFilter" DisplayMemberPath="Label"
+                                  Style="{StaticResource DarkCombo}"
+                                  ToolTip="{DynamicResource L.Library.AllGames}"
+                                  SelectionChanged="ReplayFilter_SelectionChanged" Margin="0,0,0,6"/>
+                        <ComboBox x:Name="RecordingModeFilter" DisplayMemberPath="Label"
+                                  Style="{StaticResource DarkCombo}"
+                                  ToolTip="{DynamicResource L.Library.AllModes}"
+                                  SelectionChanged="ReplayFilter_SelectionChanged" Margin="0,0,0,6"/>
+                        <Button Content="{DynamicResource L.Library.SelectAll}"
+                                Style="{StaticResource AboutMenuButton}" Click="SelectAllReplays_Click"/>
+                        <Button x:Name="DeleteSelectedReplaysButton" IsEnabled="False"
+                                Style="{StaticResource AboutMenuButton}" Click="DeleteSelectedReplays_Click"/>
+                        <TextBlock x:Name="ReplayLibraryStatusText" Visibility="Collapsed"
+                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" Margin="3,6,3,0"/>
+                    </StackPanel>
+                    <ListBox x:Name="RecentReplayList"
+                             ItemsSource="{Binding RecentReplayItems}"
+                             Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="0"/>
+                                <Setter Property="Margin" Value="0,0,0,7"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Focusable" Value="False"/>
+                                <Setter Property="AutomationProperties.Name" Value="{Binding Title}"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="ReplayItemBorder" CornerRadius="7"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="ReplayItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
+                                                    <Setter TargetName="ReplayItemBorder" Property="BorderBrush" Value="{DynamicResource AccentDimBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Button Style="{StaticResource AboutMenuButton}"
+                                            Padding="27,7,32,7" Click="RecentReplay_Click"
+                                            HorizontalContentAlignment="Stretch">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="52"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Width="46" Height="30" CornerRadius="5"
+                                                    Background="{StaticResource BgControlBrush}"
+                                                    ClipToBounds="True">
+                                                <Image Source="{Binding Thumbnail}"
+                                                       Stretch="UniformToFill"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="8,0,0,0"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="10.5" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Duration}"
+                                                           Style="{StaticResource SecondaryText}"
+                                                           FontSize="9.5"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Button>
+                                    <CheckBox IsChecked="{Binding IsMarked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              Style="{StaticResource ReplayCheckBox}"
+                                              HorizontalAlignment="Left" VerticalAlignment="Center"
+                                              Margin="3,0,0,0" Click="ReplayMarked_Click"
+                                              ToolTip="{DynamicResource L.Library.SelectClip}"/>
+                                    <Button x:Name="DeleteRecentReplayButton"
+                                            Width="28" Height="28" Margin="0,0,7,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Visibility="Collapsed"
+                                            Style="{StaticResource ClipActionButton}"
+                                            ToolTip="{DynamicResource L.Library.Delete}"
+                                            Click="RequestDeleteRecentReplay_Click">
+                                        <Path Data="M7 8h10 M9 8V6h6v2 M9 10v8h6v-8"
+                                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.6" Stretch="Uniform"/>
+                                    </Button>
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                 Value="True">
+                                        <Setter TargetName="DeleteRecentReplayButton"
+                                                Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
             <Border x:Name="OverwriteConfirmOverlay" Grid.RowSpan="2" Panel.ZIndex="30"
+                    Grid.ColumnSpan="2"
                     Visibility="Collapsed" Background="#C20A0D0F"
                     CornerRadius="0">
                 <Border Width="370" Padding="20" HorizontalAlignment="Center"
@@ -674,6 +877,34 @@
                             <Button Content="{DynamicResource L.Library.Overwrite}"
                                     Style="{StaticResource AccentButton}" Padding="16,8"
                                     Click="ConfirmOverwrite_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Border>
+
+            <Border x:Name="DeleteRecentReplayOverlay" Grid.RowSpan="2"
+                    Grid.ColumnSpan="2" Panel.ZIndex="30"
+                    Visibility="Collapsed" Background="#C20A0D0F"
+                    CornerRadius="0">
+                <Border Width="370" Padding="20" HorizontalAlignment="Center"
+                        VerticalAlignment="Center" Style="{StaticResource SettingsGroup}">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource L.Library.DeleteSelectionTitle}"
+                                   FontSize="15" FontWeight="Bold"/>
+                        <TextBlock Text="{DynamicResource L.Library.DeleteSelectionMessage}"
+                                   Margin="0,9,0,0" Style="{StaticResource SecondaryText}"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock x:Name="DeleteRecentReplayFileText"
+                                   Margin="0,9,0,18" Style="{StaticResource MonoText}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="{DynamicResource L.Library.Cancel}"
+                                    Style="{StaticResource SubtleButton}"
+                                    Margin="0,0,8,0"
+                                    Click="CancelDeleteRecentReplay_Click"/>
+                            <Button Content="{DynamicResource L.Library.Delete}"
+                                    Style="{StaticResource AccentButton}" Padding="16,8"
+                                    Click="ConfirmDeleteRecentReplay_Click"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
