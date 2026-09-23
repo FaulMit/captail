@@ -20,14 +20,14 @@ Example:
 dotnet build .\tools\ProcessAudioQa\Target\ProcessAudioQaTarget.csproj -c Release
 dotnet build .\tools\ProcessAudioQa\Target\Child\ProcessAudioQaChild.csproj -c Release
 dotnet build .\tools\ProcessAudioQa\ProcessAudioQa.csproj -c Release
-.\tools\ProcessAudioQa\bin\Release\net9.0-windows10.0.22621.0\win-x64\ProcessAudioQa.exe `
+.\tools\ProcessAudioQa\bin\Release\net10.0-windows10.0.22621.0\win-x64\ProcessAudioQa.exe `
   --source target=ProcessAudioQaTarget.exe --duration 15
 ```
 
 PID-aware example:
 
 ```powershell
-.\tools\ProcessAudioQa\bin\Release\net9.0-windows10.0.22621.0\win-x64\ProcessAudioQa.exe `
+.\tools\ProcessAudioQa\bin\Release\net10.0-windows10.0.22621.0\win-x64\ProcessAudioQa.exe `
   --watch-executable ProcessAudioQaTarget.exe `
   --plugin .\native\ProcessAudio\build\Release\captail-process-audio.dll `
   --duration 15

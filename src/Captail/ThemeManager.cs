@@ -1,5 +1,7 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Captail;
 
@@ -21,6 +23,16 @@ internal static class ThemeManager
             ["amber"] = New("#F5B94C", "#F8C96E", "#B97D1E", "#251702"),
         };
 
+    private static readonly Dictionary<string, string> IconAssets =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["mint"] = "Captail.ico",
+            ["blue"] = "CaptailBlue.ico",
+            ["violet"] = "CaptailViolet.ico",
+            ["rose"] = "CaptailRose.ico",
+            ["amber"] = "CaptailAmber.ico",
+        };
+
     internal static void ApplyAccent(string? name)
     {
         if (Application.Current is null)
@@ -36,6 +48,27 @@ internal static class ThemeManager
         resources["AccentSubtleBrush"] = Brush(WithAlpha(palette.Accent, 0x24));
         resources["AccentChipBgBrush"] = Brush(WithAlpha(palette.Accent, 0x12));
         resources["AccentChipBorderBrush"] = Brush(WithAlpha(palette.Accent, 0x40));
+        resources["ApplicationIcon"] = LoadIcon(name);
+    }
+
+    internal static string IconAssetName(string? name) =>
+        IconAssets.TryGetValue(name ?? "", out string? assetName)
+            ? assetName
+            : IconAssets["mint"];
+
+    private static BitmapFrame LoadIcon(string? name)
+    {
+        using Stream stream = Application.GetResourceStream(
+            new Uri($"Assets/{IconAssetName(name)}", UriKind.Relative)).Stream;
+        var decoder = new IconBitmapDecoder(
+            stream,
+            BitmapCreateOptions.PreservePixelFormat,
+            BitmapCacheOption.OnLoad);
+        BitmapFrame frame = decoder.Frames
+            .OrderByDescending(candidate => candidate.PixelWidth)
+            .First();
+        frame.Freeze();
+        return frame;
     }
 
     private static Palette New(string accent, string hover, string dim, string onAccent) =>

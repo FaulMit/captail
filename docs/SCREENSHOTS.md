@@ -13,10 +13,9 @@ Every release must ship a fresh screenshot set captured from the exact release-c
 | `docs/captail-settings-video.png` | Video settings | Hardware AV1 selected at `3840 × 2160` and `240 FPS`, plus source, bitrate, quality profile, display, and resolution controls. |
 | `docs/captail-settings-audio.png` | Audio and replay settings | Enabled system audio and microphone, separate tracks, volume, microphone boost, buffer, storage, and hotkey controls where they fit naturally. Use a second real settings screenshot when one readable frame cannot contain them. |
 | `docs/captail-audio-routing.png` | Application audio routing open | Selected applications first, real application icons, live level meters, microphone assignment, track selectors, and additional running processes. |
-| `docs/captail-player.png` | Real replay loaded in Preview | Working AV1 4K 240 FPS playback, seek bar, keyboard help, Trim action, fullscreen control, and matching media details. |
-| `docs/captail-editor.png` | Real replay loaded | Working preview of a real AV1 4K 240 FPS replay, selected trim range, video timeline, available audio tracks, matching media details, and save actions. |
+| `docs/captail-player.png` | Real replay loaded in the combined player and editor | Working AV1 4K 240 FPS playback, video timeline, trim range, available audio tracks, output settings, save actions, fullscreen control, and matching media details. |
 
-The next refresh should migrate the two older settings JPEG files to the stable PNG names above. After that migration, overwrite the stable files on every release instead of adding versioned duplicates.
+Overwrite these stable files on every release instead of adding versioned duplicates.
 
 ## README showcase profile
 
@@ -34,7 +33,7 @@ Capture these screenshots on hardware that exposes and successfully records this
 
 ## Significant feature screenshots
 
-Add a separate screenshot when a release introduces or substantially redesigns any of these:
+Add a separate screenshot when a release introduces or substantially redesigns any of these and the required set does not already show it:
 
 - a top-level workflow;
 - a new window, panel, editor mode, or settings group;
@@ -44,7 +43,7 @@ Add a separate screenshot when a release introduces or substantially redesigns a
 
 Use `docs/captail-feature-<short-name>.png`. Keep it in README while the feature remains important to first-time users. Remove obsolete feature screenshots rather than turning README into release history.
 
-Small copy changes, internal performance work, dependency updates, and invisible bug fixes do not need their own feature screenshot. They still require the fresh four-image release baseline.
+Small copy changes, internal performance work, dependency updates, and invisible bug fixes do not need their own feature screenshot. They still require the fresh six-image release baseline.
 
 ## Capture standard
 
@@ -80,8 +79,8 @@ Small copy changes, internal performance work, dependency updates, and invisible
      -ReplayFile 'D:\Captail-Screenshot-Media\showcase-av1-4k-240.mkv'
    ```
 
-   The tool backs up the user config, applies the English AV1/4K/240 showcase profile, opens each screen through Windows UI Automation, captures cursor-free PNG files, verifies editor media with bundled `ffprobe`, and restores the config even after a failure. Use `-SkipEditor` only while preparing the required showcase replay, or `-EditorOnly` to replace only `captail-editor.png`. `-AllowNonShowcaseReplay` exists for local harness testing and must not be used for release screenshots.
-4. Inspect all four PNG files at full size. Automation removes repetitive interaction; it does not replace visual review.
+   The tool backs up the user config, applies the English AV1/4K/240 showcase profile, opens each screen through Windows UI Automation, captures cursor-free PNG files, verifies player media with bundled `ffprobe`, and restores the config even after a failure. Use `-SkipPlayer` only while preparing the required showcase replay, or `-PlayerOnly` to replace only `captail-player.png`. `-AllowNonShowcaseReplay` exists for local harness testing and must not be used for release screenshots.
+4. Inspect all six PNG files at full size. Automation removes repetitive interaction; it does not replace visual review.
 5. Capture each significant new feature or redesigned workflow.
 6. Replace stable README assets and update image references or alt text when needed.
 7. Open README locally or on the release PR and check image order, sizing, clipping, and dark-theme contrast.
@@ -90,7 +89,7 @@ Small copy changes, internal performance work, dependency updates, and invisible
 
 ## Current 0.2.x refresh queue
 
-The complete baseline was refreshed from the exact `0.2.0` portable build with the automated workflow. The editor uses the documented showcase fixture derived from a real AV1 240 FPS Captail replay with two audio tracks.
+The six-image baseline was refreshed from the `0.2.4` release candidate. The combined player/editor uses the documented showcase fixture derived from a real AV1 240 FPS Captail replay with two audio tracks. A separate native AV1 4K 240 FPS capture was saved and decoded successfully; playback of that new capture in the embedded player still needs verification.
 
 Recommended additional real screenshots:
 

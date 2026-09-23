@@ -11,6 +11,7 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using Captail.Interop;
 using H.NotifyIcon;
+using Windows.Graphics.Capture;
 
 namespace Captail;
 
@@ -70,6 +71,8 @@ public partial class App : Application
     private bool _shutdownExistingSucceeded = true;
     private bool _startedAfterCaptureRecovery;
     private StorePackageLifecycle? _storePackageLifecycle;
+    private bool _borderlessCaptureAccessPrepared;
+    private bool _windowsGraphicsCaptureReady = true;
 #if DEBUG
     private bool _qaUpdateAvailable;
     private Task? _qaRecoveryShutdownOverride;
@@ -200,6 +203,13 @@ public partial class App : Application
                 ?["--qa-replay-navigation=".Length..];
             bool replayNavigationTest =
                 !string.IsNullOrWhiteSpace(replayNavigationTestPath);
+            string? responsivePlayerTestPath = e.Args
+                .FirstOrDefault(argument => argument.StartsWith(
+                    "--qa-responsive-player=",
+                    StringComparison.OrdinalIgnoreCase))
+                ?["--qa-responsive-player=".Length..];
+            bool responsivePlayerTest =
+                !string.IsNullOrWhiteSpace(responsivePlayerTestPath);
             string? audioMixTestPath = e.Args
                 .FirstOrDefault(argument => argument.StartsWith(
                     "--qa-audio-mix=",
@@ -239,6 +249,7 @@ public partial class App : Application
             const bool clipEditorTest = false;
             const bool replayPlayerTest = false;
             const bool replayNavigationTest = false;
+            const bool responsivePlayerTest = false;
             const bool audioMixTest = false;
             const bool previewGeometryTest = false;
             const bool trimOverwriteTest = false;
@@ -262,6 +273,7 @@ public partial class App : Application
                     gameCaptureTest || gameCaptureIdleTest ||
                     replaySegmentsTest || updateCheckTest ||
                     clipEditorTest || replayPlayerTest || replayNavigationTest ||
+                    responsivePlayerTest ||
                     audioMixTest || previewGeometryTest ||
                     fileRetryTest || trimOverwriteTest ||
                      automaticCapturePolicyTest || replayRoutingTest ||
@@ -282,7 +294,7 @@ public partial class App : Application
                 OnStorePackageStopping);
             _config = Config.Load();
             Localization.SetLanguage(_config.Language);
-            ThemeManager.ApplyAccent(_config.AccentColor);
+            ApplyAccent(_config.AccentColor);
             Localization.Changed += OnLanguageChanged;
 #if !DEBUG
             if (!_uiOnly && Autostart.HasEntry())
@@ -399,6 +411,11 @@ public partial class App : Application
                 await RunReplayNavigationTestAsync(replayNavigationTestPath!);
                 return;
             }
+            if (responsivePlayerTest)
+            {
+                await RunResponsivePlayerTestAsync(responsivePlayerTestPath!);
+                return;
+            }
             if (replayToggleTest)
             {
                 await RunReplayToggleTestAsync();
@@ -507,6 +524,12 @@ public partial class App : Application
         {
             bool hotkeysPassed =
                 HotkeyManager.RunExtendedFunctionKeyQa(out string hotkeyDetails);
+            _recordingIndicator = new ReplayStatusIndicatorWindow
+            {
+                AllowCaptureForQa = true,
+            };
+            _recordingIndicator.SetGameDetected(true);
+            _recordingIndicator.SetState(ReplayIndicatorState.Active);
             fullscreen = new Window
             {
                 Left = SystemParameters.VirtualScreenLeft,
@@ -523,16 +546,23 @@ public partial class App : Application
             fullscreen.Show();
             nint fullscreenHwnd = new WindowInteropHelper(fullscreen).Handle;
 
+            bool indicatorPassed = _recordingIndicator.RunFullscreenIndicatorQa(
+                fullscreenHwnd,
+                out string indicatorDetails);
+
             _overlayNotification = new OverlayNotificationWindow();
             bool overlayPassed = _overlayNotification.RunFullscreenOverlayQa(
                 fullscreenHwnd,
                 out string overlayDetails);
-            bool passed = hotkeysPassed && overlayPassed;
+            bool passed = hotkeysPassed && indicatorPassed && overlayPassed;
             Log.Write(
                 $"FULLSCREEN_INPUT_OVERLAY_TEST {(passed ? "PASS" : "FAIL")}: " +
-                $"hotkeys=[{hotkeyDetails}], overlay=[{overlayDetails}]");
+                $"hotkeys=[{hotkeyDetails}], indicator=[{indicatorDetails}], " +
+                $"overlay=[{overlayDetails}]");
             _overlayNotification.ClosePermanently();
             _overlayNotification = null;
+            _recordingIndicator.ClosePermanently();
+            _recordingIndicator = null;
             fullscreen.Close();
             Shutdown(passed ? 0 : 28);
         }
@@ -541,6 +571,8 @@ public partial class App : Application
             Log.Write($"FULLSCREEN_INPUT_OVERLAY_TEST FAIL: {exception}");
             _overlayNotification?.ClosePermanently();
             _overlayNotification = null;
+            _recordingIndicator?.ClosePermanently();
+            _recordingIndicator = null;
             fullscreen?.Close();
             Shutdown(28);
         }
@@ -716,9 +748,13 @@ public partial class App : Application
         string workingPath = Path.Combine(
             directory,
             "overwrite-source" + Path.GetExtension(fullPath));
+        string transcodedPath = Path.Combine(
+            directory,
+            "transcoded-source" + Path.GetExtension(fullPath));
         try
         {
             File.Copy(fullPath, workingPath);
+            File.Copy(fullPath, transcodedPath);
             var ffmpeg = new FfmpegAdapter();
             TimeSpan originalDuration = await ffmpeg.ReadDurationAsync(workingPath);
             IReadOnlyList<AudioTrackInfo> audioTracks =
@@ -745,18 +781,110 @@ public partial class App : Application
                 end,
                 audioTracks.Select(track => track.StreamIndex).ToArray());
             TimeSpan trimmedDuration = await ffmpeg.ReadDurationAsync(workingPath);
+
+            var transcodedFile = new FileInfo(transcodedPath);
+            var transcodedClip = new ReplayClip(
+                transcodedPath,
+                transcodedFile.Name,
+                null,
+                transcodedFile.LastWriteTime,
+                transcodedFile.Length,
+                originalDuration,
+                null);
+            var outputSettings = new VideoOutputSettings(
+                VideoCodec: "h264",
+                AudioCodec: "aac",
+                Width: 320,
+                Height: 180,
+                VideoBitRateKbps: 1_000,
+                MergeAudioTracks: true);
+            string savedPath = await library.TrimAsync(
+                directory,
+                transcodedClip,
+                start,
+                end,
+                audioTracks.Select(track => track.StreamIndex).ToArray(),
+                outputSettings);
+            VideoStreamInfo? savedVideo = await ffmpeg.ReadVideoInfoAsync(savedPath);
+            IReadOnlyList<AudioTrackInfo> savedAudio =
+                await ffmpeg.ReadAudioTracksAsync(savedPath);
+
+            string exportedPath = Path.Combine(directory, "exported.webm");
+            var exportSettings = new VideoOutputSettings(
+                VideoCodec: "vp9",
+                AudioCodec: "opus",
+                Width: 320,
+                Height: 180,
+                VideoBitRateKbps: 750,
+                MergeAudioTracks: false);
+            await library.ExportTranscodedAsync(
+                directory,
+                transcodedClip,
+                exportedPath,
+                start,
+                end,
+                audioTracks.Select(track => track.StreamIndex).ToArray(),
+                exportSettings);
+            VideoStreamInfo? exportedVideo =
+                await ffmpeg.ReadVideoInfoAsync(exportedPath);
+            IReadOnlyList<AudioTrackInfo> exportedAudio =
+                await ffmpeg.ReadAudioTracksAsync(exportedPath);
+
+            await library.TrimOverwriteAsync(
+                directory,
+                transcodedClip,
+                start,
+                end,
+                audioTracks.Select(track => track.StreamIndex).ToArray(),
+                outputSettings);
+            VideoStreamInfo? transcodedVideo =
+                await ffmpeg.ReadVideoInfoAsync(transcodedPath);
+            IReadOnlyList<AudioTrackInfo> transcodedAudio =
+                await ffmpeg.ReadAudioTracksAsync(transcodedPath);
             string[] internalFiles = Directory.EnumerateFiles(directory)
                 .Where(ReplayLibrary.IsInternalWorkingFile)
                 .ToArray();
             bool passed = File.Exists(workingPath) &&
                           new FileInfo(workingPath).Length > 0 &&
                           trimmedDuration < originalDuration &&
+                          savedVideo is
+                          {
+                              Codec: "h264",
+                              Width: 320,
+                              Height: 180,
+                          } &&
+                          savedAudio.Count == 1 &&
+                          savedAudio[0].Codec == "aac" &&
+                          transcodedVideo is
+                          {
+                              Codec: "h264",
+                              Width: 320,
+                              Height: 180,
+                          } &&
+                          transcodedAudio.Count == 1 &&
+                          transcodedAudio[0].Codec == "aac" &&
+                          exportedVideo is
+                          {
+                              Codec: "vp9",
+                              Width: 320,
+                              Height: 180,
+                          } &&
+                          exportedAudio.Count == audioTracks.Count &&
+                          exportedAudio.All(track => track.Codec == "opus") &&
                           internalFiles.Length == 0;
             Log.Write(
                 $"TRIM_OVERWRITE_TEST {(passed ? "PASS" : "FAIL")}: " +
                 $"duration={originalDuration.TotalSeconds:0.000}->" +
                 $"{trimmedDuration.TotalSeconds:0.000}, " +
-                $"audioTracks={audioTracks.Count}, leftovers={internalFiles.Length}");
+                $"save={savedVideo?.Codec}/{savedVideo?.Width}x{savedVideo?.Height}/" +
+                $"{savedAudio.Count}audio, " +
+                $"overwrite={transcodedVideo?.Codec}/" +
+                $"{transcodedVideo?.Width}x{transcodedVideo?.Height}/" +
+                $"{transcodedAudio.Count}audio, " +
+                $"export={exportedVideo?.Codec}/" +
+                $"{exportedVideo?.Width}x{exportedVideo?.Height}/" +
+                $"{exportedAudio.Count}audio, " +
+                $"leftovers={internalFiles.Length}");
             Shutdown(passed ? 0 : 21);
         }
         catch (Exception exception)
@@ -1036,12 +1164,19 @@ public partial class App : Application
             Config replayOrganizationChange = invalidConfig.Clone();
             replayOrganizationChange.OrganizeReplaysByGame =
                 !replayOrganizationChange.OrganizeReplaysByGame;
+            long legacyWindowsCaptureMethod =
+                ObsReplayEngine.RecommendedMonitorCaptureMethod(
+                    new Version(10, 0, 17763));
             long windows10CaptureMethod =
                 ObsReplayEngine.RecommendedMonitorCaptureMethod(
                     new Version(10, 0, 19045));
             long windows11CaptureMethod =
                 ObsReplayEngine.RecommendedMonitorCaptureMethod(
                     new Version(10, 0, 22621));
+            long windows11FallbackCaptureMethod =
+                ObsReplayEngine.RecommendedMonitorCaptureMethod(
+                    new Version(10, 0, 22621),
+                    windowsGraphicsCaptureReady: false);
 
             bool passed =
                 oldNvidia.Supports("h264") &&
@@ -1060,8 +1195,10 @@ public partial class App : Application
                 ObsReplayEngine.RecommendedNvencBFrames("hevc", true) == 0 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", true) == 2 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", false) == 0 &&
-                windows10CaptureMethod == 0 &&
-                windows11CaptureMethod == 0 &&
+                legacyWindowsCaptureMethod == 0 &&
+                windows10CaptureMethod == 2 &&
+                windows11CaptureMethod == 2 &&
+                windows11FallbackCaptureMethod == 0 &&
                 invalidConfig.PipelineEquals(hotkeyOnlyChange) &&
                 invalidConfig.PipelineEquals(outputFolderChange) &&
                 invalidConfig.PipelineEquals(replayOrganizationChange) &&
@@ -1071,8 +1208,10 @@ public partial class App : Application
                 $"oldNvidiaAv1={oldNvidia.Supports("av1")}, " +
                 $"amd={amd.Preferred("av1")?.Family}, " +
                 $"intel={intel.Preferred("av1")?.Family}, " +
+                $"legacyCapture={legacyWindowsCaptureMethod}, " +
                 $"win10Capture={windows10CaptureMethod}, " +
-                $"win11Capture={windows11CaptureMethod}");
+                $"win11Capture={windows11CaptureMethod}, " +
+                $"win11Fallback={windows11FallbackCaptureMethod}");
             Shutdown(passed ? 0 : 11);
         }
         catch (Exception exception)
@@ -1734,7 +1873,11 @@ public partial class App : Application
         try
         {
             string requestedCodec = _config!.Codec;
-            engine = new ObsReplayEngine(_config);
+            _windowsGraphicsCaptureReady =
+                await PrepareWindowsGraphicsCaptureAsync();
+            engine = new ObsReplayEngine(
+                _config,
+                _windowsGraphicsCaptureReady);
             engine.Faulted += reason => OnPipelineFault(engine, reason);
             string description = await RunOnObsThreadAsync(() =>
             {
@@ -1809,6 +1952,56 @@ public partial class App : Application
             UpdateUiState();
             return false;
         }
+    }
+
+    private Task<bool> PrepareWindowsGraphicsCaptureAsync()
+    {
+        if (Dispatcher.CheckAccess())
+            return PrepareWindowsGraphicsCaptureCoreAsync();
+
+        return Dispatcher
+            .InvokeAsync(PrepareWindowsGraphicsCaptureCoreAsync)
+            .Task
+            .Unwrap();
+    }
+
+    private async Task<bool> PrepareWindowsGraphicsCaptureCoreAsync()
+    {
+        if (_config is null ||
+            string.Equals(
+                _config.CaptureSource,
+                "game",
+                StringComparison.OrdinalIgnoreCase) ||
+            Environment.OSVersion.Version.Build < 22000)
+        {
+            return true;
+        }
+
+        if (_borderlessCaptureAccessPrepared)
+            return _windowsGraphicsCaptureReady;
+
+        _borderlessCaptureAccessPrepared = true;
+        try
+        {
+            var request = GraphicsCaptureAccess.RequestAccessAsync(
+                    GraphicsCaptureAccessKind.Borderless)
+                .AsTask();
+            var status = await request.WaitAsync(TimeSpan.FromSeconds(15));
+            _windowsGraphicsCaptureReady =
+                status.ToString() != "UserPromptRequired";
+            Log.Write(
+                $"WGC borderless preflight: status={status}; " +
+                $"ready={_windowsGraphicsCaptureReady}.");
+        }
+        catch (Exception exception)
+        {
+            _windowsGraphicsCaptureReady = false;
+            Log.Write(
+                "WGC borderless preflight failed; using Auto/DXGI: " +
+                exception.Message);
+        }
+
+        return _windowsGraphicsCaptureReady;
     }
 
     private async Task StopPipelineCoreAsync()
@@ -1887,6 +2080,48 @@ public partial class App : Application
     }
 
 #if DEBUG
+    private async Task RunResponsivePlayerTestAsync(string path)
+    {
+        string fullPath = Path.GetFullPath(path);
+        if (!File.Exists(fullPath))
+            throw new FileNotFoundException("QA replay does not exist.", fullPath);
+
+        var ffmpeg = new FfmpegAdapter();
+        TimeSpan duration = await ffmpeg.ReadDurationAsync(fullPath);
+        var file = new FileInfo(fullPath);
+        var clip = new ReplayClip(
+            fullPath,
+            file.Name,
+            null,
+            file.LastWriteTime,
+            file.Length,
+            duration,
+            null);
+        var window = new ClipEditorWindow(
+            new ReplayLibrary(ffmpeg),
+            file.DirectoryName!,
+            clip,
+            _ => { },
+            ClipWindowMode.Preview);
+        MainWindow = window;
+        window.Show();
+        try
+        {
+            (bool passed, string details) =
+                await window.RunResponsivePlayerQaAsync();
+            Log.Write(
+                $"RESPONSIVE_PLAYER_TEST {(passed ? "PASS" : "FAIL")}: {details}");
+            window.Close();
+            Shutdown(passed ? 0 : 28);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"RESPONSIVE_PLAYER_TEST FAIL: {exception}");
+            window.Close();
+            Shutdown(28);
+        }
+    }
+
     private async Task RunReplayNavigationTestAsync(string path)
     {
         string fullPath = Path.GetFullPath(path);
@@ -3029,7 +3264,7 @@ public partial class App : Application
         if (_uiOnly)
         {
             _config!.CopyFrom(candidate);
-            ThemeManager.ApplyAccent(_config.AccentColor);
+            ApplyAccent(_config.AccentColor);
             _recordingIndicator?.RefreshAccent();
             _config.Save();
             UpdateUiState();
@@ -3072,7 +3307,7 @@ public partial class App : Application
             }
 
             _config.CopyFrom(candidate);
-            ThemeManager.ApplyAccent(_config.AccentColor);
+            ApplyAccent(_config.AccentColor);
             _recordingIndicator?.RefreshAccent();
             bool mustStart = candidate.ReplayEnabled &&
                 (!wasRunning || pipelineChanged);
@@ -3112,7 +3347,7 @@ public partial class App : Application
                 await StopPipelineCoreAsync();
 
             _config.CopyFrom(previous);
-            ThemeManager.ApplyAccent(_config.AccentColor);
+            ApplyAccent(_config.AccentColor);
             _recordingIndicator?.RefreshAccent();
             SaveRollbackConfig("settings apply");
             try
@@ -3196,7 +3431,9 @@ public partial class App : Application
             if (_trayActiveState != active)
             {
                 _tray.Icon = CreateIcon(
-                    active ? "Captail.ico" : "CaptailInactive.ico");
+                    active
+                        ? ThemeManager.IconAssetName(_config?.AccentColor)
+                        : "CaptailInactive.ico");
                 _trayActiveState = active;
             }
             _tray.ToolTipText = active
@@ -3464,7 +3701,7 @@ public partial class App : Application
                 string.Equals(
                     Path.GetFileName(Path.GetDirectoryName(
                         automaticDestination)),
-                    "cs2",
+                    "Counter-Strike 2",
                     StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(
                     Path.GetDirectoryName(desktopDestination),
@@ -3472,7 +3709,7 @@ public partial class App : Application
                     StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(
                     Path.GetFileName(Path.GetDirectoryName(manualDestination)),
-                    "cs2",
+                    "Counter-Strike 2",
                     StringComparison.OrdinalIgnoreCase);
             Log.Write(
                 $"REPLAY_ROUTING_TEST {(passed ? "PASS" : "FAIL")}: " +
@@ -3606,6 +3843,13 @@ public partial class App : Application
             new Uri($"Assets/{assetName}", UriKind.Relative)).Stream;
         using var icon = new Icon(stream);
         return (Icon)icon.Clone();
+    }
+
+    private void ApplyAccent(string? accentName)
+    {
+        ThemeManager.ApplyAccent(accentName);
+        ShortcutIconManager.Apply(accentName);
+        _trayActiveState = null;
     }
 
     private static void ConfigureShellIdentity()

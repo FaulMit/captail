@@ -35,7 +35,7 @@ internal sealed class AdvancedProcessAudioUnavailableException(
     Justification = "libobs is thread-affine; finalizer-thread native shutdown is unsafe.")]
 public sealed class ObsReplayEngine : IDisposable
 {
-    private const string RequiredObsVersion = "32.1.2";
+    private const string RequiredObsVersion = "32.2.2";
     private const float ObsSdrWhiteLevel = 300.0f;
     private const float ObsHdrNominalPeakLevel = 1000.0f;
     private const int AutomaticHookStableChecks = 2;
@@ -46,6 +46,7 @@ public sealed class ObsReplayEngine : IDisposable
     private const int GameCaptureIdleReleaseSeconds = 10;
     private const int GameCaptureDetectorStartupSeconds = 8;
     private const int ProcessLoopbackMinimumBuild = 19041;
+    private const int WindowsGraphicsCaptureMinimumBuild = 18362;
     private const long MonitorCaptureMethodAuto = 0;
     private const long MonitorCaptureMethodWgc = 2;
     private static readonly string[] CapabilityCodecNames = ["h264", "hevc", "av1"];
@@ -81,6 +82,7 @@ public sealed class ObsReplayEngine : IDisposable
     private static bool _contextOwned;
 
     private readonly Config _config;
+    private readonly bool _windowsGraphicsCaptureReady;
     private readonly object _saveGate = new();
     private readonly ObsNative.SignalCallback _savedCallback;
     private readonly ObsNative.SignalCallback _stoppedCallback;
@@ -114,7 +116,9 @@ public sealed class ObsReplayEngine : IDisposable
     private uint _outputHeight;
     private uint _baseWidth;
     private uint _baseHeight;
+    private uint _adapterIndex;
     private int _videoFrameRate;
+    private long _preferredMonitorCaptureMethod = MonitorCaptureMethodAuto;
     private bool _automaticGameActive;
     private bool _automaticDesktopFallbackActive;
     private bool _automaticGameSourceShowing;
@@ -223,8 +227,15 @@ public sealed class ObsReplayEngine : IDisposable
                !AutomaticCaptureRejectedProcesses.Contains(processName);
     }
 
-    internal static long RecommendedMonitorCaptureMethod(Version osVersion) =>
-        MonitorCaptureMethodAuto;
+    internal static long RecommendedMonitorCaptureMethod(
+        Version osVersion,
+        bool windowsGraphicsCaptureReady = true) =>
+        windowsGraphicsCaptureReady &&
+        (osVersion.Major > 10 ||
+         (osVersion.Major == 10 &&
+          osVersion.Build >= WindowsGraphicsCaptureMinimumBuild))
+            ? MonitorCaptureMethodWgc
+            : MonitorCaptureMethodAuto;
 
     internal static bool ShouldUseAutomaticGameCapture(
         string hookedExecutable,
@@ -587,9 +598,12 @@ public sealed class ObsReplayEngine : IDisposable
         _automaticHookStableChecks = 0;
     }
 
-    public ObsReplayEngine(Config config)
+    public ObsReplayEngine(
+        Config config,
+        bool windowsGraphicsCaptureReady = true)
     {
         _config = config;
+        _windowsGraphicsCaptureReady = windowsGraphicsCaptureReady;
         IsGameCapture = string.Equals(
             config.CaptureSource,
             "game",
@@ -632,6 +646,7 @@ public sealed class ObsReplayEngine : IDisposable
             CreateSources();
             CreateEncoders();
             CreateOutput();
+            ApplyPreferredMonitorCaptureMethod();
             _started = true;
 
             Log.Write(
@@ -892,9 +907,12 @@ public sealed class ObsReplayEngine : IDisposable
             _config.RecordingResolution);
         _outputWidth = outputWidth;
         _outputHeight = outputHeight;
+        _adapterIndex = GpuPreference.HighPerformanceAdapterIndex();
 
         ResetObsVideo(
-            IsGameCapture ? GameCaptureIdleFrameRate : _config.FrameRate,
+            IsGameCapture && !IsContinuousRecording
+                ? GameCaptureIdleFrameRate
+                : _config.FrameRate,
             diagnoseOnFailure: true);
 
         var audio = new ObsNative.AudioInfo
@@ -933,7 +951,7 @@ public sealed class ObsReplayEngine : IDisposable
                 OutputWidth = _outputWidth,
                 OutputHeight = _outputHeight,
                 OutputFormat = ObsNative.VideoFormat.Nv12,
-                Adapter = 0,
+                Adapter = _adapterIndex,
                 GpuConversion = true,
                 ColorSpace = ObsNative.VideoColorSpace.Cs709,
                 Range = ObsNative.VideoRange.Partial,
@@ -976,7 +994,7 @@ public sealed class ObsReplayEngine : IDisposable
         string adapterName = Localization.Text("L.Gpu.Generic");
         ObsNative.AdapterCallback callback = (_, name, id) =>
         {
-            if (id == 0)
+            if (id == _adapterIndex)
                 adapterName = PtrToString(name);
             return true;
         };
@@ -1164,7 +1182,9 @@ public sealed class ObsReplayEngine : IDisposable
             if (usesDetectedGameAudio)
                 Log.Write("Detected game audio routing enabled.");
             if (UsesSeparateGameAudio(_config))
+            {
                 ReconcileSeparateSystemAudio(null);
+            }
         }
 
         if (!IsAdvancedAudioRouting &&
@@ -1198,6 +1218,7 @@ public sealed class ObsReplayEngine : IDisposable
             _audioSources.Add(microphone);
             ObsNative.obs_set_output_source(2, microphone);
         }
+
     }
 
     private nint CreateGameSource(bool desktopFallback)
@@ -1239,23 +1260,31 @@ public sealed class ObsReplayEngine : IDisposable
         }
     }
 
-    private static nint CreateMonitorSource(CaptureInterop.MonitorInfo monitor)
+    private nint CreateMonitorSource(CaptureInterop.MonitorInfo monitor)
     {
         nint settings = ObsNative.obs_data_create();
         try
         {
-            // Auto prefers borderless DXGI duplication and retains WGC as a
-            // compatibility fallback. Forced WGC can show a Windows system
-            // border when borderless consent or package capability is absent.
-            long captureMethod =
-                RecommendedMonitorCaptureMethod(Environment.OSVersion.Version);
+            // WGC excludes protected video from captured frames instead of
+            // competing with DRM presentation through Desktop Duplication.
+            // Windows 11 can grant borderless capture; older Windows builds
+            // retain OBS Auto/DXGI compatibility behavior.
+            _preferredMonitorCaptureMethod =
+                RecommendedMonitorCaptureMethod(
+                    Environment.OSVersion.Version,
+                    _windowsGraphicsCaptureReady);
+            long captureMethod = _preferredMonitorCaptureMethod ==
+                                 MonitorCaptureMethodWgc
+                ? MonitorCaptureMethodAuto
+                : _preferredMonitorCaptureMethod;
             ObsNative.obs_data_set_int(
                 settings,
                 "method",
                 captureMethod);
             Log.Write(
-                $"Desktop capture backend: " +
-                $"{(captureMethod == MonitorCaptureMethodWgc ? "WGC" : "Auto (DXGI preferred)")}; " +
+                $"Desktop capture startup backend: Auto; " +
+                $"preferred=" +
+                $"{(_preferredMonitorCaptureMethod == MonitorCaptureMethodWgc ? "WGC" : "Auto")}; " +
                 $"Windows {Environment.OSVersion.Version}");
             ObsNative.obs_data_set_string(settings, "monitor_id", monitor.DeviceId);
             ObsNative.obs_data_set_bool(settings, "capture_cursor", true);
@@ -1273,6 +1302,30 @@ public sealed class ObsReplayEngine : IDisposable
                     Localization.Text("L.Engine.VideoSourceFailed"));
             }
             return source;
+        }
+        finally
+        {
+            ObsNative.obs_data_release(settings);
+        }
+    }
+
+    private void ApplyPreferredMonitorCaptureMethod()
+    {
+        if (_desktopVideoSource == 0 ||
+            _preferredMonitorCaptureMethod != MonitorCaptureMethodWgc)
+        {
+            return;
+        }
+
+        nint settings = ObsNative.obs_data_create();
+        try
+        {
+            ObsNative.obs_data_set_int(
+                settings,
+                "method",
+                MonitorCaptureMethodWgc);
+            ObsNative.obs_source_update(_desktopVideoSource, settings);
+            Log.Write("Desktop capture backend switch requested: WGC.");
         }
         finally
         {

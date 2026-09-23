@@ -21,7 +21,7 @@ Logs are stored at `%APPDATA%\Captail\log.txt`. Review logs before attaching the
 Requirements:
 
 - Windows 10/11 x64
-- .NET 9 SDK
+- .NET 10 SDK
 - Visual Studio 2022 Build Tools with Desktop development with C++
 - CMake 3.20+
 

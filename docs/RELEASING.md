@@ -50,7 +50,7 @@ gh workflow run release.yml `
   -f prerelease=true
 ```
 
-The workflow validates the version, builds and verifies both packages, creates tag `v0.1.1`, and publishes the GitHub Release using the matching changelog section.
+The workflow validates the version, builds and verifies both packages, creates tag `v<version>`, and publishes the GitHub Release using the matching changelog section.
 
 After publishing, verify:
 
@@ -62,7 +62,7 @@ After publishing, verify:
 
 ## Local package build
 
-Install Inno Setup, then run:
+Install Inno Setup 7.1.0 or newer, then run:
 
 ```powershell
 .\tools\AcquireObsRuntime.ps1

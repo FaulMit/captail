@@ -22,8 +22,7 @@ $screenshots = @(
     "captail-settings-video.png",
     "captail-settings-audio.png",
     "captail-audio-routing.png",
-    "captail-player.png",
-    "captail-editor.png"
+    "captail-player.png"
 )
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null

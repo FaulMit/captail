@@ -26,6 +26,7 @@ public sealed class MpvHost : HwndHost
     private const uint SwpNoActivate = 0x0010;
     private const uint WmEraseBackground = 0x0014;
     private const uint WmLButtonDown = 0x0201;
+    private const uint WmLButtonUp = 0x0202;
     private const uint WmMouseWheel = 0x020A;
     private const uint WmParentNotify = 0x0210;
     private static readonly object HostClassLock = new();
@@ -91,7 +92,7 @@ public sealed class MpvHost : HwndHost
     }
 
     internal void RaiseNativeMouseLeftButtonForQa() =>
-        HostWindowProc(_hostHandle, WmParentNotify, (nint)WmLButtonDown, 0);
+        HostWindowProc(_hostHandle, WmLButtonUp, 0, 0);
 
     internal bool TryValidateVideoOutput(out string details)
     {
@@ -734,8 +735,10 @@ public sealed class MpvHost : HwndHost
             return 0;
         }
 
-        if (message == WmParentNotify &&
-            ((uint)(long)wParam & 0xFFFF) == WmLButtonDown &&
+        bool directLeftClick = message == WmLButtonUp;
+        bool childLeftClick = message == WmParentNotify &&
+                              ((uint)(long)wParam & 0xFFFF) == WmLButtonDown;
+        if ((directLeftClick || childLeftClick) &&
             Hosts.TryGetValue(window, out WeakReference<MpvHost>? clickReference) &&
             clickReference.TryGetTarget(out MpvHost? clickHost))
         {

@@ -5,8 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$version = "32.1.2"
-$expectedArchiveSha256 = "8d97e4563bd8d22d03e63042aa7dccede1d555c9bd35ce8a9e5019b0d0201bf6"
+$version = "32.2.2"
+$expectedArchiveSha256 = "4d6e40e3ab155f56b30de517380566a206d74b63cdf5ad49aa596924768f97e1"
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
 $temporaryExtract = ""
@@ -89,11 +89,11 @@ foreach ($helper in @(
     }
 }
 $runtimeLibraries = @(
-    "avcodec-61.dll",
-    "avdevice-61.dll",
-    "avfilter-10.dll",
-    "avformat-61.dll",
-    "avutil-59.dll",
+    "avcodec-62.dll",
+    "avdevice-62.dll",
+    "avfilter-11.dll",
+    "avformat-62.dll",
+    "avutil-60.dll",
     "libcurl.dll",
     "libobs-d3d11.dll",
     "libobs-winrt.dll",
@@ -101,8 +101,8 @@ $runtimeLibraries = @(
     "libx264-164.dll",
     "obs.dll",
     "srt.dll",
-    "swresample-5.dll",
-    "swscale-8.dll",
+    "swresample-6.dll",
+    "swscale-9.dll",
     "w32-pthreads.dll",
     "zlib.dll"
 )

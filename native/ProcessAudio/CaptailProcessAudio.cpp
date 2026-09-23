@@ -3,7 +3,7 @@
 
     Process-loopback activation, format construction, silent-buffer handling,
     timestamps, and OBS audio delivery are narrowly adapted from OBS Studio
-    32.1.2 plugins/win-wasapi/win-wasapi.cpp.
+    32.2.2 plugins/win-wasapi/win-wasapi.cpp.
 
     OBS Studio copyright (C) Hugh Bailey and contributors.
     Captail adaptation copyright (C) Captail contributors.

@@ -8,9 +8,9 @@ tree selection, routing policy, and persistence remain outside the module.
 The process-loopback activation, libobs audio format construction, silent
 buffer handling, timestamps, and packet delivery are narrowly adapted from:
 
-- OBS Studio 32.1.2
+- OBS Studio 32.2.2
 - `plugins/win-wasapi/win-wasapi.cpp`
-- https://github.com/obsproject/obs-studio/tree/32.1.2
+- https://github.com/obsproject/obs-studio/tree/32.2.2
 
 Window matching, device capture, default-device notification, UI properties,
 localization, rerouting, and executable-name logging were intentionally not

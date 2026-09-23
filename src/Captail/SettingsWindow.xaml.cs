@@ -16,6 +16,7 @@ namespace Captail;
 public partial class SettingsWindow : Window
 {
     private const double DashboardHeight = 650;
+    private const int DashboardInitialReplayCount = 8;
 
     private readonly Config _config;
     private readonly Action _saveReplay;
@@ -2476,13 +2477,24 @@ public partial class SettingsWindow : Window
         {
             IReadOnlyList<ReplayClip> clips = await _replayLibrary.GetRecentAsync(
                 _outputDirectory,
-                int.MaxValue,
+                DashboardInitialReplayCount,
                 _lifetimeCts.Token);
             if (_lifetimeCts.IsCancellationRequested)
                 return;
 
             RecentReplaysList.ItemsSource = clips.Select(CreateReplayClipItem).ToArray();
             SetReplayLibraryState(empty: clips.Count == 0);
+            if (clips.Count < DashboardInitialReplayCount)
+                return;
+
+            IReadOnlyList<ReplayClip> allClips = await _replayLibrary.GetRecentAsync(
+                _outputDirectory,
+                int.MaxValue,
+                _lifetimeCts.Token);
+            if (_lifetimeCts.IsCancellationRequested || allClips.Count == clips.Count)
+                return;
+
+            RecentReplaysList.ItemsSource = allClips.Select(CreateReplayClipItem).ToArray();
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
@@ -2514,31 +2526,13 @@ public partial class SettingsWindow : Window
         ReplayLibraryErrorText.Visibility = error
             ? Visibility.Visible
             : Visibility.Collapsed;
-        RecentReplaysScrollViewer.Visibility = !loading && !empty && !error
+        RecentReplaysList.Visibility = !loading && !empty && !error
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
 
     private ReplayClipItem CreateReplayClipItem(ReplayClip clip)
     {
-        BitmapImage? thumbnail = null;
-        if (clip.ThumbnailPath is not null && File.Exists(clip.ThumbnailPath))
-        {
-            try
-            {
-                thumbnail = new BitmapImage();
-                thumbnail.BeginInit();
-                thumbnail.CacheOption = BitmapCacheOption.OnLoad;
-                thumbnail.UriSource = new Uri(clip.ThumbnailPath);
-                thumbnail.EndInit();
-                thumbnail.Freeze();
-            }
-            catch (Exception exception)
-            {
-                Log.Write($"Replay thumbnail load failed: {exception.Message}");
-            }
-        }
-
         string saved = clip.SavedAt.ToString("g");
         string metadata = Localization.Format(
             "L.Library.Metadata",
@@ -2551,8 +2545,30 @@ public partial class SettingsWindow : Window
             Path.GetFileNameWithoutExtension(clip.Name),
             metadata,
             FormatTimelineDuration(clip.Duration),
-            thumbnail,
+            () => LoadReplayThumbnail(clip),
             clip.Duration > TimeSpan.FromMilliseconds(200));
+    }
+
+    private static BitmapImage? LoadReplayThumbnail(ReplayClip clip)
+    {
+        if (clip.ThumbnailPath is null || !File.Exists(clip.ThumbnailPath))
+            return null;
+
+        try
+        {
+            var thumbnail = new BitmapImage();
+            thumbnail.BeginInit();
+            thumbnail.CacheOption = BitmapCacheOption.OnLoad;
+            thumbnail.UriSource = new Uri(clip.ThumbnailPath);
+            thumbnail.EndInit();
+            thumbnail.Freeze();
+            return thumbnail;
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Replay thumbnail load failed: {exception.Message}");
+            return null;
+        }
     }
 
     private void RevealReplay_Click(object sender, RoutedEventArgs e)
@@ -2567,27 +2583,6 @@ public partial class SettingsWindow : Window
         {
             HandleUiActionError("Reveal replay", exception);
         }
-    }
-
-    private void TrimReplay_Click(object sender, RoutedEventArgs e)
-    {
-        if (((FrameworkElement)sender).DataContext is not ReplayClipItem item || !item.CanTrim)
-            return;
-        var editor = new ClipEditorWindow(
-            _replayLibrary,
-            _outputDirectory,
-            item.Clip,
-            savedPath =>
-            {
-                Log.Write($"Trimmed replay saved: {savedPath}");
-                _ = RefreshReplayLibraryAsync();
-            },
-            initialVolumePercent: _config.PlayerVolume,
-            onVolumeChanged: PersistPlayerVolume)
-        {
-            Owner = this,
-        };
-        editor.ShowDialog();
     }
 
     private void PlayReplay_Click(object sender, RoutedEventArgs e)
@@ -2610,7 +2605,8 @@ public partial class SettingsWindow : Window
             Owner = this,
         };
         player.ShowDialog();
-        _ = RefreshReplayLibraryAsync();
+        if (player.HasDeletedReplays)
+            _ = RefreshReplayLibraryAsync();
     }
 
     private void PersistPlayerVolume(int volumePercent)
@@ -2969,13 +2965,33 @@ public partial class SettingsWindow : Window
             ? duration.ToString(@"h\:mm\:ss")
             : duration.ToString(@"m\:ss");
 
-    private sealed record ReplayClipItem(
-        ReplayClip Clip,
-        string Title,
-        string Details,
-        string Duration,
-        BitmapImage? Thumbnail,
-        bool CanTrim);
+    private sealed class ReplayClipItem
+    {
+        private readonly Lazy<BitmapImage?> _thumbnail;
+
+        public ReplayClipItem(
+            ReplayClip clip,
+            string title,
+            string details,
+            string duration,
+            Func<BitmapImage?> thumbnailFactory,
+            bool canTrim)
+        {
+            Clip = clip;
+            Title = title;
+            Details = details;
+            Duration = duration;
+            _thumbnail = new Lazy<BitmapImage?>(thumbnailFactory);
+            CanTrim = canTrim;
+        }
+
+        public ReplayClip Clip { get; }
+        public string Title { get; }
+        public string Details { get; }
+        public string Duration { get; }
+        public BitmapImage? Thumbnail => _thumbnail.Value;
+        public bool CanTrim { get; }
+    }
 
     private sealed record DashboardAudioSource(string Key, bool Microphone);
 

@@ -111,8 +111,13 @@ if (-not $SkipInstaller) {
         -not (Test-Path -LiteralPath $InnoSetupCompiler)) {
         throw "Inno Setup ISCC.exe not found. Pass -InnoSetupCompiler or use -SkipInstaller."
     }
+    [Version]$innoVersion =
+        (Get-Item -LiteralPath $InnoSetupCompiler).VersionInfo.ProductVersion
+    if ($innoVersion -lt [Version]"7.1.0") {
+        throw "Inno Setup 7.1.0 or newer required; found $innoVersion."
+    }
 
-    Write-Host "Creating installer..."
+    Write-Host "Creating installer with Inno Setup $innoVersion..."
     & $InnoSetupCompiler `
         "/DMyAppVersion=$Version" `
         "/DSourceDir=$publishDirectory" `

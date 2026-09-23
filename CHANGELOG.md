@@ -4,6 +4,29 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-09-23
+
+### Added
+
+- **Player and editor together:** Open a replay once to play it, browse other clips, choose a trim range and audio tracks, and save a copy or overwrite the original. The timeline, waveforms, and export actions stay available in the player.
+- **Export settings:** Choose output format, resolution, video codec, bitrate, and audio codec from the player when exporting a clip.
+
+### Improved
+
+- **Clip browsing:** The recent-replay list loads and updates more responsively, with clearer active-clip highlighting and previous/next navigation.
+- **Desktop capture:** Windows Graphics Capture preparation and monitor-source selection improve capture behavior on supported Windows systems.
+- **Media tools:** Updated FFmpeg and libmpv runtimes improve compatibility with demanding recordings; the application now uses .NET 10.
+- **Accent icons:** Window and shortcut icons follow the selected accent color.
+
+### Fixed
+
+- Fixed player controls and trim actions being separated across two windows.
+- Fixed several export format and audio-codec combinations that previously produced invalid output.
+
+### Known limitations
+
+- The original native crash reported for some AV1 clips has not been reproduced. Those clips may still show playback errors in libmpv; FFmpeg decoding alone does not establish a crash fix.
+
 ## [0.2.3] - 2026-09-06
 
 ### Added
