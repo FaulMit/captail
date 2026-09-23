@@ -243,6 +243,9 @@ internal static class ObsNative
     internal static extern void obs_source_remove(nint source);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_source_update(nint source, nint settings);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_source_inc_showing(nint source);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]

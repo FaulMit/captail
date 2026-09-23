@@ -26,8 +26,8 @@ function Get-Sha256Hash {
 }
 
 $ErrorActionPreference = "Stop"
-$version = "32.1.2"
-$expectedArchiveSha256 = "21cba22292985cf0da967d5c618999b40eaa32b73d2ab8b06154b5ea1b3d3798"
+$version = "32.2.2"
+$expectedArchiveSha256 = "f15f001f1fa526405318835f44f9910046502f496ebc3a30d5296a5018b831aa"
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $runtimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
 if (-not $Destination) {

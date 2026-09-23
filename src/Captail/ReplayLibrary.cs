@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -27,6 +28,8 @@ public sealed class ReplayLibrary
         StringComparer.OrdinalIgnoreCase);
     private readonly FfmpegAdapter _ffmpeg;
     private readonly string _thumbnailDirectory;
+    private readonly ConcurrentDictionary<ReplayCacheKey, ReplayClip> _clipCache = new();
+    private readonly SemaphoreSlim _timelineThumbnailGate = new(3, 3);
 
     public ReplayLibrary(FfmpegAdapter ffmpeg)
     {
@@ -108,6 +111,11 @@ public sealed class ReplayLibrary
             RecycleOption.SendToRecycleBin,
             UICancelOption.ThrowException);
         DeleteThumbnail(clip.ThumbnailPath);
+        foreach (ReplayCacheKey key in _clipCache.Keys)
+        {
+            if (string.Equals(key.Path, path, StringComparison.OrdinalIgnoreCase))
+                _clipCache.TryRemove(key, out _);
+        }
     }
 
     public async Task<string> TrimAsync(
@@ -170,6 +178,132 @@ public sealed class ReplayLibrary
             mergeAudioTracks,
             cancellationToken);
         return source;
+    }
+
+    public async Task<string> TrimAsync(
+        string rootDirectory,
+        ReplayClip clip,
+        TimeSpan start,
+        TimeSpan end,
+        IReadOnlyList<int>? audioStreamIndices,
+        VideoOutputSettings outputSettings,
+        CancellationToken cancellationToken = default)
+    {
+        if (!outputSettings.HasEncodingChanges)
+        {
+            return await TrimAsync(
+                rootDirectory,
+                clip,
+                start,
+                end,
+                audioStreamIndices,
+                mergeAudioTracks: false,
+                cancellationToken);
+        }
+
+        string source = ValidateClipPath(rootDirectory, clip.Path);
+        ValidateTrimRange(source, clip, start, end);
+        string directory = Path.GetDirectoryName(source)!;
+        string destination = UniquePath(
+            directory,
+            $"{Path.GetFileNameWithoutExtension(source)}_trimmed_{DateTime.Now:HH-mm-ss}",
+            Path.GetExtension(source));
+        await _ffmpeg.TranscodeAsync(
+            source,
+            destination,
+            start,
+            end,
+            audioStreamIndices,
+            outputSettings,
+            cancellationToken);
+        return destination;
+    }
+
+    public async Task<string> TrimOverwriteAsync(
+        string rootDirectory,
+        ReplayClip clip,
+        TimeSpan start,
+        TimeSpan end,
+        IReadOnlyList<int>? audioStreamIndices,
+        VideoOutputSettings outputSettings,
+        CancellationToken cancellationToken = default)
+    {
+        if (!outputSettings.HasEncodingChanges)
+        {
+            return await TrimOverwriteAsync(
+                rootDirectory,
+                clip,
+                start,
+                end,
+                audioStreamIndices,
+                mergeAudioTracks: false,
+                cancellationToken);
+        }
+
+        string source = ValidateClipPath(rootDirectory, clip.Path);
+        ValidateTrimRange(source, clip, start, end);
+        await _ffmpeg.TranscodeOverwriteAsync(
+            source,
+            start,
+            end,
+            audioStreamIndices,
+            outputSettings,
+            cancellationToken);
+        return source;
+    }
+
+    public async Task<string> ExportTranscodedAsync(
+        string rootDirectory,
+        ReplayClip clip,
+        string destinationPath,
+        TimeSpan start,
+        TimeSpan end,
+        IReadOnlyList<int>? audioStreamIndices = null,
+        VideoOutputSettings? outputSettings = null,
+        CancellationToken cancellationToken = default)
+    {
+        string source = ValidateClipPath(rootDirectory, clip.Path);
+        if (!File.Exists(source))
+            throw new FileNotFoundException("Replay no longer exists.", source);
+        if (start < TimeSpan.Zero ||
+            end > clip.Duration + TimeSpan.FromMilliseconds(250) ||
+            end <= start)
+        {
+            throw new ArgumentOutOfRangeException(nameof(start));
+        }
+
+        string destination = Path.GetFullPath(destinationPath);
+        if (string.Equals(source, destination, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Export destination must differ from the source replay.");
+        }
+
+        await _ffmpeg.TranscodeAsync(
+            source,
+            destination,
+            start,
+            end,
+            audioStreamIndices,
+            outputSettings,
+            cancellationToken);
+        return destination;
+    }
+
+    private static void ValidateTrimRange(
+        string source,
+        ReplayClip clip,
+        TimeSpan start,
+        TimeSpan end)
+    {
+        if (!File.Exists(source))
+            throw new FileNotFoundException("Replay no longer exists.", source);
+        if (start < TimeSpan.Zero ||
+            end > clip.Duration + TimeSpan.FromMilliseconds(250) ||
+            end <= start)
+        {
+            throw new ArgumentOutOfRangeException(nameof(start));
+        }
     }
 
     public Task<IReadOnlyList<AudioTrackInfo>> GetAudioTracksAsync(
@@ -241,6 +375,7 @@ public sealed class ReplayLibrary
         string rootDirectory,
         ReplayClip clip,
         int count,
+        Action<int, string>? thumbnailReady = null,
         CancellationToken cancellationToken = default)
     {
         string source = ValidateClipPath(rootDirectory, clip.Path);
@@ -249,25 +384,49 @@ public sealed class ReplayLibrary
 
         string identity = $"{source}|{clip.SizeBytes}|{clip.SavedAt.ToUniversalTime().Ticks}";
         string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
-        var thumbnails = new List<string>(count);
+        var thumbnails = new string[count];
+        var pending = new List<Task>(count);
         for (int index = 0; index < count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             string path = Path.Combine(
                 _thumbnailDirectory,
                 $"{hash}_timeline_{index}.jpg");
-            if (!File.Exists(path))
+            thumbnails[index] = path;
+            if (File.Exists(path))
             {
-                double fraction = (index + 0.5) / count;
-                await _ffmpeg.CreateThumbnailAtAsync(
-                    source,
-                    path,
-                    TimeSpan.FromSeconds(clip.Duration.TotalSeconds * fraction),
-                    cancellationToken);
+                thumbnailReady?.Invoke(index, path);
+                continue;
             }
-            thumbnails.Add(path);
+
+            int thumbnailIndex = index;
+            pending.Add(GenerateTimelineThumbnailAsync(thumbnailIndex, path));
         }
+
+        await Task.WhenAll(pending);
         return thumbnails;
+
+        async Task GenerateTimelineThumbnailAsync(int index, string path)
+        {
+            await _timelineThumbnailGate.WaitAsync(cancellationToken);
+            try
+            {
+                if (!File.Exists(path))
+                {
+                    double fraction = (index + 0.5) / count;
+                    await _ffmpeg.CreateThumbnailAtAsync(
+                        source,
+                        path,
+                        TimeSpan.FromSeconds(clip.Duration.TotalSeconds * fraction),
+                        cancellationToken);
+                }
+                thumbnailReady?.Invoke(index, path);
+            }
+            finally
+            {
+                _timelineThumbnailGate.Release();
+            }
+        }
     }
 
     public async Task<string?> GetPreviewThumbnailAsync(
@@ -300,6 +459,13 @@ public sealed class ReplayLibrary
         FileInfo file,
         CancellationToken cancellationToken)
     {
+        var cacheKey = new ReplayCacheKey(
+            file.FullName,
+            file.Length,
+            file.LastWriteTimeUtc.Ticks);
+        if (_clipCache.TryGetValue(cacheKey, out ReplayClip? cached))
+            return cached;
+
         TimeSpan duration = TimeSpan.Zero;
         string? thumbnail = null;
         if (_ffmpeg.IsAvailable)
@@ -325,7 +491,7 @@ public sealed class ReplayLibrary
         string? collection = Path.GetRelativePath(rootDirectory, file.DirectoryName!);
         if (collection == ".")
             collection = null;
-        return new ReplayClip(
+        var clip = new ReplayClip(
             file.FullName,
             file.Name,
             collection,
@@ -333,6 +499,8 @@ public sealed class ReplayLibrary
             file.Length,
             duration,
             thumbnail);
+        _clipCache[cacheKey] = clip;
+        return clip;
     }
 
     private string ThumbnailPath(FileInfo file)
@@ -357,6 +525,11 @@ public sealed class ReplayLibrary
         Path.GetFullPath(rootDirectory).TrimEnd(
             Path.DirectorySeparatorChar,
             Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+    private readonly record struct ReplayCacheKey(
+        string Path,
+        long SizeBytes,
+        long LastWriteTimeUtcTicks);
 
     internal static bool IsInternalWorkingFile(string path)
     {

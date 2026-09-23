@@ -16,6 +16,7 @@ function Require([string]$text, [string]$pattern, [string]$message) {
 
 $hotkeys = Read-Text "src\Captail\HotkeyManager.cs"
 $overlay = Read-Text "src\Captail\OverlayNotificationWindow.xaml.cs"
+$indicator = Read-Text "src\Captail\ReplayStatusIndicatorWindow.xaml.cs"
 $app = Read-Text "src\Captail\App.xaml.cs"
 
 Require $hotkeys 'WhKeyboardLl' `
@@ -37,6 +38,15 @@ Require $overlay 'MonitorFromWindow' `
     "Notification must use foreground game's monitor instead of primary monitor only."
 Require $overlay 'RunFullscreenOverlayQa' `
     "Overlay native styles and z-order maintenance need runtime QA."
+
+Require $indicator 'RunFullscreenIndicatorQa' `
+    "Recording indicator needs runtime coverage for fullscreen z-order loss."
+Require $indicator 'foregroundChanged[\s\S]{0,300}HwndTopmost' `
+    "Recording indicator must recover topmost z-order after foreground changes."
+Require $indicator 'IsCoveredByHigherWindow' `
+    "Recording indicator must recover from non-activating topmost windows."
+Require $app 'indicatorPassed' `
+    "Combined fullscreen QA must fail when recording indicator loses z-order."
 
 Require $app '--qa-fullscreen-input-overlay' `
     "Combined fullscreen hotkey/overlay QA entry point is missing."

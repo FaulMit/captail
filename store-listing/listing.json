@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "ReleaseVersion": "0.2.3",
+  "ReleaseVersion": "0.2.4",
   "Screenshots": [
     {
       "Source": "images/captail-main.png",
@@ -25,16 +25,12 @@
     {
       "Source": "images/captail-player.png",
       "FileName": "captail-player.png"
-    },
-    {
-      "Source": "images/captail-editor.png",
-      "FileName": "captail-editor.png"
     }
   ],
   "Listings": {
     "en-us": {
       "ShortDescription": "Lightweight instant replay and continuous recording for Windows with automatic capture recovery and a built-in clip player.",
-      "Description": "Captail is a lightweight, open-source game and desktop recorder for Windows. Use Instant Replay to keep the latest seconds or minutes in a rolling buffer and save them with a global hotkey, or switch to Recording and write a continuous file until you stop.\n\nCaptail focuses on capture without a large streaming interface. Desktop mode automatically switches to a detected game while it is active and returns to desktop capture after you Alt+Tab. Game Capture mode records games without recording the desktop.\n\nCapture interruptions do not silently disable recording. Captail monitors the pipeline and attempts automatic recovery after game exits, source loss, encoder problems, graphics-driver interruptions, and a hung capture shutdown. Protected content may appear black, but Captail is designed to recover normal capture afterward.\n\nChoose AV1, HEVC, or H.264 according to the hardware encoders available on your GPU. Captail supports 30 to 240 FPS, resolutions up to 4K, system or detected-game audio, microphone capture, separate audio tracks, per-application routing, volume controls, microphone boost, per-game folders, and configurable global hotkeys including F13-F24.\n\nBrowse saved clips inside Captail, filter them by game or capture mode, and delete one or several clips. The resizable built-in player supports clip navigation, volume controls, simultaneous multi-track preview, and fullscreen playback. Continue into the focused editor to trim a clip, select audio tracks, save a copy, or overwrite the original.\n\nChoose from five accent colors. Captail starts in the Windows notification area, can launch with Windows, and includes an optional capture-status indicator. Recordings and diagnostics stay local. Captail does not upload recorded video or personal data.",
+      "Description": "Captail is a lightweight, open-source game and desktop recorder for Windows. Use Instant Replay to keep the latest seconds or minutes in a rolling buffer and save them with a global hotkey, or switch to Recording and write a continuous file until you stop.\n\nCaptail focuses on capture without a large streaming interface. Desktop mode automatically switches to a detected game while it is active and returns to desktop capture after you Alt+Tab. Game Capture mode records games without recording the desktop.\n\nCapture interruptions do not silently disable recording. Captail monitors the pipeline and attempts automatic recovery after game exits, source loss, encoder problems, graphics-driver interruptions, and a hung capture shutdown. Protected content may appear black, but Captail is designed to recover normal capture afterward.\n\nChoose AV1, HEVC, or H.264 according to the hardware encoders available on your GPU. Captail supports 30 to 240 FPS, resolutions up to 4K, system or detected-game audio, microphone capture, separate audio tracks, per-application routing, volume controls, microphone boost, per-game folders, and configurable global hotkeys including F13-F24.\n\nBrowse saved clips inside Captail, filter them by game or capture mode, and delete one or several clips. The resizable built-in player supports clip navigation, volume controls, simultaneous multi-track preview, and fullscreen playback. Use the same player to trim a clip, select audio tracks, choose export settings, save a copy, or overwrite the original.\n\nChoose from five accent colors. Captail starts in the Windows notification area, can launch with Windows, and includes an optional capture-status indicator. Recordings and diagnostics stay local. Captail does not upload recorded video or personal data.",
       "Features": [
         "Rolling instant replay buffer up to 15 minutes",
         "Continuous game and desktop recording",
@@ -50,14 +46,14 @@
         "Recent replay library with fast built-in player",
         "Clip filters, multi-select deletion, and previous/next navigation",
         "Resizable fullscreen player with wheel and keyboard volume controls",
-        "Focused clip editor with trimming and audio-track selection",
+        "Combined player and editor with trimming, audio tracks, and export settings",
         "Automatic recording recovery after capture failures",
         "Optional replay-status indicator and game reminder",
         "Five selectable interface accent colors",
         "Per-game replay folders",
         "Eleven interface languages"
       ],
-      "ReleaseNotes": "Captail 0.2.3 adds continuous Recording alongside Instant Replay, five accent colors, F13-F24 hotkeys, and clip-library filters with multi-select deletion. The player is now resizable, supports previous/next clips, fullscreen playback, wheel and keyboard volume, and simultaneous multi-track audio. This update also improves HDR and high-frame-rate playback, stretches non-native game resolutions correctly, recovers from hung graphics-device shutdowns, keeps notifications above fullscreen games, and fixes external links, black screens when switching clips, and the light player border.",
+      "ReleaseNotes": "Captail 0.2.4 combines playback and trimming in one window, with the full timeline, audio tracks, and save actions always available. Export now offers format, resolution, video codec, bitrate, and audio codec settings. Clip browsing and active-clip highlighting are more responsive, accent colors carry through to window and shortcut icons, and updated media runtimes improve compatibility. Desktop capture preparation was also improved on supported Windows systems.",
       "Keywords": [
         "instant replay",
         "game recorder",
@@ -73,7 +69,7 @@
     },
     "ru-ru": {
       "ShortDescription": "Лёгкая программа мгновенных повторов и непрерывной записи для Windows с автовосстановлением и встроенным плеером.",
-      "Description": "Captail — лёгкая программа с открытым исходным кодом для записи игр и рабочего стола в Windows. Мгновенный повтор хранит последние секунды или минуты в циклическом буфере и сохраняет их по глобальной горячей клавише. Режим «Запись» пишет непрерывный файл, пока вы его не остановите.\n\nCaptail даёт удобный захват без громоздкого интерфейса для стриминга. Режим рабочего стола автоматически переключается на обнаруженную игру, пока она активна, и возвращается к рабочему столу после Alt+Tab. Game Capture записывает игры, но не записывает рабочий стол.\n\nСбой захвата не должен незаметно отключать запись. Captail следит за конвейером и пытается восстановить его после закрытия игры, потери источника, ошибки кодировщика, сбоя видеодрайвера или зависшего завершения захвата. Защищённый контент может отображаться чёрным, но Captail рассчитан на восстановление обычной записи после него.\n\nМожно выбрать AV1, HEVC или H.264 в зависимости от аппаратных кодировщиков видеокарты. Поддерживаются частота от 30 до 240 FPS, разрешение до 4K, системный звук или звук обнаруженной игры, микрофон, раздельные аудиодорожки, маршрутизация отдельных приложений, регулировка громкости, усиление микрофона, папки по играм и глобальные клавиши, включая F13-F24.\n\nПросматривайте сохранённые клипы в Captail, фильтруйте их по игре или режиму записи и удаляйте по одному или группой. Масштабируемый встроенный плеер поддерживает переход между клипами, регулировку громкости, одновременное воспроизведение всех выбранных дорожек и полноэкранный режим. Из плеера можно перейти в редактор, обрезать клип, выбрать дорожки, сохранить копию или перезаписать оригинал.\n\nДоступно пять акцентных цветов. Captail запускается в области уведомлений Windows, может стартовать вместе с системой и показывает необязательный индикатор захвата. Записи и диагностика остаются на компьютере. Captail не загружает видео или личные данные.",
+      "Description": "Captail — лёгкая программа с открытым исходным кодом для записи игр и рабочего стола в Windows. Мгновенный повтор хранит последние секунды или минуты в циклическом буфере и сохраняет их по глобальной горячей клавише. Режим «Запись» пишет непрерывный файл, пока вы его не остановите.\n\nCaptail даёт удобный захват без громоздкого интерфейса для стриминга. Режим рабочего стола автоматически переключается на обнаруженную игру, пока она активна, и возвращается к рабочему столу после Alt+Tab. Game Capture записывает игры, но не записывает рабочий стол.\n\nСбой захвата не должен незаметно отключать запись. Captail следит за конвейером и пытается восстановить его после закрытия игры, потери источника, ошибки кодировщика, сбоя видеодрайвера или зависшего завершения захвата. Защищённый контент может отображаться чёрным, но Captail рассчитан на восстановление обычной записи после него.\n\nМожно выбрать AV1, HEVC или H.264 в зависимости от аппаратных кодировщиков видеокарты. Поддерживаются частота от 30 до 240 FPS, разрешение до 4K, системный звук или звук обнаруженной игры, микрофон, раздельные аудиодорожки, маршрутизация отдельных приложений, регулировка громкости, усиление микрофона, папки по играм и глобальные клавиши, включая F13-F24.\n\nПросматривайте сохранённые клипы в Captail, фильтруйте их по игре или режиму записи и удаляйте по одному или группой. Масштабируемый встроенный плеер поддерживает переход между клипами, регулировку громкости, одновременное воспроизведение всех выбранных дорожек и полноэкранный режим. В этом же плеере можно обрезать клип, выбрать дорожки и параметры экспорта, сохранить копию или перезаписать оригинал.\n\nДоступно пять акцентных цветов. Captail запускается в области уведомлений Windows, может стартовать вместе с системой и показывает необязательный индикатор захвата. Записи и диагностика остаются на компьютере. Captail не загружает видео или личные данные.",
       "Features": [
         "Циклический буфер мгновенного повтора до 15 минут",
         "Непрерывная запись игр и рабочего стола",
@@ -89,14 +85,14 @@
         "Библиотека повторов с быстрым встроенным плеером",
         "Фильтры, групповое удаление и переход между клипами",
         "Масштабируемый полноэкранный плеер с управлением громкостью",
-        "Компактный редактор с обрезкой и выбором аудиодорожек",
+        "Плеер и редактор с обрезкой, выбором дорожек и настройками экспорта",
         "Автоматическое восстановление после сбоев захвата",
         "Индикатор состояния повтора и напоминание в игре",
         "Пять акцентных цветов интерфейса",
         "Раздельные папки для разных игр",
         "Одиннадцать языков интерфейса"
       ],
-      "ReleaseNotes": "В Captail 0.2.3 появились непрерывная запись рядом с мгновенным повтором, пять акцентных цветов, клавиши F13-F24 и фильтры библиотеки с групповым удалением. Плеер теперь меняет размер, переключает клипы, работает в полноэкранном режиме, регулирует громкость колёсиком и клавишами и воспроизводит все выбранные дорожки одновременно. Также улучшены HDR и тяжёлые записи с высокой частотой кадров, исправлены растянутые игровые разрешения, восстановление после зависания видеодрайвера, уведомления поверх полноэкранных игр, внешние ссылки, чёрный экран при смене клипа и светлая рамка плеера.",
+      "ReleaseNotes": "Captail 0.2.4 объединяет воспроизведение и обрезку в одном окне: шкала времени, аудиодорожки и сохранение всегда доступны. При экспорте можно выбрать формат, разрешение, видеокодек, битрейт и аудиокодек. Быстрее работает список клипов, заметнее выделяется воспроизводимый клип, значки окон и ярлыков соответствуют цвету интерфейса. Обновлены медиакомпоненты и подготовка захвата рабочего стола на поддерживаемых версиях Windows.",
       "Keywords": [
         "мгновенный повтор",
         "запись игр",

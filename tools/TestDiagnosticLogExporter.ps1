@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $assemblyPath = Join-Path $repoRoot `
-    "src\Captail\bin\Debug\net9.0-windows10.0.22621.0\win-x64\Captail.dll"
+    "src\Captail\bin\Debug\net10.0-windows10.0.22621.0\win-x64\Captail.dll"
 if (-not (Test-Path -LiteralPath $assemblyPath)) {
     throw "Build Captail before running diagnostic-log QA."
 }

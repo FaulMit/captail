@@ -27,6 +27,7 @@ internal enum ReplayIndicatorPlacement
 public partial class ReplayStatusIndicatorWindow : Window
 {
     private const int GwlExStyle = -20;
+    private const int WsExTopmost = 0x00000008;
     private const int WsExTransparent = 0x00000020;
     private const int WsExToolWindow = 0x00000080;
     private const int WsExNoActivate = 0x08000000;
@@ -35,6 +36,8 @@ public partial class ReplayStatusIndicatorWindow : Window
     private const uint MonitorDefaultToPrimary = 0x00000001;
     private const uint SwpNoZOrder = 0x0004;
     private const uint SwpNoActivate = 0x0010;
+    private const uint GwHwndPrev = 3;
+    private static readonly nint HwndTopmost = new(-1);
 
     private readonly DispatcherTimer _positionTimer;
     private readonly DispatcherTimer _captureAffinityTimer;
@@ -45,7 +48,9 @@ public partial class ReplayStatusIndicatorWindow : Window
     private bool _transientActive;
     private bool _allowClose;
     private bool _captureAffinityFailureLogged;
+    private bool _topmostFailureLogged;
     private uint? _captureAffinity;
+    private nint _lastPositionForegroundWindow;
     private uint _lastForegroundProcessId;
     private bool _lastForegroundIsScreenCapture;
     private bool _gameDetected;
@@ -163,6 +168,7 @@ public partial class ReplayStatusIndicatorWindow : Window
     {
         if (!IsVisible)
         {
+            _lastPositionForegroundWindow = 0;
             Opacity = 0;
             Show();
             BeginAnimation(
@@ -420,6 +426,9 @@ public partial class ReplayStatusIndicatorWindow : Window
             return;
 
         nint foreground = GetForegroundWindow();
+        bool foregroundChanged =
+            foreground != 0 && foreground != _lastPositionForegroundWindow;
+        _lastPositionForegroundWindow = foreground;
         nint monitor = MonitorFromWindow(
             foreground != 0 ? foreground : hwnd,
             MonitorDefaultToPrimary);
@@ -447,17 +456,100 @@ public partial class ReplayStatusIndicatorWindow : Window
         int top = placeBottom
             ? bounds.Bottom - size - inset
             : bounds.Top + inset;
-        // Preserve current topmost-band order. Raising the window on every
-        // timer tick would cover newer system overlays such as Snipping Tool.
-        SetWindowPos(
+        // A fullscreen/topmost app can enter the z-order after Captail and
+        // cover this window while it still has WS_EX_TOPMOST. Reassert the
+        // native topmost position only after a foreground transition or when
+        // another app fully covers it. Screen capture tools stay above the
+        // indicator and can capture it for QA.
+        bool screenCaptureForeground = IsScreenCaptureForeground();
+        bool raiseAboveForeground =
+            !screenCaptureForeground &&
+            (foregroundChanged || IsCoveredByHigherWindow(hwnd));
+        bool positioned = SetWindowPos(
             hwnd,
-            0,
+            raiseAboveForeground ? HwndTopmost : 0,
             left,
             top,
             size,
             size,
-            SwpNoActivate | SwpNoZOrder);
+            SwpNoActivate |
+            (raiseAboveForeground ? 0 : SwpNoZOrder));
+        if (!positioned && raiseAboveForeground && !_topmostFailureLogged)
+        {
+            _topmostFailureLogged = true;
+            Log.Write(
+                $"Could not raise recording indicator above foreground window: " +
+                $"Win32 error {Marshal.GetLastWin32Error()}.");
+        }
     }
+
+    private static bool IsCoveredByHigherWindow(nint hwnd)
+    {
+        if (!GetWindowRect(hwnd, out Rect indicatorBounds))
+            return false;
+
+        for (nint current = GetWindow(hwnd, GwHwndPrev);
+             current != 0;
+             current = GetWindow(current, GwHwndPrev))
+        {
+            _ = GetWindowThreadProcessId(current, out uint processId);
+            if (processId == Environment.ProcessId ||
+                !IsWindowVisible(current) ||
+                !GetWindowRect(current, out Rect bounds))
+            {
+                continue;
+            }
+
+            if (bounds.Left <= indicatorBounds.Left &&
+                bounds.Top <= indicatorBounds.Top &&
+                bounds.Right >= indicatorBounds.Right &&
+                bounds.Bottom >= indicatorBounds.Bottom)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+#if DEBUG
+    internal bool RunFullscreenIndicatorQa(
+        nint fullscreenWindow,
+        out string details)
+    {
+        // Foreground activation can be denied to an unattended QA process.
+        // Invalidate only the cached HWND so this call deterministically
+        // exercises the same foreground-transition path as the timer.
+        _lastPositionForegroundWindow = 0;
+        PositionOnForegroundMonitor();
+        nint hwnd = new WindowInteropHelper(this).Handle;
+        int styles = GetWindowLong(hwnd, GwlExStyle);
+        bool aboveFullscreen = IsWindowAbove(hwnd, fullscreenWindow);
+        bool passed = hwnd != 0 &&
+                      (styles & WsExTopmost) != 0 &&
+                      (styles & WsExTransparent) != 0 &&
+                      (styles & WsExNoActivate) != 0 &&
+                      _positionTimer.IsEnabled &&
+                      aboveFullscreen;
+        details = $"hwnd={hwnd != 0}, topmost={(styles & WsExTopmost) != 0}, " +
+                  $"transparent={(styles & WsExTransparent) != 0}, " +
+                  $"noActivate={(styles & WsExNoActivate) != 0}, " +
+                  $"timer={_positionTimer.IsEnabled}, " +
+                  $"aboveFullscreen={aboveFullscreen}";
+        return passed;
+    }
+
+    private static bool IsWindowAbove(nint candidate, nint reference)
+    {
+        for (nint current = GetWindow(reference, GwHwndPrev);
+             current != 0;
+             current = GetWindow(current, GwHwndPrev))
+        {
+            if (current == candidate)
+                return true;
+        }
+        return false;
+    }
+#endif
 
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect
@@ -499,6 +591,14 @@ public partial class ReplayStatusIndicatorWindow : Window
     private static extern bool GetMonitorInfo(nint monitor, ref MonitorInfo info);
 
     [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(nint hwnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(nint hwnd, out Rect rect);
+
+    [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(nint hwnd);
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -515,4 +615,7 @@ public partial class ReplayStatusIndicatorWindow : Window
         int width,
         int height,
         uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetWindow(nint hwnd, uint command);
 }

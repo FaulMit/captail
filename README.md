@@ -30,18 +30,15 @@
 Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It can keep the latest seconds or minutes in a rolling buffer or write a continuous recording until you stop it. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
 
 > [!WARNING]
-> Captail `v0.2.3` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+> Captail `v0.2.4` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
 
-## What's new in Captail 0.2.3?
+## What's new in Captail 0.2.4?
 
-- Switch between the default Instant Replay workflow and continuous Recording directly from the main dashboard.
-- Resize the replay player, browse and filter the complete clip library, move between recordings, delete one or several clips, and use a true fullscreen view with auto-hiding controls.
-- Control preview volume with the mouse wheel, slider, or keyboard while hearing every selected audio track together.
-- Choose mint, blue, violet, rose, or amber as Captail's accent color.
-- Use F13-F24 hotkeys and see Captail notifications over fullscreen applications on the active monitor.
-- Recover automatically after a hung graphics-device shutdown and preview demanding HEVC or AV1 recordings more smoothly under load.
-- Record stretched non-native game resolutions correctly and avoid black HDR Game Capture output through explicit tone mapping.
-- Open GitHub, bug-report, and feature-request links reliably from both Portable and Microsoft Store builds.
+- Play and trim clips in one window, with the complete timeline, audio tracks, and save actions always available.
+- Export clips with a chosen format, resolution, video codec, bitrate, and audio codec.
+- Browse recent clips more smoothly and see which clip is currently playing.
+- Use window and shortcut icons that match your chosen accent color.
+- Benefit from updated media runtimes and improved desktop-capture preparation on supported systems.
 
 ## Is Captail for me?
 
@@ -78,11 +75,7 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 </p>
 
 <p align="center">
-  <img src="docs/captail-player.png" alt="Captail replay player showing a real AV1 4K 240 FPS replay with seek, playback, trim, and fullscreen controls" width="820">
-</p>
-
-<p align="center">
-  <img src="docs/captail-editor.png" alt="Captail clip editor showing AV1 3840 by 2160 video at 240 FPS, trim timeline, and separate system and microphone audio tracks" width="820">
+  <img src="docs/captail-player.png" alt="Captail player and editor showing a real AV1 4K 240 FPS replay, trim timeline, audio tracks, output settings, and save actions" width="820">
 </p>
 
 ## How do I install it?
@@ -208,7 +201,7 @@ Yes. The main window lists supported files from the selected replay folder in a 
 
 - Open a replay in File Explorer.
 - Move it to the Recycle Bin after confirmation.
-- Play it immediately without entering edit mode.
+- Play and edit it in the same window.
 - Seek, pause, use fullscreen, and change playback speed from `0.25×` to `2×` with the keyboard.
 - Scrub through a responsive preview.
 - Select one trim range with draggable handles.
@@ -294,7 +287,7 @@ Have an improvement rather than a bug? Open **About → Feature** to use Captail
 
 ## How do I build or contribute?
 
-Development requires Windows 10/11 x64, .NET 9 SDK, CMake 3.20+, and Visual Studio 2022 Build Tools with **Desktop development with C++**.
+Development requires Windows 10/11 x64, .NET 10 SDK, CMake 3.20+, and Visual Studio 2022 Build Tools with **Desktop development with C++**.
 
 ```powershell
 git clone https://github.com/FaulMit/captail.git

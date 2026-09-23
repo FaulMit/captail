@@ -6,7 +6,7 @@ param(
 
 $root = [IO.Path]::GetFullPath($ProjectRoot)
 $exe = Join-Path $root `
-    'src\Captail\bin\Debug\net9.0-windows10.0.22621.0\win-x64\Captail.exe'
+    'src\Captail\bin\Debug\net10.0-windows10.0.22621.0\win-x64\Captail.exe'
 $logPath = Join-Path $env:LOCALAPPDATA 'Captail\log.txt'
 
 if (-not (Test-Path -LiteralPath $exe)) {

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows10.0.22621.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PlatformTarget>x64</PlatformTarget>
@@ -15,24 +15,23 @@
     <RootNamespace>Captail</RootNamespace>
     <ApplicationIcon>Assets\Captail.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.3</Version>
+    <Version>0.2.4</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <DefineConstants Condition="'$(MicrosoftStoreBuild)' == 'true'">$(DefineConstants);MICROSOFT_STORE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="NAudio" Version="2.3.0" />
-    <PackageReference Include="Endpne.LibMPV.Windows" Version="0.41.0"
-                      GeneratePathProperty="true" />
-    <!-- 2.4.x currently publishes .NET Framework-only assets; keep last
-         compatible modern-WPF build until upstream restores net targets. -->
-    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.1.4" />
-    <PackageReference Include="System.Drawing.Common" Version="10.0.10" />
+    <PackageReference Include="H.NotifyIcon.Wpf" Version="2.4.1" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Assets\Captail.ico" />
+    <Resource Include="Assets\CaptailAmber.ico" />
+    <Resource Include="Assets\CaptailBlue.ico" />
     <Resource Include="Assets\CaptailInactive.ico" />
+    <Resource Include="Assets\CaptailRose.ico" />
+    <Resource Include="Assets\CaptailViolet.ico" />
     <EmbeddedResource Include="Assets\GameCatalog.json"
                       LogicalName="Captail.Assets.GameCatalog.json" />
     <Content Include="..\..\LICENSE" Link="LICENSE">
@@ -50,8 +49,10 @@
 
   <PropertyGroup>
     <ObsRuntimeRoot>$(MSBuildProjectDirectory)\..\..\runtime\obs</ObsRuntimeRoot>
+    <MpvRuntimeRoot>$(MSBuildProjectDirectory)\..\..\runtime\mpv</MpvRuntimeRoot>
     <FfmpegRuntimeRoot>$(MSBuildProjectDirectory)\..\..\runtime\ffmpeg</FfmpegRuntimeRoot>
     <AcquireObsRuntimeOnBuild Condition="'$(AcquireObsRuntimeOnBuild)' == ''">true</AcquireObsRuntimeOnBuild>
+    <AcquireMpvRuntimeOnBuild Condition="'$(AcquireMpvRuntimeOnBuild)' == ''">true</AcquireMpvRuntimeOnBuild>
     <AcquireFfmpegRuntimeOnBuild Condition="'$(AcquireFfmpegRuntimeOnBuild)' == ''">true</AcquireFfmpegRuntimeOnBuild>
     <ObsBridgeSource>$(MSBuildProjectDirectory)\..\..\native\ObsBridge</ObsBridgeSource>
     <NativeBuildSuffix Condition="'$(NativeBuildSuffix)' == ''"></NativeBuildSuffix>
@@ -60,18 +61,22 @@
     <ProcessAudioSource>$(MSBuildProjectDirectory)\..\..\native\ProcessAudio</ProcessAudioSource>
     <ProcessAudioBuild>$(ProcessAudioSource)\build$(NativeBuildSuffix)</ProcessAudioBuild>
     <NativeCmakeGenerator Condition="'$(NativeCmakeGenerator)' == ''">Visual Studio 17 2022</NativeCmakeGenerator>
-    <MpvWindowsX64Enabled>false</MpvWindowsX64Enabled>
-    <MpvWindowsArm64Enabled>false</MpvWindowsArm64Enabled>
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="$(PkgEndpne_LibMPV_Windows)\build\x64\libmpv-2.dll"
+    <Content Include="$(MpvRuntimeRoot)\libmpv-2.dll"
              Link="libmpv-2.dll">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
+
+  <Target Name="AcquireMpvRuntime"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(AcquireMpvRuntimeOnBuild)' == 'true' and !Exists('$(MpvRuntimeRoot)\libmpv-2.dll')">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\tools\AcquireMpvRuntime.ps1&quot;" />
+  </Target>
 
   <Target Name="AcquireObsRuntime"
           BeforeTargets="PrepareForBuild"

@@ -38,7 +38,7 @@ $editorXaml = Read-Text "src\Captail\ClipEditorWindow.xaml"
 
 Assert-NotContains $app '_activeTrayIcon|_inactiveTrayIcon' `
     "Tray icons must not be reused after TaskbarIcon disposes replaced instances."
-Assert-Contains $app 'CreateIcon\(\s*active\s*\?\s*"Captail\.ico"\s*:\s*"CaptailInactive\.ico"\)' `
+Assert-Contains $app 'CreateIcon\(\s*active\s*\?[\s\S]{0,160}ThemeManager\.IconAssetName[\s\S]{0,160}:\s*"CaptailInactive\.ico"\)' `
     "Tray state changes must assign a fresh icon instance."
 Assert-Contains $app '--qa-replay-toggle' `
     "Native replay stop/start needs an unattended regression loop."

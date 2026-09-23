@@ -41,11 +41,12 @@ public partial class ClipEditorWindow : Window
     private readonly Action<string> _onSaved;
     private readonly Action<int>? _onVolumeChanged;
     private readonly CancellationTokenSource _lifetimeCts = new();
+    private CancellationTokenSource? _timelineLoadCts;
     private readonly DispatcherTimer _playbackTimer;
     private readonly DispatcherTimer _fullscreenUiTimer;
     private readonly DispatcherTimer _speedFeedbackTimer;
     private readonly DispatcherTimer _volumePersistTimer;
-    private readonly List<BitmapImage> _timelineImages = [];
+    private readonly ObservableCollection<BitmapImage?> _timelineImages = [];
     private double _selectionStart;
     private double _selectionEnd;
     private double _playbackPosition;
@@ -70,13 +71,13 @@ public partial class ClipEditorWindow : Window
     private DateTime _lastPointerActivityUtc;
     private VideoStreamInfo? _videoInfo;
     private bool _previewMode;
-    private bool _editorAssetsStarted;
     private int _playbackSpeedIndex = 3;
     private int _playbackVolumePercent;
     private bool _updatingVolumeSlider;
     private bool _volumePersistPending;
     private DateTime? _bufferingSinceUtc;
     private int _currentReplayIndex = -1;
+    private int _replayLoadVersion;
     private RecentReplayEntry[] _pendingDeleteReplays = [];
     private readonly List<RecentReplayEntry> _allReplayItems = [];
     private bool _updatingReplayFilters;
@@ -89,9 +90,11 @@ public partial class ClipEditorWindow : Window
     private bool _interactiveResizePlayerVisible;
     private bool _resumeAfterInteractiveResize;
     private Visibility _imageVisibilityBeforeInteractiveResize = Visibility.Visible;
+    private bool _outputSettingsInitialized;
 
     public ObservableCollection<AudioTrackRow> AudioTracks { get; } = [];
     public ObservableCollection<RecentReplayEntry> RecentReplayItems { get; } = [];
+    public bool HasDeletedReplays { get; private set; }
 
     public ClipEditorWindow(
         ReplayLibrary library,
@@ -114,6 +117,7 @@ public partial class ClipEditorWindow : Window
         InitializeComponent();
         PreviewPlayer.NativeMouseWheel += PreviewPlayer_NativeMouseWheel;
         PreviewPlayer.NativeMouseLeftButton += PreviewPlayer_NativeMouseLeftButton;
+        EditorVolumeSlider.Value = _playbackVolumePercent;
         PreviewVolumeSlider.Value = _playbackVolumePercent;
         _updatingVolumeSlider = false;
         DataContext = this;
@@ -137,8 +141,12 @@ public partial class ClipEditorWindow : Window
         _volumePersistTimer.Tick += (_, _) => PersistPlaybackVolumeNow();
         Loaded += async (_, _) => await LoadEditorAsync();
         SourceInitialized += Window_SourceInitialized;
+        StateChanged += (_, _) => ClosePopupsWhenHidden();
+        IsVisibleChanged += (_, _) => ClosePopupsWhenHidden();
         Closed += (_, _) =>
         {
+            if (Owner is not null)
+                Owner.StateChanged -= Owner_StateChanged;
             _playbackTimer.Stop();
             _fullscreenUiTimer.Stop();
             _speedFeedbackTimer.Stop();
@@ -161,15 +169,14 @@ public partial class ClipEditorWindow : Window
             ? LoadRecentReplaysAsync()
             : Task.CompletedTask;
         Task videoInfoTask = LoadVideoInfoAsync();
-        Task timelineTask = _previewMode
-            ? Task.CompletedTask
-            : LoadTimelineThumbnailsAsync();
-        _editorAssetsStarted = !_previewMode;
-        await LoadAudioTracksAsync(loadWaveforms: !_previewMode);
+        _ = LoadTimelineThumbnailsAsync();
+        await LoadAudioTracksAsync(loadWaveforms: true);
         await InitializePreviewAsync();
         if (_previewMode && PreviewPlayer.IsReady)
             await StartPlaybackAsync(_selectionStart);
-        await Task.WhenAll(timelineTask, videoInfoTask, recentTask);
+        await videoInfoTask;
+        InitializeOutputSettings();
+        await recentTask;
     }
 
     private async Task LoadRecentReplaysAsync()
@@ -257,13 +264,15 @@ public partial class ClipEditorWindow : Window
 
     private async Task LoadReplayAsync(ReplayClip clip)
     {
-        if (!_previewMode || _playerLoading ||
+        if (_playerLoading ||
             string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
+        int replayLoadVersion = ++_replayLoadVersion;
         _playerLoading = true;
+        SetReplayNavigationButtonsEnabled(false, false);
         PlayButton.IsEnabled = false;
         PreviewPlayButton.IsEnabled = false;
         try
@@ -285,8 +294,13 @@ public partial class ClipEditorWindow : Window
                 : null;
             PreviewImage.Visibility = Visibility.Visible;
             PreviewLoadingOverlay.Visibility = Visibility.Visible;
+            _timelineImages.Clear();
+            TimelineFrames.ItemsSource = null;
+            _outputSettingsInitialized = false;
+            OutputSettingsButton.IsEnabled = false;
+            OutputSettingsPopup.IsOpen = false;
             AudioTracks.Clear();
-            await LoadAudioTracksAsync(loadWaveforms: false);
+            await LoadAudioTracksAsync(loadWaveforms: true);
             await LoadPreviewPlayerAsync(clip, TimeSpan.Zero);
             PreviewPlayer.SetPlaybackSpeed(PlaybackSpeeds[_playbackSpeedIndex]);
             PreviewImage.Visibility = Visibility.Collapsed;
@@ -297,8 +311,7 @@ public partial class ClipEditorWindow : Window
             _playbackTimer.Start();
             UpdateRangeText();
             UpdatePlayIcon();
-            await LoadVideoInfoAsync();
-            UpdateReplayNavigationState();
+            _ = CompleteReplayEnrichmentAsync(clip, replayLoadVersion);
         }
         catch (Exception exception)
         {
@@ -311,36 +324,69 @@ public partial class ClipEditorWindow : Window
             _playerLoading = false;
             PlayButton.IsEnabled = PreviewPlayer.IsReady;
             PreviewPlayButton.IsEnabled = PreviewPlayer.IsReady;
+            UpdateReplayNavigationState();
         }
     }
+
+    private async Task CompleteReplayEnrichmentAsync(
+        ReplayClip clip,
+        int replayLoadVersion)
+    {
+        Task videoInfoTask = LoadVideoInfoAsync(clip, replayLoadVersion);
+        _ = LoadTimelineThumbnailsAsync(clip, replayLoadVersion);
+        await videoInfoTask;
+        if (IsCurrentReplayLoad(clip, replayLoadVersion))
+            InitializeOutputSettings();
+    }
+
+    private bool IsCurrentReplayLoad(ReplayClip clip, int replayLoadVersion) =>
+        replayLoadVersion == _replayLoadVersion &&
+        string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase);
 
     private void UpdateReplayNavigationState()
     {
-        _currentReplayIndex = RecentReplayItems
-            .Select((item, index) => (item, index))
-            .FirstOrDefault(pair => string.Equals(
-                pair.item.Clip.Path,
-                _clip.Path,
-                StringComparison.OrdinalIgnoreCase))
-            .index;
-        if (RecentReplayItems.Count == 0 ||
-            !RecentReplayItems.Any(item => string.Equals(
+        foreach (RecentReplayEntry item in _allReplayItems)
+        {
+            item.IsActive = string.Equals(
                 item.Clip.Path,
                 _clip.Path,
-                StringComparison.OrdinalIgnoreCase)))
+                StringComparison.OrdinalIgnoreCase);
+        }
+        _currentReplayIndex = RecentReplayItems
+            .Select((item, index) => (item, index))
+            .FirstOrDefault(pair => pair.item.IsActive)
+            .index;
+        if (RecentReplayItems.Count == 0 ||
+            !RecentReplayItems.Any(item => item.IsActive))
         {
             _currentReplayIndex = -1;
         }
-        PreviousReplayButton.IsEnabled =
+        bool canNavigatePrevious = _currentReplayIndex > 0;
+        bool canNavigateNext =
             _currentReplayIndex >= 0 &&
             _currentReplayIndex < RecentReplayItems.Count - 1;
-        NextReplayButton.IsEnabled = _currentReplayIndex > 0;
-        RecentReplayList.SelectedItem = _currentReplayIndex >= 0
-            ? RecentReplayItems[_currentReplayIndex]
-            : null;
+        SetReplayNavigationButtonsEnabled(canNavigatePrevious, canNavigateNext);
+        RecentReplayList.UnselectAll();
+    }
+
+    private void SetReplayNavigationButtonsEnabled(
+        bool previousEnabled,
+        bool nextEnabled)
+    {
+        PreviousReplayButton.IsEnabled = previousEnabled;
+        EditorPreviousReplayButton.IsEnabled = previousEnabled;
+        NextReplayButton.IsEnabled = nextEnabled;
+        EditorNextReplayButton.IsEnabled = nextEnabled;
     }
 
     private async void PreviousReplay_Click(object sender, RoutedEventArgs e)
+    {
+        if (_deletingReplays || _currentReplayIndex <= 0)
+            return;
+        await LoadReplayAsync(RecentReplayItems[_currentReplayIndex - 1].Clip);
+    }
+
+    private async void NextReplay_Click(object sender, RoutedEventArgs e)
     {
         if (_deletingReplays || _currentReplayIndex < 0 ||
             _currentReplayIndex >= RecentReplayItems.Count - 1)
@@ -350,13 +396,6 @@ public partial class ClipEditorWindow : Window
         await LoadReplayAsync(RecentReplayItems[_currentReplayIndex + 1].Clip);
     }
 
-    private async void NextReplay_Click(object sender, RoutedEventArgs e)
-    {
-        if (_deletingReplays || _currentReplayIndex <= 0)
-            return;
-        await LoadReplayAsync(RecentReplayItems[_currentReplayIndex - 1].Clip);
-    }
-
     private async void RecentReplay_Click(object sender, RoutedEventArgs e)
     {
         if (_deletingReplays || DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
@@ -364,7 +403,15 @@ public partial class ClipEditorWindow : Window
         if (((FrameworkElement)sender).DataContext is RecentReplayEntry entry)
         {
             if (string.Equals(entry.Clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase))
-                await TogglePlaybackAsync();
+            {
+                if (!_playing)
+                {
+                    double start = CurrentPlaybackPosition() >= _selectionEnd - 0.05
+                        ? _selectionStart
+                        : CurrentPlaybackPosition();
+                    await StartPlaybackAsync(start);
+                }
+            }
             else
                 await LoadReplayAsync(entry.Clip);
         }
@@ -457,6 +504,7 @@ public partial class ClipEditorWindow : Window
                 await Task.Run(
                     () => _library.DeleteToRecycleBin(_rootDirectory, entry.Clip),
                     _lifetimeCts.Token);
+                HasDeletedReplays = true;
                 _allReplayItems.Remove(entry);
                 RecentReplayItems.Remove(entry);
             }
@@ -562,28 +610,17 @@ public partial class ClipEditorWindow : Window
             _previewMode ? "L.Library.PreviewTitle" : "L.Library.TrimTitle");
         Title = HeaderTitleText.Text;
 
-        TimelineEditorPanel.Visibility = _previewMode
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-        EditorActionsPanel.Visibility = _previewMode
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-        PreviewModePanel.Visibility = _previewMode
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        TimelineEditorPanel.Visibility = Visibility.Visible;
+        EditorActionsPanel.Visibility = Visibility.Visible;
+        PreviewModePanel.Visibility = Visibility.Collapsed;
         RecentReplaySidebar.Visibility = _previewMode && !_isFullscreen
             ? Visibility.Visible
             : Visibility.Collapsed;
-        NormalPlaybackBar.Visibility = _previewMode
-            ? Visibility.Collapsed
-            : Visibility.Visible;
-        TimelineRow.Height = _previewMode
-            ? GridLength.Auto
-            : new GridLength(1, GridUnitType.Star);
-        ActionsRow.Height = _previewMode ? new GridLength(0) : GridLength.Auto;
-        PreviewRow.Height = _previewMode
-            ? new GridLength(1, GridUnitType.Star)
-            : new GridLength(390);
+        NormalPlaybackBar.Visibility = Visibility.Visible;
+        TimelineRow.Height = GridLength.Auto;
+        ActionsRow.Height = GridLength.Auto;
+        PreviewRow.Height = new GridLength(1, GridUnitType.Star);
+        UpdateAudioTrackViewport();
 
         if (!adjustWindow)
             return;
@@ -591,10 +628,9 @@ public partial class ClipEditorWindow : Window
             AudioTracks.Count,
             BaseVisibleAudioTracks,
             MaximumVisibleAudioTracks);
-        double preferredHeight = _previewMode
-            ? 736
-            : TrimWindowBaseHeight +
-              (visibleAudioTracks - BaseVisibleAudioTracks) * AudioTrackRowHeight;
+        double preferredHeight = TrimWindowBaseHeight +
+                                 (visibleAudioTracks - BaseVisibleAudioTracks) *
+                                 AudioTrackRowHeight;
         Rect workArea = IsLoaded ? CurrentMonitorWorkArea() : SystemParameters.WorkArea;
         double targetHeight = Math.Min(
             preferredHeight,
@@ -622,38 +658,24 @@ public partial class ClipEditorWindow : Window
         });
     }
 
-    private void EnterTrimMode_Click(object sender, RoutedEventArgs e)
+    private async Task LoadVideoInfoAsync(
+        ReplayClip? requestedClip = null,
+        int? replayLoadVersion = null)
     {
-        if (!_previewMode)
-            return;
-        _previewMode = false;
-        ApplyWindowModeLayout(adjustWindow: true);
-        BeginEditorAssetsLoad();
-    }
-
-    private void BeginEditorAssetsLoad()
-    {
-        if (_editorAssetsStarted)
-            return;
-        _editorAssetsStarted = true;
-        _ = LoadEditorAssetsAsync();
-    }
-
-    private async Task LoadEditorAssetsAsync()
-    {
-        await Task.WhenAll(
-            LoadTimelineThumbnailsAsync(),
-            Task.WhenAll(AudioTracks.Select(LoadWaveformAsync)));
-    }
-
-    private async Task LoadVideoInfoAsync()
-    {
+        ReplayClip clip = requestedClip ?? _clip;
         try
         {
-            _videoInfo = await _library.GetVideoInfoAsync(
+            VideoStreamInfo? videoInfo = await _library.GetVideoInfoAsync(
                 _rootDirectory,
-                _clip,
+                clip,
                 _lifetimeCts.Token);
+            if (!string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase) ||
+                (replayLoadVersion.HasValue &&
+                 !IsCurrentReplayLoad(clip, replayLoadVersion.Value)))
+            {
+                return;
+            }
+            _videoInfo = videoInfo;
             UpdateClipInfoText();
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
@@ -668,6 +690,82 @@ public partial class ClipEditorWindow : Window
     }
 
 #if DEBUG
+    internal async Task<(bool Passed, string Details)> RunResponsivePlayerQaAsync()
+    {
+        DateTime readyDeadline = DateTime.UtcNow.AddSeconds(12);
+        while ((_playerLoading || AudioTracks.Count < 3) &&
+               DateTime.UtcNow < readyDeadline)
+        {
+            await Task.Delay(50, _lifetimeCts.Token);
+        }
+        if (AudioTracks.Count < 3)
+            return (false, $"expected three audio tracks, got {AudioTracks.Count}");
+
+        async Task<(double Preview, double Audio, double TimelineBottom,
+            double ActionsTop, double ActionsBottom, double Workspace,
+            double ActionLeft, double ActionRight, double PlaybackOptionsLeft,
+            double TransportRight, double WorkspaceWidth)> MeasureAsync(
+            double width, double height)
+        {
+            Width = width;
+            Height = height;
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            EditorWorkspace.UpdateLayout();
+            return (
+                PreviewBorder.ActualHeight,
+                AudioTrackScrollViewer.ActualHeight,
+                TimelineEditorPanel.TranslatePoint(
+                    new Point(0, TimelineEditorPanel.ActualHeight), EditorWorkspace).Y,
+                EditorActionsPanel.TranslatePoint(new Point(), EditorWorkspace).Y,
+                EditorActionsPanel.TranslatePoint(
+                    new Point(0, EditorActionsPanel.ActualHeight), EditorWorkspace).Y,
+                EditorWorkspace.ActualHeight,
+                EditorActionButtons.TranslatePoint(new Point(), EditorWorkspace).X,
+                EditorActionButtons.TranslatePoint(
+                    new Point(EditorActionButtons.ActualWidth, 0), EditorWorkspace).X,
+                EditorPlaybackOptions.TranslatePoint(new Point(), EditorWorkspace).X,
+                EditorTransportControls.TranslatePoint(
+                    new Point(EditorTransportControls.ActualWidth, 0), EditorWorkspace).X,
+                EditorWorkspace.ActualWidth);
+        }
+
+        var compact = await MeasureAsync(760, 556);
+        CaptureVisualToPng(Path.Combine(
+            Path.GetTempPath(), "Captail", "responsive-player-compact-qa.png"));
+        var normal = await MeasureAsync(1120, 790);
+        var expanded = await MeasureAsync(1552, 1026);
+        CaptureVisualToPng(Path.Combine(
+            Path.GetTempPath(), "Captail", "responsive-player-expanded-qa.png"));
+        bool compactFits = compact.Preview >= 150 &&
+                           compact.TimelineBottom <= compact.ActionsTop + 1 &&
+                           compact.ActionsBottom <= compact.Workspace + 1 &&
+                           compact.Audio <= AudioTrackRowHeight + 1 &&
+                           compact.ActionLeft >= -1 &&
+                           compact.ActionRight <= compact.WorkspaceWidth + 1 &&
+                           compact.PlaybackOptionsLeft >= compact.TransportRight - 1;
+        bool grows = normal.Preview > compact.Preview + 100 &&
+                     expanded.Preview > normal.Preview + 140;
+
+        EnterFullscreen();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        ExitFullscreen();
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool restored = PreviewRow.Height.IsStar && TimelineRow.Height.IsAuto &&
+                        PreviewBorder.ActualHeight > normal.Preview + 140;
+        bool passed = compactFits && grows && restored;
+        string details =
+            $"preview={compact.Preview:0}/{normal.Preview:0}/{expanded.Preview:0}, " +
+            $"compactAudio={compact.Audio:0}, " +
+            $"compactBounds={compact.TimelineBottom:0}/{compact.ActionsTop:0}/" +
+            $"{compact.ActionsBottom:0}/{compact.Workspace:0}, " +
+            $"compactActions={compact.ActionLeft:0}..{compact.ActionRight:0}/" +
+            $"{compact.WorkspaceWidth:0}, " +
+            $"compactPlayback={compact.TransportRight:0}/" +
+            $"{compact.PlaybackOptionsLeft:0}, " +
+            $"compactFits={compactFits}, grows={grows}, fullscreenRestore={restored}";
+        return (passed, details);
+    }
+
     internal async Task<(bool Passed, string Details)> RunReplayNavigationQaAsync()
     {
         DateTime readyDeadline = DateTime.UtcNow.AddSeconds(12);
@@ -689,11 +787,13 @@ public partial class ClipEditorWindow : Window
         bool allClipsPassed = RecentReplayItems.Count >= 13;
         bool initialVolumePassed = _playbackVolumePercent == 64 &&
                                    PreviewPlayer.VolumePercent == 64 &&
+                                   Math.Abs(EditorVolumeSlider.Value - 64) < 0.1 &&
                                    Math.Abs(PreviewVolumeSlider.Value - 64) < 0.1;
         PreviewVolumeSlider.Value = 73;
         await Task.Delay(500, _lifetimeCts.Token);
         bool sliderVolumePassed = _playbackVolumePercent == 73 &&
-                                  PreviewPlayer.VolumePercent == 73;
+                                  PreviewPlayer.VolumePercent == 73 &&
+                                  Math.Abs(EditorVolumeSlider.Value - 73) < 0.1;
 
         int volumeBefore = PreviewPlayer.VolumePercent;
         PreviewPlayer.RaiseNativeMouseWheelForQa(-120);
@@ -702,6 +802,74 @@ public partial class ClipEditorWindow : Window
 
         ReplayClip initialClip = _clip;
         string initialPath = initialClip.Path;
+        int initialReplayIndex = _currentReplayIndex;
+        ReplayClip firstClip = RecentReplayItems[0].Clip;
+        ReplayClip secondClip = RecentReplayItems[1].Clip;
+        await LoadReplayAsync(secondClip);
+        bool previousButtonEnabled = EditorPreviousReplayButton.IsEnabled;
+        EditorPreviousReplayButton.RaiseEvent(
+            new RoutedEventArgs(Button.ClickEvent, EditorPreviousReplayButton));
+        DateTime previousDeadline = DateTime.UtcNow.AddSeconds(8);
+        while ((_playerLoading ||
+                !string.Equals(
+                    _clip.Path,
+                    firstClip.Path,
+                    StringComparison.OrdinalIgnoreCase)) &&
+               DateTime.UtcNow < previousDeadline)
+        {
+            await Task.Delay(50, _lifetimeCts.Token);
+        }
+        bool previousToFirstPassed = previousButtonEnabled &&
+                                     string.Equals(
+                                         _clip.Path,
+                                         firstClip.Path,
+                                         StringComparison.OrdinalIgnoreCase);
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        var firstContainer = (ListBoxItem?)RecentReplayList.ItemContainerGenerator
+            .ContainerFromIndex(0);
+        var initialContainer = initialReplayIndex >= 0
+            ? (ListBoxItem?)RecentReplayList.ItemContainerGenerator
+                .ContainerFromIndex(initialReplayIndex)
+            : null;
+        var firstSelectionBorder = firstContainer?.Template.FindName(
+            "ReplayItemBorder",
+            firstContainer) as Border;
+        var initialSelectionBorder = initialContainer?.Template.FindName(
+            "ReplayItemBorder",
+            initialContainer) as Border;
+        var activeBackground = (SolidColorBrush)FindResource("AccentSubtleBrush");
+        var activeBorder = (SolidColorBrush)FindResource("AccentDimBrush");
+        bool initialHighlightCleared = initialReplayIndex == 0 ||
+                                       initialSelectionBorder is not
+                                       {
+                                           Background: SolidColorBrush initialBackground,
+                                           BorderBrush: SolidColorBrush initialBorder,
+                                       } ||
+                                       initialBackground.Color != activeBackground.Color ||
+                                       initialBorder.Color != activeBorder.Color;
+        bool activeHighlightPassed =
+            RecentReplayItems[0].IsActive &&
+            RecentReplayItems.Count(item => item.IsActive) == 1 &&
+            firstSelectionBorder is
+            {
+                Background: SolidColorBrush firstBackground,
+                BorderBrush: SolidColorBrush firstBorder,
+            } &&
+            firstBackground.Color == activeBackground.Color &&
+            firstBorder.Color == activeBorder.Color &&
+            initialHighlightCleared;
+        var firstClipButton = new Button
+        {
+            DataContext = RecentReplayItems[0],
+        };
+        RecentReplay_Click(firstClipButton, new RoutedEventArgs());
+        await Task.Delay(150, _lifetimeCts.Token);
+        bool activeFirstClickPassed = _playing &&
+                                      string.Equals(
+                                          _clip.Path,
+                                          firstClip.Path,
+                                          StringComparison.OrdinalIgnoreCase);
+
         bool switched = true;
         for (int index = 0; index < 6; index++)
         {
@@ -771,7 +939,8 @@ public partial class ClipEditorWindow : Window
 
         RecentReplay_Click(deleteButton, new RoutedEventArgs());
         await Task.Delay(150, _lifetimeCts.Token);
-        bool activeClipPaused = !_playing && _clip.Path == target.Clip.Path;
+        bool activeClipContinued = _playing && _clip.Path == target.Clip.Path;
+        await PausePlaybackAsync();
         RecentReplay_Click(deleteButton, new RoutedEventArgs());
         await Task.Delay(150, _lifetimeCts.Token);
         bool activeClipResumed = _playing && _clip.Path == target.Clip.Path;
@@ -796,6 +965,33 @@ public partial class ClipEditorWindow : Window
         RecordingModeFilter.SelectedIndex = 0;
         bool filterResetPassed = RecentReplayItems.Count == unfilteredCount;
 
+        DateTime enrichmentDeadline = DateTime.UtcNow.AddSeconds(10);
+        while (!_outputSettingsInitialized &&
+               DateTime.UtcNow < enrichmentDeadline)
+        {
+            await Task.Delay(50, _lifetimeCts.Token);
+        }
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool unifiedEditorPassed = _previewMode &&
+                                   TimelineEditorPanel.Visibility == Visibility.Visible &&
+                                   RangeTimeline.Visibility == Visibility.Visible &&
+                                   AudioTrackRows.Items.Count == AudioTracks.Count &&
+                                   AudioTrackCountText.Text == AudioTracks.Count.ToString() &&
+                                   EditorActionsPanel.Visibility == Visibility.Visible &&
+                                   OutputSettingsButton.IsVisible &&
+                                   _outputSettingsInitialized &&
+                                   NormalPlaybackBar.Visibility == Visibility.Visible &&
+                                   EditorVolumeSlider.IsVisible &&
+                                   Math.Abs(EditorVolumeSlider.Value -
+                                            _playbackVolumePercent) < 0.1 &&
+                                   PreviewModePanel.Visibility == Visibility.Collapsed &&
+                                   RecentReplaySidebar.Visibility == Visibility.Visible;
+        PlayerHelp_Click(PlayerHelpButton, new RoutedEventArgs());
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool helpPassed = PlayerHelpPopup.IsOpen &&
+                          PlayerHelpPopup.Child is not null;
+        PlayerHelp_Click(PlayerHelpButton, new RoutedEventArgs());
+
         bool batchDeletePassed = true;
         if (File.Exists(Path.Combine(_rootDirectory, ".captail-library-qa")))
         {
@@ -818,25 +1014,31 @@ public partial class ClipEditorWindow : Window
         ExitFullscreen();
 
         bool passed = allClipsPassed && initialVolumePassed &&
-                      sliderVolumePassed && wheelPassed && switched &&
+                      sliderVolumePassed && wheelPassed &&
+                      previousToFirstPassed && activeHighlightPassed &&
+                      activeFirstClickPassed && switched &&
                       playbackAdvanced && clickPaused && clickResumed &&
                       resizeSuppressed && resizeRestored &&
                       deletePromptPassed && deleteCancelPassed && fullscreenPassed &&
-                      activeClipPaused && activeClipResumed && markedAll && clearedAll && bulkPrompt &&
+                      activeClipContinued && activeClipResumed && markedAll && clearedAll && bulkPrompt &&
                       gameFilterPassed && combinedFilterPassed && filterResetPassed && batchDeletePassed;
+        passed &= unifiedEditorPassed && helpPassed;
         return (
             passed,
             $"clips={RecentReplayItems.Count}, volume={volumeBefore}->{PreviewPlayer.VolumePercent}, " +
+            $"firstClip={previousToFirstPassed}/{activeHighlightPassed}/{activeFirstClickPassed}, " +
             $"switched={Path.GetFileName(initialPath)}->{Path.GetFileName(_clip.Path)}, " +
             $"click={clickPaused}/{clickResumed}, resize={resizeSuppressed}/{resizeRestored}, " +
             $"delete={deletePromptPassed}/{deleteCancelPassed}, " +
-            $"activeClip={activeClipPaused}/{activeClipResumed}, selection={markedAll}/{clearedAll}/{bulkPrompt}, " +
+            $"activeClip={activeClipContinued}/{activeClipResumed}, selection={markedAll}/{clearedAll}/{bulkPrompt}, " +
             $"filters={gameFilterPassed}/{combinedFilterPassed}/{filterResetPassed}, batchDelete={batchDeletePassed}, " +
+            $"playerUi={unifiedEditorPassed}/{helpPassed}, " +
             $"playbackAdvanced={playbackAdvanced}, fullscreen={fullscreenPassed}");
     }
 
     internal async Task<(bool Passed, string Details)> RunPreviewGeometryQaAsync()
     {
+        Width = MinWidth;
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Loaded);
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
         DateTime readyDeadline = DateTime.UtcNow.AddSeconds(10);
@@ -847,6 +1049,77 @@ public partial class ClipEditorWindow : Window
         }
         if (!PreviewPlayer.IsReady)
             return (false, "preview player did not become ready");
+
+        string editorScreenshot = Path.Combine(
+            Path.GetTempPath(),
+            "Captail",
+            "editor-export-layout-qa.png");
+        CaptureVisualToPng(editorScreenshot);
+        Point outputSettingsButtonPosition = OutputSettingsButton.TranslatePoint(
+            new Point(),
+            EditorActionsPanel);
+        Point cancelButtonPosition = CancelButton.TranslatePoint(
+            new Point(),
+            EditorActionsPanel);
+        double actionColumnLeft = EditorActionsPanel.ColumnDefinitions[0].ActualWidth;
+        bool exportLayoutPassed =
+            OutputSettingsButton.IsVisible &&
+            OutputSettingsButton.ActualWidth > 0 &&
+            outputSettingsButtonPosition.X >= actionColumnLeft &&
+            outputSettingsButtonPosition.X + OutputSettingsButton.ActualWidth <=
+                EditorActionsPanel.ActualWidth &&
+            outputSettingsButtonPosition.X < cancelButtonPosition.X;
+
+        OutputSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        string outputSettingsScreenshot = Path.Combine(
+            Path.GetTempPath(),
+            "Captail",
+            "editor-output-settings-qa.png");
+        bool outputSettingsOpenedByClick = OutputSettingsPopup.IsOpen;
+        bool outputSettingsPassed =
+            outputSettingsOpenedByClick &&
+            VideoCodecComboBox.SelectedIndex == 0 &&
+            AudioCodecComboBox.SelectedIndex == 0 &&
+            ResolutionComboBox.SelectedIndex == 0 &&
+            BitRateComboBox.SelectedIndex == 0 &&
+            MergeAudioCheckBox.Visibility == Visibility.Visible;
+        if (OutputSettingsPopup.Child is FrameworkElement outputSettingsPanel)
+            CaptureVisualToPng(outputSettingsPanel, outputSettingsScreenshot);
+        VideoCodecComboBox.SelectedIndex = 1;
+        AudioCodecComboBox.SelectedIndex = 1;
+        ResolutionComboBox.SelectedItem = ResolutionComboBox.Items
+            .Cast<OutputSettingOption>()
+            .First(option => option.Width == 1280 && option.Height == 720);
+        BitRateComboBox.SelectedItem = BitRateComboBox.Items
+            .Cast<OutputSettingOption>()
+            .First(option => option.BitRateKbps == 5_000);
+        MergeAudioCheckBox.IsChecked = true;
+        VideoOutputSettings selectedSettings = CurrentOutputSettings();
+        bool outputSettingsSelectionPassed =
+            selectedSettings.VideoCodec is not null &&
+            selectedSettings.AudioCodec is not null &&
+            selectedSettings is
+            {
+                Width: 1280,
+                Height: 720,
+                VideoBitRateKbps: 5_000,
+                MergeAudioTracks: true,
+            };
+        CloseOutputSettingsOnOutsideClick(VideoCodecComboBox);
+        bool popupInteractionPassed = OutputSettingsPopup.IsOpen;
+        CloseOutputSettingsOnOutsideClick(EditorActionsPanel);
+        bool outsideClickPassed = !OutputSettingsPopup.IsOpen;
+        OutputSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        ResetOutputSettings_Click(this, new RoutedEventArgs());
+        OutputSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        bool outputSettingsClosedByClick = !OutputSettingsPopup.IsOpen;
+        OutputSettingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        WindowState = WindowState.Minimized;
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+        bool popupClosedOnMinimize = !OutputSettingsPopup.IsOpen;
+        WindowState = WindowState.Normal;
+        await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
 
         RequestOverwrite_Click(this, new RoutedEventArgs());
         await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
@@ -925,11 +1198,25 @@ public partial class ClipEditorWindow : Window
         bool videoOutputPassed = PreviewPlayer.TryValidateVideoOutput(out videoOutput);
         await PreviewPlayer.StopAsync(_lifetimeCts.Token);
         bool stopPassed = !PreviewPlayer.IsReady;
-        bool passed = overwriteOverlayPassed && savingOverlayPassed &&
+        bool passed = exportLayoutPassed && outputSettingsPassed &&
+                      outputSettingsClosedByClick &&
+                      popupInteractionPassed && outsideClickPassed &&
+                      popupClosedOnMinimize &&
+                      outputSettingsSelectionPassed &&
+                      overwriteOverlayPassed && savingOverlayPassed &&
                       clockAdvanced &&
                       seekPassed && tracksPassed && audioMixPassed && volumePassed &&
                       geometryPassed && videoOutputPassed && stopPassed;
         string details =
+            $"exportLayout={(exportLayoutPassed ? "left-of-cancel" : "failed")}, " +
+            $"editorScreenshot={editorScreenshot}, " +
+            $"outputSettings={(outputSettingsPassed ? "click-opened/current-defaults" : "failed")}/" +
+            $"{(outputSettingsSelectionPassed ? "changes-mapped" : "changes-failed")}, " +
+            $"popupClick={(popupInteractionPassed ? "kept-open" : "closed")}, " +
+            $"outsideClick={(outsideClickPassed ? "closed" : "kept-open")}, " +
+            $"settingsClose={(outputSettingsClosedByClick ? "click-closed" : "failed")}, " +
+            $"minimize={(popupClosedOnMinimize ? "closed" : "kept-open")}, " +
+            $"outputSettingsScreenshot={outputSettingsScreenshot}, " +
             $"overlay={(overwriteOverlayPassed ? "clear" : "occluded")}, " +
             $"saving={(savingOverlayPassed ? "visible" : "hidden")}, " +
             $"savingScreenshot={savingScreenshot}, " +
@@ -946,16 +1233,25 @@ public partial class ClipEditorWindow : Window
 
     private void CaptureVisualToPng(string path)
     {
-        DpiScale dpi = VisualTreeHelper.GetDpi(this);
-        int width = Math.Max(1, (int)Math.Ceiling(ActualWidth * dpi.DpiScaleX));
-        int height = Math.Max(1, (int)Math.Ceiling(ActualHeight * dpi.DpiScaleY));
+        CaptureVisualToPng(this, path);
+    }
+
+    private static void CaptureVisualToPng(FrameworkElement element, string path)
+    {
+        DpiScale dpi = VisualTreeHelper.GetDpi(element);
+        int width = Math.Max(
+            1,
+            (int)Math.Ceiling(element.ActualWidth * dpi.DpiScaleX));
+        int height = Math.Max(
+            1,
+            (int)Math.Ceiling(element.ActualHeight * dpi.DpiScaleY));
         var bitmap = new RenderTargetBitmap(
             width,
             height,
             dpi.PixelsPerInchX,
             dpi.PixelsPerInchY,
             PixelFormats.Pbgra32);
-        bitmap.Render(this);
+        bitmap.Render(element);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         using FileStream stream = File.Create(path);
         var encoder = new PngBitmapEncoder();
@@ -964,26 +1260,63 @@ public partial class ClipEditorWindow : Window
     }
 #endif
 
-    private async Task LoadTimelineThumbnailsAsync()
+    private async Task LoadTimelineThumbnailsAsync(
+        ReplayClip? requestedClip = null,
+        int? replayLoadVersion = null)
     {
+        ReplayClip clip = requestedClip ?? _clip;
+        using var timelineCts = CancellationTokenSource.CreateLinkedTokenSource(
+            _lifetimeCts.Token);
+        CancellationTokenSource? previousTimelineCts = Interlocked.Exchange(
+            ref _timelineLoadCts,
+            timelineCts);
+        previousTimelineCts?.Cancel();
         try
         {
-            IReadOnlyList<string> paths = await _library.GetTimelineThumbnailsAsync(
-                _rootDirectory,
-                _clip,
-                TimelineFrameCount,
-                _lifetimeCts.Token);
+            if (!IsCurrentTimelineLoad())
+                return;
+
             _timelineImages.Clear();
-            _timelineImages.AddRange(paths.Select(path => LoadBitmap(path, 240)));
+            for (int index = 0; index < TimelineFrameCount; index++)
+                _timelineImages.Add(null);
             TimelineFrames.ItemsSource = _timelineImages;
+
+            await _library.GetTimelineThumbnailsAsync(
+                _rootDirectory,
+                clip,
+                TimelineFrameCount,
+                ShowThumbnail,
+                timelineCts.Token);
+
+            void ShowThumbnail(int index, string path)
+            {
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (IsCurrentTimelineLoad() &&
+                        index >= 0 &&
+                        index < _timelineImages.Count)
+                    {
+                        _timelineImages[index] = LoadBitmap(path, 240);
+                    }
+                });
+            }
+
+            bool IsCurrentTimelineLoad() =>
+                string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase) &&
+                (!replayLoadVersion.HasValue ||
+                 IsCurrentReplayLoad(clip, replayLoadVersion.Value));
         }
-        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        catch (OperationCanceledException) when (timelineCts.IsCancellationRequested)
         {
-            // Window is closing.
+            // Window is closing or a newer replay replaced this timeline.
         }
         catch (Exception exception)
         {
             Log.Write($"Timeline thumbnail generation failed: {exception.Message}");
+        }
+        finally
+        {
+            Interlocked.CompareExchange(ref _timelineLoadCts, null, timelineCts);
         }
     }
 
@@ -1005,6 +1338,7 @@ public partial class ClipEditorWindow : Window
             NoAudioText.Visibility = tracks.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            PreviewNoAudioText.Visibility = NoAudioText.Visibility;
             UpdateMergeAudioState();
             UpdateAudioTrackLayout(tracks.Count);
 
@@ -1022,25 +1356,62 @@ public partial class ClipEditorWindow : Window
         {
             Log.Write($"Audio track inspection failed: {exception.Message}");
             NoAudioText.Visibility = Visibility.Visible;
+            PreviewNoAudioText.Visibility = Visibility.Visible;
             MergeAudioCheckBox.Visibility = Visibility.Collapsed;
         }
     }
 
     private void UpdateAudioTrackLayout(int trackCount)
     {
-        int visibleTrackCount = Math.Min(trackCount, MaximumVisibleAudioTracks);
         AudioTrackCountText.Text = trackCount.ToString();
+        PreviewAudioTrackCountText.Text = trackCount.ToString();
         AudioTrackCountBadge.Visibility = trackCount > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
+        PreviewAudioTrackCountBadge.Visibility = AudioTrackCountBadge.Visibility;
+        ApplyWindowModeLayout(adjustWindow: true);
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        UpdateAudioTrackViewport();
+
+    private void EditorWorkspace_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (!e.WidthChanged)
+            return;
+
+        bool compactActions = e.NewSize.Width < 740;
+        EditorActionsPanel.RowDefinitions[1].Height =
+            compactActions ? GridLength.Auto : new GridLength(0);
+        Grid.SetRow(EditorActionButtons, compactActions ? 1 : 0);
+        Grid.SetColumn(EditorActionButtons, compactActions ? 0 : 1);
+        Grid.SetColumnSpan(EditorActionButtons, compactActions ? 2 : 1);
+
+        bool compactPlayback = e.NewSize.Width < 600;
+        EditorVolumeSlider.Visibility = compactPlayback
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        RangeDurationText.Visibility = compactPlayback
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+    }
+
+    private void UpdateAudioTrackViewport()
+    {
+        if (_isFullscreen)
+            return;
+
+        double windowHeight = ActualHeight > 0 ? ActualHeight : Height;
+        int rowsForHeight = Math.Clamp(
+            (int)Math.Floor((windowHeight - 650) / AudioTrackRowHeight) + 1,
+            1,
+            MaximumVisibleAudioTracks);
+        int visibleTrackCount = Math.Min(AudioTracks.Count, rowsForHeight);
         AudioTrackScrollViewer.Height = visibleTrackCount * AudioTrackRowHeight;
         AudioTrackScrollViewer.VerticalScrollBarVisibility =
-            trackCount > MaximumVisibleAudioTracks
+            AudioTracks.Count > visibleTrackCount
                 ? ScrollBarVisibility.Auto
                 : ScrollBarVisibility.Disabled;
-
-        if (!_previewMode)
-            ApplyWindowModeLayout(adjustWindow: true);
     }
 
     private async Task LoadWaveformAsync(AudioTrackRow row)
@@ -1652,9 +2023,6 @@ public partial class ClipEditorWindow : Window
     private void UpdateMergeAudioState()
     {
         bool hasSeparateTracks = AudioTracks.Count > 1;
-        MergeAudioCheckBox.Visibility = hasSeparateTracks
-            ? Visibility.Visible
-            : Visibility.Collapsed;
         bool canMerge = hasSeparateTracks &&
             AudioTracks.Count(track => track.IsSelected) > 1;
         MergeAudioCheckBox.IsEnabled = canMerge;
@@ -1664,6 +2032,145 @@ public partial class ClipEditorWindow : Window
 
     private async void SaveTrim_Click(object sender, RoutedEventArgs e) =>
         await SaveTrimAsync(overwrite: false);
+
+    private void OutputSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_outputSettingsInitialized || _saveInProgress)
+            return;
+        PlayerHelpPopup.IsOpen = false;
+        OutputSettingsPopup.IsOpen = !OutputSettingsPopup.IsOpen;
+    }
+
+    private void PlayerHelp_Click(object sender, RoutedEventArgs e)
+    {
+        OutputSettingsPopup.IsOpen = false;
+        PlayerHelpPopup.IsOpen = !PlayerHelpPopup.IsOpen;
+    }
+
+    private void ResetOutputSettings_Click(object sender, RoutedEventArgs e)
+    {
+        VideoCodecComboBox.SelectedIndex = 0;
+        AudioCodecComboBox.SelectedIndex = 0;
+        ResolutionComboBox.SelectedIndex = 0;
+        BitRateComboBox.SelectedIndex = 0;
+        MergeAudioCheckBox.IsChecked = false;
+        UpdateMergeAudioState();
+    }
+
+    private async void ExportAs_Click(object sender, RoutedEventArgs e)
+    {
+        if (_saveInProgress)
+            return;
+
+        OutputSettingsPopup.IsOpen = false;
+
+        string sourceExtension = Path.GetExtension(_clip.Path).ToLowerInvariant();
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = Localization.Text("L.Library.ExportVideo"),
+            AddExtension = true,
+            CheckPathExists = true,
+            DefaultExt = sourceExtension,
+            FileName = $"{Path.GetFileNameWithoutExtension(_clip.Name)}_converted",
+            Filter =
+                "MP4 video (*.mp4)|*.mp4|" +
+                "Matroska video (*.mkv)|*.mkv|" +
+                "WebM video (*.webm)|*.webm|" +
+                "QuickTime video (*.mov)|*.mov",
+            FilterIndex = sourceExtension switch
+            {
+                ".mkv" => 2,
+                ".webm" => 3,
+                ".mov" => 4,
+                _ => 1,
+            },
+            InitialDirectory = Path.GetDirectoryName(_clip.Path),
+            OverwritePrompt = true,
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        string destination = Path.GetFullPath(dialog.FileName);
+        string extension = Path.GetExtension(destination).ToLowerInvariant();
+        if (extension is not (".mp4" or ".mkv" or ".webm" or ".mov"))
+        {
+            EditorStatusText.Text = Localization.Text(
+                "L.Library.ExportUnsupportedFormat");
+            return;
+        }
+        if (string.Equals(
+                destination,
+                Path.GetFullPath(_clip.Path),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            EditorStatusText.Text = Localization.Text(
+                "L.Library.ExportChooseDifferentFile");
+            return;
+        }
+
+        await ExportVideoAsync(
+            destination,
+            OutputSettingsForDestination(destination));
+    }
+
+    private async Task ExportVideoAsync(
+        string destination,
+        VideoOutputSettings outputSettings)
+    {
+        _saveInProgress = true;
+        OutputSettingsButton.IsEnabled = false;
+        SaveTrimButton.IsEnabled = false;
+        OverwriteButton.IsEnabled = false;
+        MergeAudioCheckBox.IsEnabled = false;
+        string exportingStatus = Localization.Text("L.Library.ExportingVideo");
+        EditorStatusText.Text = exportingStatus;
+        SavingStatusText.Text = exportingStatus;
+        try
+        {
+            PauseNativePlayback();
+            PreviewPlayer.Visibility = Visibility.Collapsed;
+            ShowSavingOverlay();
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
+            await PreviewPlayer.StopAsync(_lifetimeCts.Token);
+            await _library.ExportTranscodedAsync(
+                _rootDirectory,
+                _clip,
+                destination,
+                TimeSpan.FromSeconds(_selectionStart),
+                TimeSpan.FromSeconds(_selectionEnd),
+                SelectedAudioStreamIndices(),
+                outputSettings,
+                _lifetimeCts.Token);
+            HideSavingOverlay();
+            EditorStatusText.Text = Localization.Text("L.Library.ExportedVideo");
+            OutputSettingsButton.IsEnabled = true;
+            SaveTrimButton.IsEnabled = true;
+            OverwriteButton.IsEnabled = true;
+            UpdateMergeAudioState();
+            await InitializePreviewAsync();
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+            // Window is closing.
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Replay export failed: {exception}");
+            HideSavingOverlay();
+            EditorStatusText.Text = IsSharingViolation(exception)
+                ? Localization.Text("L.Library.FileInUse")
+                : exception.Message;
+            OutputSettingsButton.IsEnabled = true;
+            SaveTrimButton.IsEnabled = true;
+            OverwriteButton.IsEnabled = true;
+            UpdateMergeAudioState();
+            await InitializePreviewAsync();
+        }
+        finally
+        {
+            _saveInProgress = false;
+        }
+    }
 
     private void RequestOverwrite_Click(object sender, RoutedEventArgs e)
     {
@@ -1679,8 +2186,9 @@ public partial class ClipEditorWindow : Window
         if (PreviewImage.Source is not null)
             PreviewImage.Visibility = Visibility.Visible;
 
+        OutputSettingsPopup.IsOpen = false;
         OverwriteMessageText.Text = Localization.Text(
-            MergeAudioCheckBox.IsChecked == true
+            CurrentOutputSettings().MergeAudioTracks
                 ? "L.Library.OverwriteMergeMessage"
                 : "L.Library.OverwriteMessage");
         OverwriteFileText.Text = _clip.Name;
@@ -1719,12 +2227,19 @@ public partial class ClipEditorWindow : Window
         if (_saveInProgress)
             return;
         _saveInProgress = true;
+        OutputSettingsPopup.IsOpen = false;
+        OutputSettingsButton.IsEnabled = false;
         SaveTrimButton.IsEnabled = false;
         OverwriteButton.IsEnabled = false;
         MergeAudioCheckBox.IsEnabled = false;
-        bool mergeAudioTracks = MergeAudioCheckBox.IsChecked == true;
+        VideoOutputSettings outputSettings = CurrentOutputSettings();
         string savingStatus = Localization.Text(
-            mergeAudioTracks
+            outputSettings.VideoCodec is not null ||
+            outputSettings.AudioCodec is not null ||
+            outputSettings.Width is not null ||
+            outputSettings.VideoBitRateKbps is not null
+                ? "L.Library.ExportingVideo"
+                : outputSettings.MergeAudioTracks
                 ? "L.Library.TrimmingMerge"
                 : "L.Library.Trimming");
         EditorStatusText.Text = savingStatus;
@@ -1746,7 +2261,7 @@ public partial class ClipEditorWindow : Window
                     start,
                     end,
                     audioStreams,
-                    mergeAudioTracks,
+                    outputSettings,
                     _lifetimeCts.Token)
                 : await _library.TrimAsync(
                     _rootDirectory,
@@ -1754,7 +2269,7 @@ public partial class ClipEditorWindow : Window
                     start,
                     end,
                     audioStreams,
-                    mergeAudioTracks,
+                    outputSettings,
                     _lifetimeCts.Token);
             _onSaved(path);
             DialogResult = true;
@@ -1771,6 +2286,7 @@ public partial class ClipEditorWindow : Window
             EditorStatusText.Text = IsSharingViolation(exception)
                 ? Localization.Text("L.Library.FileInUse")
                 : exception.Message;
+            OutputSettingsButton.IsEnabled = true;
             SaveTrimButton.IsEnabled = true;
             OverwriteButton.IsEnabled = true;
             UpdateMergeAudioState();
@@ -1973,9 +2489,9 @@ public partial class ClipEditorWindow : Window
         SidebarColumn.Width = GridLength.Auto;
         Grid.SetColumnSpan(EditorWorkspace, 1);
         EditorWorkspace.Margin = new Thickness(20, 0, 20, 20);
-        PreviewRow.Height = new GridLength(390);
+        PreviewRow.Height = new GridLength(1, GridUnitType.Star);
         PlaybackRow.Height = GridLength.Auto;
-        TimelineRow.Height = new GridLength(1, GridUnitType.Star);
+        TimelineRow.Height = GridLength.Auto;
         ActionsRow.Height = GridLength.Auto;
         NormalPlaybackBar.Visibility = Visibility.Visible;
         WindowChrome.BorderThickness = new Thickness(1);
@@ -2102,11 +2618,100 @@ public partial class ClipEditorWindow : Window
             DragMove();
     }
 
+    private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        DependencyObject? source = e.OriginalSource as DependencyObject;
+        CloseOutputSettingsOnOutsideClick(source);
+        ClosePlayerHelpOnOutsideClick(source);
+    }
+
+    private void Owner_StateChanged(object? sender, EventArgs e)
+    {
+        if (Owner?.WindowState == WindowState.Minimized)
+            CloseEditorPopups();
+    }
+
+    private void ClosePopupsWhenHidden()
+    {
+        if (WindowState == WindowState.Minimized || !IsVisible)
+            CloseEditorPopups();
+    }
+
+    private void CloseEditorPopups()
+    {
+        OutputSettingsPopup.IsOpen = false;
+        PlayerHelpPopup.IsOpen = false;
+    }
+
+    private void ClosePlayerHelpOnOutsideClick(DependencyObject? source)
+    {
+        if (!PlayerHelpPopup.IsOpen ||
+            PlayerHelpButton.IsMouseOver ||
+            PlayerHelpPopup.Child?.IsMouseOver == true ||
+            IsDescendantOrSelf(source, PlayerHelpPopup.Child))
+        {
+            return;
+        }
+
+        PlayerHelpPopup.IsOpen = false;
+    }
+
+    private void CloseOutputSettingsOnOutsideClick(DependencyObject? source)
+    {
+        if (!OutputSettingsPopup.IsOpen ||
+            OutputSettingsButton.IsMouseOver ||
+            OutputSettingsPopup.Child?.IsMouseOver == true ||
+            IsDescendantOrSelf(source, OutputSettingsPopup.Child))
+        {
+            return;
+        }
+
+        OutputSettingsPopup.IsOpen = false;
+    }
+
+    private static bool IsDescendantOrSelf(
+        DependencyObject? source,
+        DependencyObject? ancestor)
+    {
+        if (source is null || ancestor is null)
+            return false;
+
+        for (DependencyObject? current = source;
+             current is not null;
+             current = current is Visual or System.Windows.Media.Media3D.Visual3D
+                 ? VisualTreeHelper.GetParent(current)
+                 : LogicalTreeHelper.GetParent(current))
+        {
+            if (ReferenceEquals(current, ancestor))
+                return true;
+        }
+
+        return false;
+    }
+
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (_saveInProgress || _deletingReplays)
         {
             e.Handled = true;
+            return;
+        }
+        if (OutputSettingsPopup.IsOpen)
+        {
+            if (e.Key == Key.Escape)
+            {
+                OutputSettingsPopup.IsOpen = false;
+                e.Handled = true;
+            }
+            return;
+        }
+        if (PlayerHelpPopup.IsOpen)
+        {
+            if (e.Key == Key.Escape)
+            {
+                PlayerHelpPopup.IsOpen = false;
+                e.Handled = true;
+            }
             return;
         }
         if (DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
@@ -2140,7 +2745,10 @@ public partial class ClipEditorWindow : Window
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
+        {
             Close();
+            e.Handled = true;
+        }
         else if (e.Key == Key.F)
         {
             if (_isFullscreen)
@@ -2226,7 +2834,7 @@ public partial class ClipEditorWindow : Window
         SetPlaybackVolume(volume, showFeedback: true);
     }
 
-    private void PreviewVolumeSlider_ValueChanged(
+    private void PlayerVolumeSlider_ValueChanged(
         object sender,
         RoutedPropertyChangedEventArgs<double> e)
     {
@@ -2241,9 +2849,11 @@ public partial class ClipEditorWindow : Window
         _playbackVolumePercent = normalized;
         if (PreviewPlayer.IsReady)
             PreviewPlayer.SetVolumePercent(normalized);
-        if (Math.Abs(PreviewVolumeSlider.Value - normalized) > 0.1)
+        if (Math.Abs(EditorVolumeSlider.Value - normalized) > 0.1 ||
+            Math.Abs(PreviewVolumeSlider.Value - normalized) > 0.1)
         {
             _updatingVolumeSlider = true;
+            EditorVolumeSlider.Value = normalized;
             PreviewVolumeSlider.Value = normalized;
             _updatingVolumeSlider = false;
         }
@@ -2332,6 +2942,8 @@ public partial class ClipEditorWindow : Window
 
     private void Window_SourceInitialized(object? sender, EventArgs e)
     {
+        if (Owner is not null)
+            Owner.StateChanged += Owner_StateChanged;
         ApplyNativeCornerPreference();
         nint handle = new WindowInteropHelper(this).Handle;
         _windowSource = HwndSource.FromHwnd(handle);
@@ -2414,6 +3026,205 @@ public partial class ClipEditorWindow : Window
         {
             // Rounded corners are cosmetic and unavailable on older Windows builds.
         }
+    }
+
+    private void InitializeOutputSettings()
+    {
+        string extension = Path.GetExtension(_clip.Path).ToLowerInvariant();
+        string currentVideoCodec = FormatVideoCodec(_videoInfo?.Codec);
+        string[] audioCodecs = AudioTracks
+            .Select(track => FormatAudioCodec(track.Track.Codec))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string currentAudioCodec = audioCodecs.Length switch
+        {
+            0 => "—",
+            1 => audioCodecs[0],
+            _ => string.Join(" / ", audioCodecs),
+        };
+        int width = Math.Max(1, _videoInfo?.Width ?? 0);
+        int height = Math.Max(1, _videoInfo?.Height ?? 0);
+        int currentBitRate = _videoInfo?.BitRateKbps > 0
+            ? _videoInfo.BitRateKbps
+            : EstimateSourceBitRateKbps();
+
+        var videoOptions = new List<OutputSettingOption>
+        {
+            new("current", Localization.Format(
+                "L.Library.CurrentValue", currentVideoCodec)),
+        };
+        foreach ((string value, string label) in VideoCodecOptions(extension))
+            videoOptions.Add(new OutputSettingOption(value, label));
+        VideoCodecComboBox.ItemsSource = videoOptions;
+
+        var audioOptions = new List<OutputSettingOption>
+        {
+            new("current", Localization.Format(
+                "L.Library.CurrentValue", currentAudioCodec)),
+        };
+        foreach ((string value, string label) in AudioCodecOptions(extension))
+            audioOptions.Add(new OutputSettingOption(value, label));
+        AudioCodecComboBox.ItemsSource = audioOptions;
+
+        ResolutionComboBox.ItemsSource = BuildResolutionOptions(width, height);
+        BitRateComboBox.ItemsSource = BuildBitRateOptions(currentBitRate);
+        VideoCodecComboBox.SelectedIndex = 0;
+        AudioCodecComboBox.SelectedIndex = 0;
+        ResolutionComboBox.SelectedIndex = 0;
+        BitRateComboBox.SelectedIndex = 0;
+        _outputSettingsInitialized = true;
+        OutputSettingsButton.IsEnabled = true;
+        UpdateMergeAudioState();
+    }
+
+    private VideoOutputSettings CurrentOutputSettings()
+    {
+        if (!_outputSettingsInitialized)
+        {
+            return new VideoOutputSettings(
+                MergeAudioTracks: MergeAudioCheckBox.IsChecked == true);
+        }
+
+        var video = (OutputSettingOption)VideoCodecComboBox.SelectedItem;
+        var audio = (OutputSettingOption)AudioCodecComboBox.SelectedItem;
+        var resolution = (OutputSettingOption)ResolutionComboBox.SelectedItem;
+        var bitRate = (OutputSettingOption)BitRateComboBox.SelectedItem;
+        return new VideoOutputSettings(
+            VideoCodec: video.Value == "current" ? null : video.Value,
+            AudioCodec: audio.Value == "current" ? null : audio.Value,
+            Width: resolution.Width > 0 ? resolution.Width : null,
+            Height: resolution.Height > 0 ? resolution.Height : null,
+            VideoBitRateKbps: bitRate.BitRateKbps > 0
+                ? bitRate.BitRateKbps
+                : null,
+            MergeAudioTracks: MergeAudioCheckBox.IsChecked == true);
+    }
+
+    private VideoOutputSettings OutputSettingsForDestination(string destination)
+    {
+        VideoOutputSettings settings = CurrentOutputSettings();
+        string sourceExtension = Path.GetExtension(_clip.Path).ToLowerInvariant();
+        string destinationExtension = Path.GetExtension(destination).ToLowerInvariant();
+        if (destinationExtension == sourceExtension)
+            return settings;
+
+        return settings with
+        {
+            VideoCodec = settings.VideoCodec ??
+                (destinationExtension == ".webm" ? "vp9" : "h264"),
+            AudioCodec = settings.AudioCodec ??
+                (destinationExtension == ".webm" ? "opus" : "aac"),
+        };
+    }
+
+    private int EstimateSourceBitRateKbps()
+    {
+        double seconds = Math.Max(MinimumSelectionSeconds, _clip.Duration.TotalSeconds);
+        return (int)Math.Clamp(_clip.SizeBytes * 8d / seconds / 1000d, 500, 100_000);
+    }
+
+    private static IReadOnlyList<OutputSettingOption> BuildResolutionOptions(
+        int currentWidth,
+        int currentHeight)
+    {
+        var options = new List<OutputSettingOption>
+        {
+            new(
+                "current",
+                Localization.Format(
+                    "L.Library.CurrentValue",
+                    $"{currentWidth}×{currentHeight}")),
+        };
+        foreach ((int width, int height) in new[]
+                 {
+                     (3840, 2160),
+                     (2560, 1440),
+                     (1920, 1080),
+                     (1280, 720),
+                     (854, 480),
+                 })
+        {
+            if (width != currentWidth || height != currentHeight)
+            {
+                options.Add(new OutputSettingOption(
+                    $"{width}x{height}",
+                    $"{width}×{height}",
+                    width,
+                    height));
+            }
+        }
+        return options;
+    }
+
+    private static IReadOnlyList<OutputSettingOption> BuildBitRateOptions(
+        int currentBitRateKbps)
+    {
+        var options = new List<OutputSettingOption>
+        {
+            new(
+                "current",
+                Localization.Format(
+                    "L.Library.CurrentValue",
+                    FormatBitRate(currentBitRateKbps))),
+        };
+        foreach (int bitRateKbps in new[]
+                 { 5_000, 10_000, 15_000, 20_000, 30_000, 50_000, 75_000 })
+        {
+            if (Math.Abs(bitRateKbps - currentBitRateKbps) >= 250)
+            {
+                options.Add(new OutputSettingOption(
+                    bitRateKbps.ToString(
+                        System.Globalization.CultureInfo.InvariantCulture),
+                    FormatBitRate(bitRateKbps),
+                    BitRateKbps: bitRateKbps));
+            }
+        }
+        return options;
+    }
+
+    private static IEnumerable<(string Value, string Label)> VideoCodecOptions(
+        string extension) => extension switch
+        {
+            ".webm" => [("vp9", "VP9"), ("av1", "AV1")],
+            ".mov" => [("h264", "H.264"), ("hevc", "HEVC")],
+            ".mp4" => [("h264", "H.264"), ("hevc", "HEVC"), ("av1", "AV1")],
+            _ =>
+            [
+                ("h264", "H.264"),
+                ("hevc", "HEVC"),
+                ("av1", "AV1"),
+                ("vp9", "VP9"),
+            ],
+        };
+
+    private static IEnumerable<(string Value, string Label)> AudioCodecOptions(
+        string extension) => extension == ".webm"
+            ? [("opus", "Opus")]
+            : extension is ".mp4" or ".mov"
+                ? [("aac", "AAC")]
+                : [("aac", "AAC"), ("opus", "Opus")];
+
+    private static string FormatAudioCodec(string? codec) =>
+        codec?.ToLowerInvariant() switch
+        {
+            "aac" => "AAC",
+            "opus" => "Opus",
+            "mp3" => "MP3",
+            null or "" => "—",
+            _ => codec.ToUpperInvariant(),
+        };
+
+    private static string FormatBitRate(int bitRateKbps) =>
+        $"{bitRateKbps / 1000d:0.#} Mbps";
+
+    private sealed record OutputSettingOption(
+        string Value,
+        string Label,
+        int Width = 0,
+        int Height = 0,
+        int BitRateKbps = 0)
+    {
+        public override string ToString() => Label;
     }
 
     private static T? FindAncestor<T>(DependencyObject? element)
@@ -2575,6 +3386,7 @@ public sealed record RecentReplayEntry(
     ImageSource? Thumbnail) : INotifyPropertyChanged
 {
     private bool _isMarked;
+    private bool _isActive;
     public bool IsMarked
     {
         get => _isMarked;
@@ -2583,6 +3395,17 @@ public sealed record RecentReplayEntry(
             if (_isMarked == value) return;
             _isMarked = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMarked)));
+        }
+    }
+
+    public bool IsActive
+    {
+        get => _isActive;
+        set
+        {
+            if (_isActive == value) return;
+            _isActive = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsActive)));
         }
     }
     public event PropertyChangedEventHandler? PropertyChanged;

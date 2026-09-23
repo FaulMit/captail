@@ -35,7 +35,7 @@ Assert-Contains $indicator `
     'if\s*\(!_firstFrameRendered\)\s*return;' `
     "Recording indicator must not apply capture affinity before rendering."
 Assert-Contains $settings `
-    'Icon="pack://application:,,,/Captail;component/Assets/Captail\.ico"' `
-    "Main window must use an absolute pack URI for its taskbar icon."
+    'Icon="\{DynamicResource ApplicationIcon\}"' `
+    "Main window must use the accent-aware application icon resource."
 
 Write-Host "STARTUP_UI_SURFACES_TEST PASS"

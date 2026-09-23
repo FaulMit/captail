@@ -4,14 +4,16 @@
         xmlns:local="clr-namespace:Captail"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="{DynamicResource L.Library.TrimTitle}"
-        Icon="pack://application:,,,/Captail;component/Assets/Captail.ico"
+        Icon="{DynamicResource ApplicationIcon}"
         Width="900" Height="790" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None" ResizeMode="CanResize"
         AllowsTransparency="False" Background="{StaticResource BgWindowBrush}"
         Foreground="{StaticResource TextPrimaryBrush}"
         FontFamily="{StaticResource FontUi}"
-        PreviewKeyDown="Window_PreviewKeyDown">
+        SizeChanged="Window_SizeChanged"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewMouseDown="Window_PreviewMouseDown">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="0"
                             ResizeBorderThickness="6"
@@ -154,6 +156,8 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <Path x:Name="HeaderTrimIcon" Data="{StaticResource IconScissors}"
@@ -169,7 +173,17 @@
                 <TextBlock x:Name="ClipNameText" Grid.Column="1" Margin="14,0,14,0"
                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                            Foreground="{StaticResource TextSecondaryBrush}" FontSize="12"/>
-                <Button Grid.Column="2" Style="{StaticResource IconButton}"
+                <Button x:Name="PlayerHelpButton" Grid.Column="2"
+                        Content="{DynamicResource L.Library.Help}"
+                        Style="{StaticResource SubtleButton}"
+                        Height="30" MinWidth="82" Padding="13,0"
+                        VerticalAlignment="Center" FontWeight="SemiBold"
+                        Foreground="{DynamicResource AccentBrush}"
+                        Background="{DynamicResource AccentSubtleBrush}"
+                        BorderBrush="{DynamicResource AccentDimBrush}"
+                        BorderThickness="1"
+                        Click="PlayerHelp_Click"/>
+                <Button Grid.Column="4" Style="{StaticResource IconButton}"
                         Click="Close_Click" ToolTip="{DynamicResource L.Close}">
                     <Path Data="M6 6l12 12 M18 6L6 18"
                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
@@ -178,11 +192,11 @@
             </Grid>
 
             <Grid x:Name="EditorWorkspace" Grid.Row="1" Grid.Column="0"
-                  Margin="20,0,20,20">
+                  Margin="20,0,20,20" SizeChanged="EditorWorkspace_SizeChanged">
                 <Grid.RowDefinitions>
-                    <RowDefinition x:Name="PreviewRow" Height="390"/>
+                    <RowDefinition x:Name="PreviewRow" Height="*"/>
                     <RowDefinition x:Name="PlaybackRow" Height="Auto"/>
-                    <RowDefinition x:Name="TimelineRow" Height="*"/>
+                    <RowDefinition x:Name="TimelineRow" Height="Auto"/>
                     <RowDefinition x:Name="ActionsRow" Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -214,11 +228,23 @@
                                Foreground="{StaticResource TextSecondaryBrush}"/>
                     <StackPanel x:Name="EditorTransportControls" Grid.Column="1"
                                 Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="EditorPreviousReplayButton"
+                                Style="{StaticResource ClipActionButton}"
+                                Click="PreviousReplay_Click"
+                                ToolTip="{DynamicResource L.Library.PreviousReplay}">
+                            <Path Data="{StaticResource IconSkipPrevious}"
+                                  Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  Stretch="Uniform"/>
+                        </Button>
                         <Button Style="{StaticResource ClipActionButton}" Click="Back_Click"
+                                Margin="6,0,0,0"
                                 ToolTip="{DynamicResource L.Library.Back5}">
-                            <Path Data="M15 5L8 12l7 7 M8 12h10"
+                            <Path Data="{StaticResource IconSeekBack}"
+                                  Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" Stretch="Uniform"/>
                         </Button>
                         <Button x:Name="PlayButton" Style="{StaticResource ClipActionButton}"
                                 Click="PlayPause_Click" ToolTip="{DynamicResource L.Library.Play}"
@@ -229,17 +255,38 @@
                         </Button>
                         <Button Style="{StaticResource ClipActionButton}" Click="Forward_Click"
                                 ToolTip="{DynamicResource L.Library.Forward5}" Margin="6,0,0,0">
-                            <Path Data="M9 5l7 7-7 7 M6 12h10"
+                            <Path Data="{StaticResource IconSeekForward}"
+                                  Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                   Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                  StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" Stretch="Uniform"/>
+                        </Button>
+                        <Button x:Name="EditorNextReplayButton"
+                                Style="{StaticResource ClipActionButton}"
+                                Margin="6,0,0,0"
+                                Click="NextReplay_Click"
+                                ToolTip="{DynamicResource L.Library.NextReplay}">
+                            <Path Data="{StaticResource IconSkipNext}"
+                                  Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  Stretch="Uniform"/>
                         </Button>
                     </StackPanel>
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel x:Name="EditorPlaybackOptions" Grid.Column="2"
+                                Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Slider x:Name="EditorVolumeSlider"
+                                Width="110" Margin="0,0,12,0"
+                                Minimum="0" Maximum="100" TickFrequency="1"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource VolumeSlider}"
+                                ToolTip="{DynamicResource L.Library.ShortcutVolume}"
+                                ValueChanged="PlayerVolumeSlider_ValueChanged"/>
                         <TextBlock x:Name="RangeDurationText"
                                    FontFamily="{StaticResource FontMono}" FontSize="11.5"
                                    Foreground="{StaticResource TextSecondaryBrush}"
                                    VerticalAlignment="Center"/>
-                        <Button Style="{StaticResource ClipActionButton}"
+                        <Button x:Name="EditorFullscreenButton"
+                                Style="{StaticResource ClipActionButton}"
                                 Margin="10,-7,0,-7" Click="EnterFullscreen_Click"
                                 ToolTip="{DynamicResource L.Library.Fullscreen}">
                             <Path Data="{StaticResource IconFullscreen}"
@@ -276,9 +323,11 @@
                             <StackPanel Orientation="Horizontal">
                                 <Button Style="{StaticResource ClipActionButton}" Click="Back_Click"
                                         ToolTip="{DynamicResource L.Library.Back5}">
-                                    <Path Data="M15 5L8 12l7 7 M8 12h10"
+                                    <Path Data="{StaticResource IconSeekBack}"
+                                          Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                                          StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" Stretch="Uniform"/>
                                 </Button>
                                 <Button Style="{StaticResource ClipActionButton}"
                                         Click="PlayPause_Click" ToolTip="{DynamicResource L.Library.Play}"
@@ -289,9 +338,11 @@
                                 </Button>
                                 <Button Style="{StaticResource ClipActionButton}" Click="Forward_Click"
                                         ToolTip="{DynamicResource L.Library.Forward5}" Margin="7,0,0,0">
-                                    <Path Data="M9 5l7 7-7 7 M6 12h10"
+                                    <Path Data="{StaticResource IconSeekForward}"
+                                          Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                          StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                                          StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                          StrokeLineJoin="Round" Stretch="Uniform"/>
                                 </Button>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal"
@@ -466,11 +517,16 @@
                 </StackPanel>
 
                 <Grid x:Name="EditorActionsPanel" Grid.Row="3" Margin="0,9,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="0"/>
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="330"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0" Margin="2,0,14,0" VerticalAlignment="Center">
+                    <StackPanel x:Name="EditorStatusPanel" Grid.Column="0"
+                                Margin="2,0,14,0" VerticalAlignment="Center">
                         <TextBlock x:Name="EditorStatusText" Style="{StaticResource SecondaryText}"
                                    HorizontalAlignment="Left" TextAlignment="Left"
                                    TextTrimming="CharacterEllipsis" FontSize="10"/>
@@ -479,33 +535,120 @@
                                    FontFamily="{StaticResource FontMono}"
                                    FontSize="9.5" Foreground="{StaticResource TextMutedBrush}"/>
                     </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal"
+                    <StackPanel x:Name="EditorActionButtons" Grid.Column="1"
+                                Orientation="Horizontal"
                                 HorizontalAlignment="Right" ClipToBounds="False">
-                        <Button Content="{DynamicResource L.Library.Cancel}" Style="{StaticResource SubtleButton}"
+                        <Button x:Name="OutputSettingsButton"
+                                Style="{StaticResource ClipActionButton}"
+                                Margin="0,0,8,0" Click="OutputSettings_Click"
+                                IsEnabled="False"
+                                ToolTip="{DynamicResource L.Library.OutputSettings}">
+                            <Path Data="{StaticResource IconGear}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8" StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Width="17" Height="17" Stretch="Uniform"/>
+                        </Button>
+                        <Button x:Name="CancelButton"
+                                Content="{DynamicResource L.Library.Cancel}" Style="{StaticResource SubtleButton}"
                                 Padding="16,9" Click="Close_Click"/>
                         <Button x:Name="OverwriteButton" Margin="8,0,0,0"
                                 Content="{DynamicResource L.Library.Overwrite}"
                                 Style="{StaticResource SubtleButton}" Padding="16,9"
                                 Click="RequestOverwrite_Click"/>
-                        <CheckBox x:Name="MergeAudioCheckBox" Margin="12,0,3,0"
-                                  Style="{StaticResource EditorMergeCheckBox}"
-                                  Visibility="Collapsed"
-                                  ToolTip="{DynamicResource L.Library.MergeAudioTip}"
-                                  ToolTipService.ShowOnDisabled="True">
-                            <StackPanel>
-                                <TextBlock Text="{DynamicResource L.Library.MergeAudio}"
-                                           FontSize="11" FontWeight="SemiBold"/>
-                                <TextBlock Text="{DynamicResource L.Library.MergeAudioSummary}"
-                                           FontSize="9.5"
-                                           Foreground="{StaticResource TextMutedBrush}"/>
-                            </StackPanel>
-                        </CheckBox>
                         <Button x:Name="SaveTrimButton" Margin="8,0,0,0"
                                 Content="{DynamicResource L.Library.SaveTrim}"
                                 Style="{StaticResource AccentButton}" Padding="18,9"
                                 Click="SaveTrim_Click"/>
                     </StackPanel>
                 </Grid>
+
+                <Popup x:Name="OutputSettingsPopup"
+                       PlacementTarget="{Binding ElementName=OutputSettingsButton}"
+                       Placement="Top" HorizontalOffset="-286" VerticalOffset="-8"
+                       AllowsTransparency="True" StaysOpen="True"
+                       PopupAnimation="None">
+                    <Border Width="326" Padding="16"
+                            Background="#FF151A1D"
+                            BorderBrush="{StaticResource WindowBorderBrush}"
+                            BorderThickness="1" CornerRadius="12">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{DynamicResource L.Library.OutputSettings}"
+                                           FontSize="14" FontWeight="Bold"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Content="{DynamicResource L.Library.ResetOutputSettings}"
+                                        Style="{StaticResource SubtleButton}"
+                                        Padding="9,5" Click="ResetOutputSettings_Click"/>
+                            </Grid>
+                            <TextBlock Text="{DynamicResource L.Library.OutputSettingsHint}"
+                                       Margin="0,7,0,13"
+                                       Style="{StaticResource SecondaryText}"
+                                       TextWrapping="Wrap"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="104"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Text="{DynamicResource L.Library.VideoCodec}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ComboBox x:Name="VideoCodecComboBox" Grid.Column="1"
+                                          Style="{StaticResource DarkCombo}"
+                                          DisplayMemberPath="Label"/>
+                                <TextBlock Grid.Row="1" Text="{DynamicResource L.Audio.Codec}"
+                                           Margin="0,9,0,0" VerticalAlignment="Center"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ComboBox x:Name="AudioCodecComboBox" Grid.Row="1" Grid.Column="1"
+                                          Margin="0,9,0,0"
+                                          Style="{StaticResource DarkCombo}"
+                                          DisplayMemberPath="Label"/>
+                                <TextBlock Grid.Row="2" Text="{DynamicResource L.Library.Resolution}"
+                                           Margin="0,9,0,0" VerticalAlignment="Center"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ComboBox x:Name="ResolutionComboBox" Grid.Row="2" Grid.Column="1"
+                                          Margin="0,9,0,0"
+                                          Style="{StaticResource DarkCombo}"
+                                          DisplayMemberPath="Label"/>
+                                <TextBlock Grid.Row="3" Text="{DynamicResource L.Video.Bitrate}"
+                                           Margin="0,9,0,0" VerticalAlignment="Center"
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
+                                <ComboBox x:Name="BitRateComboBox" Grid.Row="3" Grid.Column="1"
+                                          Margin="0,9,0,0"
+                                          Style="{StaticResource DarkCombo}"
+                                          DisplayMemberPath="Label"/>
+                            </Grid>
+                            <CheckBox x:Name="MergeAudioCheckBox" Margin="0,14,0,0"
+                                      Style="{StaticResource EditorMergeCheckBox}"
+                                      ToolTip="{DynamicResource L.Library.MergeAudioTip}"
+                                      ToolTipService.ShowOnDisabled="True">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.Library.MergeAudio}"
+                                               FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{DynamicResource L.Library.MergeAudioSummary}"
+                                               FontSize="9.5"
+                                               Foreground="{StaticResource TextMutedBrush}"/>
+                                </StackPanel>
+                            </CheckBox>
+                            <Button Content="{DynamicResource L.Library.ExportAs}"
+                                    Style="{StaticResource SubtleButton}"
+                                    Margin="0,14,0,0" Padding="12,8"
+                                    HorizontalAlignment="Stretch"
+                                    Click="ExportAs_Click"/>
+                        </StackPanel>
+                    </Border>
+                </Popup>
 
                 <Grid x:Name="PreviewModePanel" Grid.Row="2" Grid.RowSpan="2"
                       Margin="1,5,1,0" Visibility="Collapsed">
@@ -528,18 +671,23 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel Orientation="Horizontal">
-                            <Button x:Name="NextReplayButton"
+                            <Button x:Name="PreviousReplayButton"
                                     Style="{StaticResource ClipActionButton}"
-                                    Click="NextReplay_Click"
-                                    ToolTip="{DynamicResource L.Library.NextReplay}">
-                                <TextBlock Text="⏭" FontSize="12"/>
+                                    Click="PreviousReplay_Click"
+                                    ToolTip="{DynamicResource L.Library.PreviousReplay}">
+                                <Path Data="{StaticResource IconSkipPrevious}"
+                                      Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stretch="Uniform"/>
                             </Button>
                             <Button Style="{StaticResource ClipActionButton}" Click="Back_Click"
                                     Margin="7,0,0,0"
                                     ToolTip="{DynamicResource L.Library.Back5}">
-                                <Path Data="M15 5L8 12l7 7 M8 12h10"
+                                <Path Data="{StaticResource IconSeekBack}"
+                                      Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                       Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" Stretch="Uniform"/>
                             </Button>
                             <Button x:Name="PreviewPlayButton"
                                     Style="{StaticResource ClipActionButton}"
@@ -551,16 +699,21 @@
                             </Button>
                             <Button Style="{StaticResource ClipActionButton}" Click="Forward_Click"
                                     ToolTip="{DynamicResource L.Library.Forward5}" Margin="7,0,0,0">
-                                <Path Data="M9 5l7 7-7 7 M6 12h10"
+                                <Path Data="{StaticResource IconSeekForward}"
+                                      Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
                                       Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                                      StrokeThickness="2" StrokeLineJoin="Round" Stretch="Uniform"/>
+                                      StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round" Stretch="Uniform"/>
                             </Button>
-                            <Button x:Name="PreviousReplayButton"
+                            <Button x:Name="NextReplayButton"
                                     Style="{StaticResource ClipActionButton}"
                                     Margin="7,0,0,0"
-                                    Click="PreviousReplay_Click"
-                                    ToolTip="{DynamicResource L.Library.PreviousReplay}">
-                                <TextBlock Text="⏮" FontSize="12"/>
+                                    Click="NextReplay_Click"
+                                    ToolTip="{DynamicResource L.Library.NextReplay}">
+                                <Path Data="{StaticResource IconSkipNext}"
+                                      Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      Stretch="Uniform"/>
                             </Button>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal"
@@ -584,10 +737,9 @@
                                     VerticalAlignment="Center"
                                     Style="{StaticResource VolumeSlider}"
                                     ToolTip="{DynamicResource L.Library.ShortcutVolume}"
-                                    ValueChanged="PreviewVolumeSlider_ValueChanged"/>
+                                    ValueChanged="PlayerVolumeSlider_ValueChanged"/>
                             <Button Content="{DynamicResource L.Library.Trim}"
-                                    Style="{StaticResource AccentButton}" Padding="16,8"
-                                    Click="EnterTrimMode_Click"/>
+                                    Style="{StaticResource AccentButton}" Padding="16,8"/>
                             <Button Style="{StaticResource ClipActionButton}"
                                     Margin="8,0,0,0" Click="EnterFullscreen_Click"
                                     ToolTip="{DynamicResource L.Library.Fullscreen}">
@@ -598,10 +750,88 @@
                             </Button>
                         </StackPanel>
                     </Grid>
-                    <StackPanel Grid.Row="2" Margin="0,4,0,0">
-                        <TextBlock Text="{DynamicResource L.Section.Hotkeys}"
-                                   Style="{StaticResource SectionHeaderText}"
-                                   Margin="2,10,2,7"/>
+                    <StackPanel Grid.Row="2" Margin="0,11,0,0">
+                        <Grid Margin="2,0,2,7">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{DynamicResource L.Library.AudioTracks}"
+                                           Style="{StaticResource SectionHeaderText}"
+                                           VerticalAlignment="Center"/>
+                                <Border x:Name="PreviewAudioTrackCountBadge" Margin="7,0,0,0"
+                                        MinWidth="24" Height="18" Padding="6,0"
+                                        Background="{DynamicResource AccentChipBgBrush}"
+                                        BorderBrush="{DynamicResource AccentChipBorderBrush}"
+                                        BorderThickness="1" CornerRadius="6"
+                                        Visibility="Collapsed">
+                                    <TextBlock x:Name="PreviewAudioTrackCountText" Text="0"
+                                               FontFamily="{StaticResource FontMono}"
+                                               FontSize="10" FontWeight="Bold"
+                                               Foreground="{DynamicResource AccentBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="{DynamicResource L.Library.AudioTrackHint}"
+                                       HorizontalAlignment="Right" FontSize="10.5"
+                                       Foreground="{StaticResource TextMutedBrush}"/>
+                        </Grid>
+                        <ScrollViewer MaxHeight="126"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      PanningMode="VerticalOnly">
+                            <ItemsControl x:Name="PreviewAudioTrackRows"
+                                          ItemsSource="{Binding AudioTracks}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ToggleButton IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                                                      Tag="{Binding}" Click="AudioTrackToggle_Click"
+                                                      Style="{StaticResource SourceChip}"
+                                                      Height="36" Margin="0,0,8,8">
+                                            <Grid Margin="10,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Ellipse Width="7" Height="7"
+                                                         Fill="{DynamicResource AccentBrush}"
+                                                         VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1" Text="{Binding Label}"
+                                                           Margin="8,0" TextTrimming="CharacterEllipsis"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="2" Text="{Binding Codec}"
+                                                           VerticalAlignment="Center" FontSize="9.5"
+                                                           Foreground="{StaticResource TextMutedBrush}"/>
+                                            </Grid>
+                                        </ToggleButton>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <TextBlock x:Name="PreviewNoAudioText"
+                                   Text="{DynamicResource L.Library.NoAudio}"
+                                   Style="{StaticResource SecondaryText}" Margin="2,4,0,7"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+
+            <Popup x:Name="PlayerHelpPopup"
+                   PlacementTarget="{Binding ElementName=PlayerHelpButton}"
+                   Placement="Bottom" HorizontalOffset="-270" VerticalOffset="8"
+                   AllowsTransparency="True" StaysOpen="True"
+                   PopupAnimation="None">
+                <Border Width="620" Padding="16"
+                        Background="#FF151A1D"
+                        BorderBrush="{StaticResource WindowBorderBrush}"
+                        BorderThickness="1" CornerRadius="12">
+                    <StackPanel>
+                        <TextBlock Text="{DynamicResource L.Library.Help}"
+                                   FontSize="14" FontWeight="Bold" Margin="2,0,2,10"/>
                         <Border Style="{StaticResource SettingsGroup}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -613,7 +843,6 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
-
                                 <Border Style="{StaticResource PlayerShortcutCell}"
                                         BorderThickness="0,0,1,1">
                                     <Grid>
@@ -632,7 +861,6 @@
                                         </Border>
                                     </Grid>
                                 </Border>
-
                                 <Border Grid.Column="1" Style="{StaticResource PlayerShortcutCell}"
                                         BorderThickness="0,0,0,1">
                                     <Grid>
@@ -651,9 +879,7 @@
                                         </Border>
                                     </Grid>
                                 </Border>
-
-                                <Border Grid.Row="1"
-                                        Style="{StaticResource PlayerShortcutCell}"
+                                <Border Grid.Row="1" Style="{StaticResource PlayerShortcutCell}"
                                         BorderThickness="0,0,1,1">
                                     <Grid>
                                         <Grid.ColumnDefinitions>
@@ -671,7 +897,6 @@
                                         </Border>
                                     </Grid>
                                 </Border>
-
                                 <Border Grid.Row="1" Grid.Column="1"
                                         Style="{StaticResource PlayerShortcutCell}"
                                         BorderThickness="0,0,0,1">
@@ -691,7 +916,6 @@
                                         </Border>
                                     </Grid>
                                 </Border>
-
                                 <Border Grid.Row="2" Style="{StaticResource PlayerShortcutCell}"
                                         BorderThickness="0,0,1,0">
                                     <Grid>
@@ -710,7 +934,6 @@
                                         </Border>
                                     </Grid>
                                 </Border>
-
                                 <Border Grid.Row="2" Grid.Column="1"
                                         Style="{StaticResource PlayerShortcutCell}">
                                     <Grid>
@@ -732,8 +955,8 @@
                             </Grid>
                         </Border>
                     </StackPanel>
-                </Grid>
-            </Grid>
+                </Border>
+            </Popup>
 
             <Border x:Name="RecentReplaySidebar" Grid.Row="1" Grid.Column="1"
                     Width="260" Margin="0,0,20,20" Padding="12,10"
@@ -764,6 +987,7 @@
                     </StackPanel>
                     <ListBox x:Name="RecentReplayList"
                              ItemsSource="{Binding RecentReplayItems}"
+                             IsSynchronizedWithCurrentItem="False"
                              Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              ScrollViewer.VerticalScrollBarVisibility="Auto">
@@ -785,10 +1009,10 @@
                                                 <ContentPresenter/>
                                             </Border>
                                             <ControlTemplate.Triggers>
-                                                <Trigger Property="IsSelected" Value="True">
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
                                                     <Setter TargetName="ReplayItemBorder" Property="Background" Value="{DynamicResource AccentSubtleBrush}"/>
                                                     <Setter TargetName="ReplayItemBorder" Property="BorderBrush" Value="{DynamicResource AccentDimBrush}"/>
-                                                </Trigger>
+                                                </DataTrigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
                                     </Setter.Value>

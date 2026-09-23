@@ -77,7 +77,7 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          dotnet-version: 9.0.x
+          dotnet-version: 10.0.x
           cache: true
           cache-dependency-path: src/Captail/packages.lock.json
 
@@ -89,12 +89,12 @@ jobs:
         id: inno
         shell: pwsh
         run: |
-          $url = "https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe"
-          $installer = Join-Path $env:RUNNER_TEMP "innosetup-7.0.2-x64.exe"
+          $url = "https://github.com/jrsoftware/issrc/releases/download/is-7_1_0/innosetup-7.1.0-x64.exe"
+          $installer = Join-Path $env:RUNNER_TEMP "innosetup-7.1.0-x64.exe"
           $installDirectory = Join-Path $env:RUNNER_TEMP "innosetup7"
           Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $installer
 
-          $expectedHash = "5ad54ca3def786f8f4212552e54cc6d8d61329e2d24a1cfee0571d42c2684ff1"
+          $expectedHash = "0362a383ed217d4c4239b5933866dd96d3eb2102737da92f80f6057a4b40df2f"
           $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
           if (-not $actualHash.Equals($expectedHash, [StringComparison]::OrdinalIgnoreCase)) {
             throw "Inno Setup SHA-256 verification failed: $actualHash"

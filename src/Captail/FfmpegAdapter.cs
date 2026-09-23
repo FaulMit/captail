@@ -16,7 +16,25 @@ public sealed record VideoStreamInfo(
     string Codec,
     int Width,
     int Height,
-    double FrameRate);
+    double FrameRate,
+    int BitRateKbps = 0);
+
+public sealed record VideoOutputSettings(
+    string? VideoCodec = null,
+    string? AudioCodec = null,
+    int? Width = null,
+    int? Height = null,
+    int? VideoBitRateKbps = null,
+    bool MergeAudioTracks = false)
+{
+    public bool HasEncodingChanges =>
+        VideoCodec is not null ||
+        AudioCodec is not null ||
+        Width is not null ||
+        Height is not null ||
+        VideoBitRateKbps is not null ||
+        MergeAudioTracks;
+}
 
 public sealed class FfmpegAdapter
 {
@@ -123,7 +141,8 @@ public sealed class FfmpegAdapter
             [
                 "-v", "error",
                 "-select_streams", "v:0",
-                "-show_entries", "stream=codec_name,width,height,avg_frame_rate,r_frame_rate",
+                "-show_entries",
+                "stream=codec_name,width,height,avg_frame_rate,r_frame_rate,bit_rate:format=bit_rate",
                 "-of", "json",
                 path,
             ],
@@ -156,11 +175,18 @@ public sealed class FfmpegAdapter
                 ? rawRate.GetString()
                 : null;
         }
+        int bitRateKbps = ReadBitRateKbps(stream);
+        if (bitRateKbps == 0 &&
+            document.RootElement.TryGetProperty("format", out JsonElement format))
+        {
+            bitRateKbps = ReadBitRateKbps(format);
+        }
         return new VideoStreamInfo(
             codec,
             width,
             height,
-            ParseFrameRate(frameRateText));
+            ParseFrameRate(frameRateText),
+            bitRateKbps);
     }
 
     public async Task CreateThumbnailAsync(
@@ -395,6 +421,342 @@ public sealed class FfmpegAdapter
         {
             TryDeleteWorkingFile(replacementPath);
         }
+    }
+
+    public async Task TranscodeAsync(
+        string sourcePath,
+        string destinationPath,
+        TimeSpan start,
+        TimeSpan end,
+        IReadOnlyList<int>? audioStreamIndices = null,
+        VideoOutputSettings? outputSettings = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (start < TimeSpan.Zero || end <= start)
+            throw new ArgumentOutOfRangeException(nameof(start));
+
+        VideoOutputSettings settings = outputSettings ?? new VideoOutputSettings();
+        string extension = Path.GetExtension(destinationPath).ToLowerInvariant();
+        string outputFormat = OutputFormatForPath(destinationPath);
+        VideoStreamInfo? videoInfo = await ReadVideoInfoAsync(
+            sourcePath,
+            cancellationToken);
+        string videoCodec = NormalizeVideoCodec(
+            settings.VideoCodec ?? videoInfo?.Codec ?? "h264");
+        string audioCodec = NormalizeAudioCodec(
+            settings.AudioCodec ?? DefaultAudioCodec(extension));
+        bool encodeVideo =
+            settings.VideoCodec is not null ||
+            settings.Width is not null ||
+            settings.Height is not null ||
+            settings.VideoBitRateKbps is not null;
+        if (encodeVideo &&
+            settings.VideoCodec is null &&
+            videoCodec is not ("h264" or "hevc" or "av1" or "vp9"))
+        {
+            videoCodec = extension == ".webm" ? "vp9" : "h264";
+        }
+        ValidateOutputCodecs(extension, videoCodec, audioCodec, encodeVideo,
+            settings.AudioCodec is not null || settings.MergeAudioTracks);
+        string temporaryPath = destinationPath + $".{Guid.NewGuid():N}.tmp";
+        try
+        {
+            int[] selectedAudioStreams = audioStreamIndices?
+                .Distinct()
+                .ToArray() ?? [];
+            bool mixSelectedAudio =
+                settings.MergeAudioTracks && selectedAudioStreams.Length > 1;
+            var arguments = new List<string>
+            {
+                "-nostdin", "-hide_banner", "-loglevel", "error",
+                "-ss", start.TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+                "-i", sourcePath,
+                "-t", (end - start).TotalSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+                "-map", "0:v:0",
+            };
+            if (mixSelectedAudio)
+            {
+                string inputs = string.Concat(
+                    selectedAudioStreams.Select(streamIndex => $"[0:{streamIndex}]"));
+                arguments.AddRange(
+                [
+                    "-filter_complex",
+                    $"{inputs}amix=inputs={selectedAudioStreams.Length}:" +
+                    "duration=longest:dropout_transition=0:normalize=0," +
+                    "alimiter=limit=0.95[mixed_audio]",
+                    "-map", "[mixed_audio]",
+                    "-metadata:s:a:0", "title=Mixed audio",
+                ]);
+            }
+            else if (audioStreamIndices is null)
+            {
+                arguments.AddRange(["-map", "0:a?"]);
+            }
+            else
+            {
+                foreach (int streamIndex in selectedAudioStreams)
+                    arguments.AddRange(["-map", $"0:{streamIndex}?"]);
+            }
+
+            if (encodeVideo)
+            {
+                string videoFilter = settings is { Width: > 0, Height: > 0 }
+                    ? $"scale=w={settings.Width}:h={settings.Height}:" +
+                      "force_original_aspect_ratio=decrease," +
+                      $"pad={settings.Width}:{settings.Height}:(ow-iw)/2:(oh-ih)/2," +
+                      "format=yuv420p"
+                    : "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p";
+                arguments.AddRange(["-vf", videoFilter]);
+                int bitrateKbps = settings.VideoBitRateKbps ??
+                    (videoInfo?.BitRateKbps > 0
+                        ? videoInfo.BitRateKbps
+                        : CalculateH264BitrateKbps(videoInfo));
+                AddVideoEncoderArguments(
+                    arguments,
+                    videoCodec,
+                    Math.Clamp(bitrateKbps, 500, 100_000));
+            }
+            else
+            {
+                arguments.AddRange(["-c:v", "copy"]);
+            }
+            bool encodeAudio = settings.AudioCodec is not null || mixSelectedAudio;
+            arguments.AddRange(encodeAudio
+                ? AudioEncoderArguments(audioCodec)
+                : ["-c:a", "copy"]);
+            arguments.AddRange(["-map_metadata", "0", "-avoid_negative_ts", "make_zero"]);
+            if (extension is ".mp4" or ".mov")
+                arguments.AddRange(["-movflags", "+faststart"]);
+            arguments.AddRange(["-f", outputFormat, "-y", temporaryPath]);
+
+            if (encodeVideo && videoCodec == "hevc")
+            {
+                int encoderIndex = arguments.IndexOf("-c:v") + 1;
+                InvalidOperationException? lastEncoderError = null;
+                foreach (string encoder in new[]
+                         { "hevc_mf", "hevc_nvenc", "hevc_amf", "hevc_qsv" })
+                {
+                    arguments[encoderIndex] = encoder;
+                    try
+                    {
+                        await RunAsync(
+                            _ffmpegPath,
+                            arguments,
+                            TimeSpan.FromHours(2),
+                            cancellationToken);
+                        lastEncoderError = null;
+                        break;
+                    }
+                    catch (InvalidOperationException exception)
+                        when (!cancellationToken.IsCancellationRequested &&
+                              (exception.Message.Contains(
+                                   encoder,
+                                   StringComparison.OrdinalIgnoreCase) ||
+                               exception.Message.Contains(
+                                   "Unknown encoder",
+                                   StringComparison.OrdinalIgnoreCase)))
+                    {
+                        lastEncoderError = exception;
+                        Log.Write($"HEVC encoder {encoder} failed: {exception.Message}");
+                        TryDeleteWorkingFile(temporaryPath);
+                    }
+                }
+                if (lastEncoderError is not null)
+                {
+                    throw new InvalidOperationException(
+                        "HEVC export failed with all available encoders. " +
+                        lastEncoderError.Message,
+                        lastEncoderError);
+                }
+            }
+            else
+            {
+                await RunAsync(
+                    _ffmpegPath,
+                    arguments,
+                    TimeSpan.FromHours(2),
+                    cancellationToken);
+            }
+            if (!File.Exists(temporaryPath) || new FileInfo(temporaryPath).Length == 0)
+                throw new InvalidOperationException("FFmpeg produced an empty export.");
+
+            await RunFileOperationWithRetryAsync(
+                () => File.Move(temporaryPath, destinationPath, overwrite: true),
+                cancellationToken);
+        }
+        finally
+        {
+            TryDeleteWorkingFile(temporaryPath);
+        }
+    }
+
+    public async Task TranscodeOverwriteAsync(
+        string sourcePath,
+        TimeSpan start,
+        TimeSpan end,
+        IReadOnlyList<int>? audioStreamIndices,
+        VideoOutputSettings outputSettings,
+        CancellationToken cancellationToken = default)
+    {
+        string directory = Path.GetDirectoryName(sourcePath)!;
+        string replacementPath = Path.Combine(
+            directory,
+            $".{Path.GetFileNameWithoutExtension(sourcePath)}." +
+            $"{Guid.NewGuid():N}.replacement{Path.GetExtension(sourcePath)}");
+        try
+        {
+            await TranscodeAsync(
+                sourcePath,
+                replacementPath,
+                start,
+                end,
+                audioStreamIndices,
+                outputSettings,
+                cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            await ReplaceFileWithRetryAsync(
+                replacementPath,
+                sourcePath,
+                cancellationToken);
+        }
+        finally
+        {
+            TryDeleteWorkingFile(replacementPath);
+        }
+    }
+
+    private static void AddVideoEncoderArguments(
+        List<string> arguments,
+        string codec,
+        int bitrateKbps)
+    {
+        switch (codec)
+        {
+            case "h264":
+                arguments.AddRange(
+                [
+                    "-c:v", "libopenh264",
+                    "-profile:v", "high",
+                    "-rc_mode", "bitrate",
+                    "-b:v", $"{bitrateKbps}k",
+                    "-maxrate", $"{bitrateKbps * 3 / 2}k",
+                    "-bufsize", $"{bitrateKbps * 2}k",
+                ]);
+                break;
+            case "hevc":
+                arguments.AddRange(
+                [
+                    "-c:v", "hevc_mf",
+                    "-b:v", $"{bitrateKbps}k",
+                ]);
+                break;
+            case "av1":
+                arguments.AddRange(
+                [
+                    "-c:v", "libsvtav1",
+                    "-preset", "8",
+                    "-b:v", $"{bitrateKbps}k",
+                ]);
+                break;
+            case "vp9":
+                arguments.AddRange(
+                [
+                    "-c:v", "libvpx-vp9",
+                    "-b:v", $"{bitrateKbps}k",
+                    "-deadline", "good",
+                    "-cpu-used", "4",
+                    "-row-mt", "1",
+                ]);
+                break;
+            default:
+                throw new NotSupportedException(
+                    $"Unsupported video codec '{codec}'.");
+        }
+    }
+
+    private static string[] AudioEncoderArguments(string codec) => codec switch
+    {
+        "aac" => ["-c:a", "aac", "-b:a", "256k"],
+        "opus" => ["-c:a", "libopus", "-b:a", "192k"],
+        _ => throw new NotSupportedException(
+            $"Unsupported audio codec '{codec}'."),
+    };
+
+    private static void ValidateOutputCodecs(
+        string extension,
+        string videoCodec,
+        string audioCodec,
+        bool encodeVideo,
+        bool encodeAudio)
+    {
+        if (extension == ".webm" &&
+            ((encodeVideo && videoCodec is not ("vp9" or "av1")) ||
+             (encodeAudio && audioCodec != "opus")))
+        {
+            throw new NotSupportedException(
+                "WebM export supports VP9 or AV1 video with Opus audio.");
+        }
+        if (extension is ".mp4" or ".mov" &&
+            encodeAudio && audioCodec != "aac")
+        {
+            throw new NotSupportedException(
+                "MP4 and MOV export support AAC audio.");
+        }
+        if (extension == ".mp4" &&
+            encodeVideo && videoCodec is not ("h264" or "hevc" or "av1"))
+        {
+            throw new NotSupportedException(
+                "MP4 export supports H.264, HEVC, or AV1 video.");
+        }
+        if (extension == ".mov" &&
+            encodeVideo && videoCodec is not ("h264" or "hevc"))
+        {
+            throw new NotSupportedException(
+                "MOV export supports H.264 or HEVC video.");
+        }
+    }
+
+    private static string NormalizeVideoCodec(string codec) =>
+        codec.ToLowerInvariant() switch
+        {
+            "h265" => "hevc",
+            string value => value,
+        };
+
+    private static string NormalizeAudioCodec(string codec) =>
+        codec.ToLowerInvariant() switch
+        {
+            "libopus" => "opus",
+            string value => value,
+        };
+
+    private static string DefaultAudioCodec(string extension) =>
+        extension == ".webm" ? "opus" : "aac";
+
+    private static int CalculateH264BitrateKbps(VideoStreamInfo? videoInfo)
+    {
+        if (videoInfo is null)
+            return 12_000;
+
+        double bitsPerSecond =
+            videoInfo.Width * (double)videoInfo.Height *
+            Math.Max(24, videoInfo.FrameRate) * 0.08;
+        return (int)Math.Clamp(bitsPerSecond / 1000, 4_000, 60_000);
+    }
+
+    private static int ReadBitRateKbps(JsonElement element)
+    {
+        if (!element.TryGetProperty("bit_rate", out JsonElement bitRateElement) ||
+            !long.TryParse(
+                bitRateElement.GetString(),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out long bitsPerSecond) ||
+            bitsPerSecond <= 0)
+        {
+            return 0;
+        }
+        return (int)Math.Clamp(bitsPerSecond / 1000, 1, int.MaxValue);
     }
 
     private static string OutputFormatForPath(string path) =>

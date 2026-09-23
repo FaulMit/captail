@@ -1,31 +1,20 @@
 [CmdletBinding()]
 param(
-    [string]$Destination = "",
-
-    [ValidateSet("Shared", "Static")]
-    [string]$Flavor = "Shared"
+    [string]$Destination = ""
 )
 
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
-$version = "n9.0.1-84-g946fcce07b"
-$releaseTag = "autobuild-2026-09-18-13-22"
-$isStatic = $Flavor -eq "Static"
-$archiveName = if ($isStatic) {
-    "ffmpeg-$version-win64-lgpl-9.0.zip"
-}
-else {
-    "ffmpeg-$version-win64-lgpl-shared-9.0.zip"
-}
-$expectedArchiveSha256 = if ($isStatic) {
-    "e17c2a1313bec165f12f5a73d07447b03292bbd7a9153af9de901e981e0109d6"
-}
-else {
-    "a2a50423b631cb51e91c2668c16a4807197c50d1f5fc56dd4516ca188a0d731f"
-}
+
+$version = "v0.41.0-1023-g69e63f425"
+$releaseTag = "20260903"
+$archiveName = "mpv-dev-x86_64-20260903-git-69e63f425a.7z"
+$expectedArchiveSha256 =
+    "fac135c68a35b7639e39d72c0c365104edbaebdea39a0dfdd8c36e8c8e80faef"
 $url =
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/" +
+    "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/" +
     "$releaseTag/$archiveName"
+
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
 
@@ -46,8 +35,7 @@ function Get-Sha256Hex([string]$Path) {
 }
 
 if (-not $Destination) {
-    $runtimeName = if ($isStatic) { "ffmpeg-static" } else { "ffmpeg" }
-    $Destination = Join-Path $allowedRuntimeRoot $runtimeName
+    $Destination = Join-Path $allowedRuntimeRoot "mpv"
 }
 
 $Destination = [IO.Path]::GetFullPath($Destination)
@@ -57,11 +45,11 @@ $allowedPrefix = $allowedRuntimeRoot.TrimEnd(
 if (-not $Destination.StartsWith(
         $allowedPrefix,
         [StringComparison]::OrdinalIgnoreCase)) {
-    throw "FFmpeg runtime destination must stay under $allowedRuntimeRoot"
+    throw "mpv runtime destination must stay under $allowedRuntimeRoot"
 }
 
 $archive = Join-Path $env:TEMP $archiveName
-$extract = Join-Path $env:TEMP "Captail-FFmpeg-$PID-$([Guid]::NewGuid().ToString('N'))"
+$extract = Join-Path $env:TEMP "Captail-mpv-$PID-$([Guid]::NewGuid().ToString('N'))"
 try {
     if (Test-Path -LiteralPath $archive) {
         $existingHash = Get-Sha256Hex $archive
@@ -72,7 +60,7 @@ try {
         }
     }
     if (-not (Test-Path -LiteralPath $archive)) {
-        Write-Host "Downloading FFmpeg $version runtime..."
+        Write-Host "Downloading mpv $version runtime..."
         Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $archive
     }
     $actualHash = Get-Sha256Hex $archive
@@ -80,32 +68,35 @@ try {
             $expectedArchiveSha256,
             [StringComparison]::OrdinalIgnoreCase)) {
         Remove-Item -LiteralPath $archive -Force
-        throw "FFmpeg archive SHA-256 mismatch. Expected $expectedArchiveSha256; found $actualHash."
+        throw "mpv archive SHA-256 mismatch. Expected $expectedArchiveSha256; found $actualHash."
     }
 
-    Expand-Archive -LiteralPath $archive -DestinationPath $extract
-    $ffmpeg = Get-ChildItem -LiteralPath $extract -Filter ffmpeg.exe -Recurse |
+    $sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty Source -First 1
+    if (-not $sevenZip) {
+        $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+    }
+    if (-not (Test-Path -LiteralPath $sevenZip)) {
+        throw '7-Zip is required to extract the mpv runtime archive.'
+    }
+    New-Item -ItemType Directory -Force -Path $extract | Out-Null
+    & $sevenZip x -y "-o$extract" $archive | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not extract mpv runtime archive (exit code $LASTEXITCODE)."
+    }
+    $libmpv = Get-ChildItem -LiteralPath $extract -Filter libmpv-2.dll -Recurse |
         Select-Object -First 1
-    if (-not $ffmpeg) {
-        throw "ffmpeg.exe not found in FFmpeg archive."
+    if (-not $libmpv) {
+        throw "libmpv-2.dll not found in mpv archive."
     }
-    $binRoot = $ffmpeg.Directory.FullName
-    if (-not (Test-Path -LiteralPath (Join-Path $binRoot "ffprobe.exe"))) {
-        throw "ffprobe.exe not found in FFmpeg archive."
-    }
+
     if (Test-Path -LiteralPath $Destination) {
         Remove-Item -LiteralPath $Destination -Recurse -Force
     }
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
-    Copy-Item -LiteralPath (Join-Path $binRoot "ffmpeg.exe") -Destination $Destination
-    Copy-Item -LiteralPath (Join-Path $binRoot "ffprobe.exe") -Destination $Destination
-    Get-ChildItem -LiteralPath $binRoot -File -Filter *.dll |
-        Copy-Item -Destination $Destination
-
+    Copy-Item -LiteralPath $libmpv.FullName -Destination $Destination
     Set-Content -LiteralPath (Join-Path $Destination "VERSION") `
         -Value $version -Encoding UTF8
-    Set-Content -LiteralPath (Join-Path $Destination "FLAVOR") `
-        -Value $Flavor.ToLowerInvariant() -Encoding ascii
     Set-Content -LiteralPath (Join-Path $Destination "SOURCE_URL") `
         -Value $url -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $Destination "SOURCE_SHA256") `
@@ -125,4 +116,4 @@ finally {
     }
 }
 
-Write-Host "FFmpeg runtime $version ($Flavor) ready: $Destination"
+Write-Host "mpv runtime $version ready: $Destination"

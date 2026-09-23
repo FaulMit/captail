@@ -77,8 +77,13 @@
   <Geometry x:Key="IconFolder">M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z</Geometry>
   <Geometry x:Key="IconChevron">M6 9l6 6 6-6</Geometry>
   <Geometry x:Key="IconBack">M19 12H5 M12 19l-7-7 7-7</Geometry>
-  <Geometry x:Key="IconDisplay">M2 4h20v13H2z M8 21h8 M12 17v4</Geometry>
-  <Geometry x:Key="IconMic">M9 2h6v12H9z M5 10v1a7 7 0 0 0 14 0v-1 M12 18v4</Geometry>
+  <Geometry x:Key="IconDisplay">M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z M8 21h8 M12 17v4</Geometry>
+  <Geometry x:Key="IconSpeaker">M4 9h4l5-4v14l-5-4H4z M16 9.5a4 4 0 0 1 0 5 M18.5 7a7.5 7.5 0 0 1 0 10</Geometry>
+  <Geometry x:Key="IconMic">M9 4a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0z M6 10v1a6 6 0 0 0 12 0v-1 M12 17v4 M9 21h6</Geometry>
+  <Geometry x:Key="IconSkipPrevious">M17 5v14L8 12l9-7z M4 5h2v14H4z</Geometry>
+  <Geometry x:Key="IconSkipNext">M7 5v14l9-7-9-7z M18 5h2v14h-2z</Geometry>
+  <Geometry x:Key="IconSeekBack">M15 5L8 12l7 7 M8 12h10</Geometry>
+  <Geometry x:Key="IconSeekForward">M9 5l7 7-7 7 M6 12h10</Geometry>
   <Geometry x:Key="IconGear">M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z</Geometry>
   <Geometry x:Key="IconScissors">M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M8.6 8.6L21 21 M8.6 15.4L21 3</Geometry>
   <Geometry x:Key="IconTrash">M3 6h18 M8 6V3h8v3 M19 6l-1 15H6L5 6 M10 11v6 M14 11v6</Geometry>
@@ -343,16 +348,16 @@
   </Style>
 
   <Style x:Key="ClipActionButton" TargetType="Button" BasedOn="{StaticResource SubtleButton}">
-    <Setter Property="Width" Value="31"/>
-    <Setter Property="Height" Value="31"/>
-    <Setter Property="Padding" Value="8"/>
+    <Setter Property="Width" Value="34"/>
+    <Setter Property="Height" Value="34"/>
+    <Setter Property="Padding" Value="6"/>
     <Setter Property="Margin" Value="3,0,0,0"/>
   </Style>
 
   <Style x:Key="IdentifyDisplayButton" TargetType="Button">
     <Setter Property="Width" Value="34"/>
     <Setter Property="Height" Value="34"/>
-    <Setter Property="Padding" Value="8"/>
+    <Setter Property="Padding" Value="6"/>
     <Setter Property="Background" Value="{StaticResource BgControlBrush}"/>
     <Setter Property="Foreground" Value="{DynamicResource AccentDimBrush}"/>
     <Setter Property="BorderBrush" Value="{StaticResource BorderControlBrush}"/>

@@ -3,8 +3,10 @@ param(
     [string]$ReplayFile,
     [string]$OutputDirectory,
     [string]$ExpectedVersion,
-    [switch]$SkipEditor,
-    [switch]$EditorOnly,
+    [string]$DemoAudioExe,
+    [switch]$KeepRecording,
+    [switch]$SkipPlayer,
+    [switch]$PlayerOnly,
     [switch]$AllowNonShowcaseReplay
 )
 
@@ -339,9 +341,7 @@ function Assert-ShowcaseReplay {
 function Open-FirstReplayAction {
     param(
         [System.Windows.Automation.AutomationElement]$Root,
-        [string]$ReplayPath,
-        [ValidateSet("Preview", "Trim")]
-        [string]$Action
+        [string]$ReplayPath
     )
 
     $list = Find-AutomationElement -Root $Root -AutomationId "RecentReplaysList" -TimeoutSeconds 30
@@ -408,15 +408,7 @@ function Open-FirstReplayAction {
         throw "Replay action buttons did not appear after hover."
     }
 
-    $actionButton = if ($Action -eq "Preview") {
-        $rowButtons[0]
-    }
-    else {
-        # Replay cards end with Trim and Delete. Pick Trim by position so
-        # adding leading actions such as Play or Show in folder stays safe.
-        $rowButtons[$rowButtons.Count - 2]
-    }
-    Invoke-AutomationElement -Element $actionButton
+    Invoke-AutomationElement -Element $rowButtons[0]
     [NativeMethods]::SetCursorPos(0, 0) | Out-Null
 }
 
@@ -550,8 +542,8 @@ public static class NativeMethods
 "@
 
 $CaptailExe = Resolve-CaptailExecutable -RequestedPath $CaptailExe
-if ($SkipEditor -and $EditorOnly) {
-    throw "-SkipEditor and -EditorOnly cannot be used together."
+if ($SkipPlayer -and $PlayerOnly) {
+    throw "-SkipPlayer and -PlayerOnly cannot be used together."
 }
 $actualVersion = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($CaptailExe).ProductVersion
 if (-not [string]::IsNullOrWhiteSpace($ExpectedVersion) -and
@@ -571,6 +563,7 @@ $originalConfigBackup = if ($hadConfigBackup) { [System.IO.File]::ReadAllBytes($
 $originalCursor = New-Object System.Drawing.Point
 [System.Windows.Forms.Cursor]::Position | ForEach-Object { $originalCursor = $_ }
 $automationProcess = $null
+$demoAudioProcess = $null
 $generatedRecordingPaths = @()
 
 try {
@@ -585,6 +578,7 @@ try {
         -ConfiguredOutputDirectory $originalOutputDirectory
 
     $config.Language = "en"
+    $config.AccentColor = "mint"
     $config.Codec = "av1"
     $config.RecordingResolution = "2160p"
     $config.FrameRate = 240
@@ -595,6 +589,18 @@ try {
     $config.CaptureMicrophone = $true
     $config.SeparateAudioTracks = $false
     $config.AudioRoutingMode = "advanced"
+    if (-not [string]::IsNullOrWhiteSpace($DemoAudioExe)) {
+        $DemoAudioExe = (Resolve-Path -LiteralPath $DemoAudioExe -ErrorAction Stop).Path
+        $config.ProcessAudioRoutes = @(
+            [pscustomobject]@{
+                Executable = [IO.Path]::GetFileName($DemoAudioExe)
+                Track = 1
+            }
+        )
+        $demoAudioProcess = Start-Process -FilePath $DemoAudioExe `
+            -ArgumentList '--frequency 440 --duration 180 --no-window' `
+            -WindowStyle Hidden -PassThru
+    }
     if ($null -ne $resolvedReplay) {
         $config.OutputDirectory = Split-Path -Parent $resolvedReplay
     }
@@ -605,8 +611,12 @@ try {
     $root = Get-CaptailRoot -Process $automationProcess
     Start-Sleep -Seconds 4
 
-    if (-not $EditorOnly) {
+    if (-not $PlayerOnly) {
         $settingsButton = Find-AutomationElement -Root $root -AutomationId "SettingsButton"
+        Invoke-AutomationElement -Element $settingsButton
+        $doneButton = Find-AutomationElement -Root $root -AutomationId "DoneButton"
+        Invoke-AutomationElement -Element $doneButton
+        Start-Sleep -Seconds 2
         Invoke-AutomationElement -Element $settingsButton
         Find-AutomationElement -Root $root -AutomationId "DoneButton" | Out-Null
         Start-Sleep -Milliseconds 600
@@ -623,6 +633,13 @@ try {
         $routingRoot = Find-CaptailChildWindow -Process $automationProcess `
             -AutomationId "ProcessAudioSearchBox" `
             -FailureMessage "Application audio routing window did not open."
+        if ($null -ne $demoAudioProcess) {
+            $searchBox = Find-AutomationElement -Root $routingRoot `
+                -AutomationId "ProcessAudioSearchBox"
+            $searchValue = $searchBox.GetCurrentPattern(
+                [System.Windows.Automation.ValuePattern]::Pattern)
+            $searchValue.SetValue($demoAudioProcess.ProcessName)
+        }
         Start-Sleep -Seconds 2
         Capture-Window -Root $routingRoot `
             -Path (Join-Path $OutputDirectory "captail-audio-routing.png")
@@ -670,32 +687,26 @@ try {
         Start-Sleep -Seconds 2
     }
 
-    if (-not $SkipEditor) {
+    if (-not $SkipPlayer) {
         if ($null -eq $resolvedReplay) {
-            throw "No replay found. Pass -ReplayFile or use -SkipEditor."
+            throw "No replay found. Pass -ReplayFile or use -SkipPlayer."
         }
         Assert-ShowcaseReplay -Path $resolvedReplay -Executable $CaptailExe `
             -AllowMismatch $AllowNonShowcaseReplay.IsPresent
 
         $editorProcess = Get-Process -Id $automationProcess.Id
-        Open-FirstReplayAction -Root $root -ReplayPath $resolvedReplay -Action Preview
+        Open-FirstReplayAction -Root $root -ReplayPath $resolvedReplay
         $playerRoot = Find-CaptailChildWindow -Process $editorProcess `
-            -AutomationId "PreviewPlayButton" `
+            -AutomationId "PlayButton" `
             -FailureMessage "Replay player window did not open."
         Start-Sleep -Seconds 4
         Capture-Window -Root $playerRoot -Path (Join-Path $OutputDirectory "captail-player.png")
-        Close-AutomationWindow -Window $playerRoot
-        Start-Sleep -Seconds 1
-
-        Open-FirstReplayAction -Root $root -ReplayPath $resolvedReplay -Action Trim
-        $editorRoot = Find-CaptailChildWindow -Process $editorProcess `
-            -AutomationId "PlayButton" `
-            -FailureMessage "Clip editor window did not open."
-        Start-Sleep -Seconds 4
-        Capture-Window -Root $editorRoot -Path (Join-Path $OutputDirectory "captail-editor.png")
     }
 }
 finally {
+    if ($null -ne $demoAudioProcess -and -not $demoAudioProcess.HasExited) {
+        Stop-Process -Id $demoAudioProcess.Id -Force -ErrorAction SilentlyContinue
+    }
     try {
         Stop-CaptailInstance -Executable $CaptailExe
     }
@@ -703,8 +714,10 @@ finally {
         Write-Warning "Captail shutdown during cleanup failed: $($_.Exception.Message)"
     }
 
-    foreach ($generatedRecordingPath in $generatedRecordingPaths) {
-        Remove-Item -LiteralPath $generatedRecordingPath -Force -ErrorAction SilentlyContinue
+    if (-not $KeepRecording) {
+        foreach ($generatedRecordingPath in $generatedRecordingPaths) {
+            Remove-Item -LiteralPath $generatedRecordingPath -Force -ErrorAction SilentlyContinue
+        }
     }
 
     New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null

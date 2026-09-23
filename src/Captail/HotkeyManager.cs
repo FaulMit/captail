@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -6,6 +7,8 @@ using System.Windows.Interop;
 namespace Captail;
 
 /// <summary>Global hotkeys for saving a replay and toggling the replay buffer.</summary>
+[SuppressMessage("Usage", "CA2216:Disposable types should declare finalizer",
+    Justification = "HwndSource and keyboard hooks must be released on the UI thread; a finalizer cannot safely dispose them.")]
 public sealed class HotkeyManager : IDisposable
 {
     [DllImport("user32.dll")]

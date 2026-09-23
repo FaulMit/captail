@@ -3,7 +3,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $fixture = Join-Path $repoRoot `
     "native\ObsCaptureFixture\build\Release\ObsCaptureFixture.exe"
 $appRoot = Join-Path $repoRoot `
-    "src\Captail\bin\Debug\net9.0-windows10.0.22621.0\win-x64"
+    "src\Captail\bin\Debug\net10.0-windows10.0.22621.0\win-x64"
 $captail = Join-Path $appRoot "Captail.exe"
 $appHook = Join-Path $appRoot `
     "data\obs-plugins\win-capture\graphics-hook64.dll"
