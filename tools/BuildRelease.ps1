@@ -111,8 +111,16 @@ if (-not $SkipInstaller) {
         -not (Test-Path -LiteralPath $InnoSetupCompiler)) {
         throw "Inno Setup ISCC.exe not found. Pass -InnoSetupCompiler or use -SkipInstaller."
     }
-    [Version]$innoVersion =
-        (Get-Item -LiteralPath $InnoSetupCompiler).VersionInfo.ProductVersion
+    $versionOutput = (& $InnoSetupCompiler --version | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or
+        $versionOutput -notmatch '\b(?<version>\d+\.\d+(?:\.\d+){0,2})\b') {
+        throw "Could not read Inno Setup compiler version: $versionOutput"
+    }
+    $versionText = $Matches.version
+    if ($versionText -match '^\d+\.\d+$') {
+        $versionText += '.0'
+    }
+    [Version]$innoVersion = $versionText
     if ($innoVersion -lt [Version]"7.1.0") {
         throw "Inno Setup 7.1.0 or newer required; found $innoVersion."
     }
