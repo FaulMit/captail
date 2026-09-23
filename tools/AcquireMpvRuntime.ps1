@@ -71,8 +71,16 @@ try {
         throw "mpv archive SHA-256 mismatch. Expected $expectedArchiveSha256; found $actualHash."
     }
 
+    $sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty Source -First 1
+    if (-not $sevenZip) {
+        $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+    }
+    if (-not (Test-Path -LiteralPath $sevenZip)) {
+        throw '7-Zip is required to extract the mpv runtime archive.'
+    }
     New-Item -ItemType Directory -Force -Path $extract | Out-Null
-    & tar.exe -xf $archive -C $extract
+    & $sevenZip x -y "-o$extract" $archive | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Could not extract mpv runtime archive (exit code $LASTEXITCODE)."
     }
