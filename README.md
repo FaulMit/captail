@@ -61,22 +61,15 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 
 
 <p align="center">
-  <img src="docs/captail-main.png" alt="Captail main window showing replay status, audio sources, recording format, disk space, and recent replays" width="420">
-  <img src="docs/captail-feature-recording.png" alt="Captail main window showing active continuous Recording mode with AV1, 4K, and 240 FPS" width="420">
+  
+
+https://github.com/user-attachments/assets/92eca176-71d2-433a-ae39-9e53feb0f0c4
+
+
 </p>
 
-<p align="center">
-  <img src="docs/captail-settings-video.png" alt="Captail video settings with hardware AV1, 80 Mbps, 3840 by 2160 resolution, and 240 FPS selected" width="390">
-  <img src="docs/captail-settings-audio.png" alt="Captail audio settings with system audio, microphone, volume controls, microphone boost, and per-application routing" width="390">
-</p>
 
-<p align="center">
-  <img src="docs/captail-audio-routing.png" alt="Captail application audio routing with selected apps, live level meters, application icons, microphone, and track assignments" width="620">
-</p>
 
-<p align="center">
-  <img src="docs/captail-player.png" alt="Captail player and editor showing a real AV1 4K 240 FPS replay, trim timeline, audio tracks, output settings, and save actions" width="820">
-</p>
 
 ## How do I install it?
 
