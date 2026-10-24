@@ -63,7 +63,11 @@ Captail is not a streaming application, scene compositor, DRM bypass, or cloud c
 <p align="center">
   
 
-https://github.com/user-attachments/assets/92eca176-71d2-433a-ae39-9e53feb0f0c4
+
+
+https://github.com/user-attachments/assets/7facda8e-478e-4057-a6b7-9a3ed43e6c27
+
+
 
 
 </p>
