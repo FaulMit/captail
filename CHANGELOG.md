@@ -4,6 +4,41 @@ All notable user-facing changes are documented here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+### Added
+
+- **Recording presets:** Save, select, rename, and delete recording profiles, including video, audio, replay-buffer, and advanced encoder settings.
+- **Advanced settings:** Switch between standard controls and detailed hardware encoder tuning without losing saved settings.
+- **Quick sidebar:** Open the side panel with `Ctrl+Shift+F11` to save a replay, control capture, and select recording presets. Choose the left or right screen edge.
+- **Instant screenshots:** Capture the selected monitor to PNG with a configurable hotkey, even when replay recording is disabled. Screenshot capture runs independently of the recording pipeline.
+- **Disk replay buffer:** Optionally keep the rolling replay buffer on disk instead of in RAM. Temporary segments stay out of the replay library and are cleaned up by their owning session.
+- **Bulgarian:** Added Bulgarian interface translation and language selection.
+
+### Improved
+
+- **Audio-track labels:** Track names and related player controls follow the selected interface language.
+- **Monitor changes:** Capture follows the selected display through reconnects, monitor reordering, and dual-mode identity changes while preserving the recording canvas and replay history.
+- **Borderless capture:** Use Windows Graphics Capture only when Windows supports borderless capture and grants access; otherwise use Desktop Duplication.
+- **Diagnostics:** Capture, replay saves, trimming, and media operations record more detailed local timing and failure information.
+
+### Fixed
+
+- Fixed duplicated audio in Separate tracks mode when supported Voicemeeter routing exposes both original application audio and the virtual mix.
+- Fixed the player closing after trimming. It stays open after saving a copy or overwriting the clip, refreshes the library, and allows further playback and edits.
+- Fixed a Windows text-services crash when closing repeated multi-track player sessions.
+- Fixed quick-panel actions taking focus away from fullscreen games.
+- Fixed a native capture shutdown crash when Windows Graphics Capture resources were released twice.
+
+### Upgrade notes
+
+- Fresh installations start with Instant Replay disabled. Enable capture when ready; existing saved preferences are preserved.
+
+### Known limitations
+
+- Saving a long disk-buffer replay to a slow drive can still take substantial time. Segment probing and final MP4 assembly remain storage-sensitive; this release does not claim to resolve the reported HDD save delay.
+- Physical dual-mode monitor behavior and virtual audio mixer configurations still require testing on the affected hardware. Voicemeeter routing does not establish compatibility with every virtual mixer.
+
 ## [0.2.4] - 2026-09-23
 
 ### Added

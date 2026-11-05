@@ -50,6 +50,11 @@ $typeface = [Windows.Media.Typeface]::new(
     [Windows.FontStretches]::Normal)
 $failures = [Collections.Generic.List[string]]::new()
 $files = @(Get-ChildItem -LiteralPath $languageRoot -Filter "Strings.*.xaml")
+[xml]$englishDictionary = Get-Content (Join-Path $languageRoot "Strings.en.xaml") -Encoding utf8
+$englishValues = @{}
+foreach ($entry in $englishDictionary.ResourceDictionary.String) {
+    $englishValues[$entry.Key] = [string]$entry.'#text'
+}
 
 [xml]$settings = Get-Content -LiteralPath $settingsPath -Encoding utf8
 $namespaces = [Xml.XmlNamespaceManager]::new($settings.NameTable)
@@ -73,7 +78,27 @@ foreach ($file in $files) {
     [xml]$dictionary = Get-Content -LiteralPath $file.FullName -Encoding utf8
     $values = @{}
     foreach ($entry in $dictionary.ResourceDictionary.String) {
+        if ($values.ContainsKey($entry.Key)) {
+            $failures.Add("$($file.Name): duplicate $($entry.Key)")
+        }
         $values[$entry.Key] = [string]$entry.'#text'
+    }
+
+    foreach ($key in $englishValues.Keys) {
+        if (-not $values.ContainsKey($key) -or [string]::IsNullOrWhiteSpace($values[$key])) {
+            $failures.Add("$($file.Name): missing or empty $key")
+            continue
+        }
+        $expected = @([regex]::Matches($englishValues[$key], '\{\d+[^}]*\}').Value | Sort-Object)
+        $actual = @([regex]::Matches($values[$key], '\{\d+[^}]*\}').Value | Sort-Object)
+        if (($expected -join '|') -ne ($actual -join '|')) {
+            $failures.Add("$($file.Name): placeholder mismatch in $key")
+        }
+    }
+    foreach ($key in $values.Keys) {
+        if (-not $englishValues.ContainsKey($key)) {
+            $failures.Add("$($file.Name): unexpected $key")
+        }
     }
 
     $language = $file.BaseName.Split('.')[-1]

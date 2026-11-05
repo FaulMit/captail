@@ -7,12 +7,16 @@ $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
 $version = "v0.41.0-1023-g69e63f425"
-$releaseTag = "20260903"
-$archiveName = "mpv-dev-x86_64-20260903-git-69e63f425a.7z"
+$releaseTag = "runtime-assets-20260923"
+$archiveName = "captail-mpv-0.41.0-1023.zip"
 $expectedArchiveSha256 =
+    "177897acc207c211245da44c33e16ff12958dff7b07ccf1f3ed31f0d134dd005"
+# Unchanged binaries from the validated upstream archive, which is no longer
+# retained by the autobuild repository.
+$upstreamArchiveSha256 =
     "fac135c68a35b7639e39d72c0c365104edbaebdea39a0dfdd8c36e8c8e80faef"
 $url =
-    "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/" +
+    "https://github.com/FaulMit/captail/releases/download/" +
     "$releaseTag/$archiveName"
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
@@ -71,19 +75,7 @@ try {
         throw "mpv archive SHA-256 mismatch. Expected $expectedArchiveSha256; found $actualHash."
     }
 
-    $sevenZip = Get-Command 7z.exe -ErrorAction SilentlyContinue |
-        Select-Object -ExpandProperty Source -First 1
-    if (-not $sevenZip) {
-        $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
-    }
-    if (-not (Test-Path -LiteralPath $sevenZip)) {
-        throw '7-Zip is required to extract the mpv runtime archive.'
-    }
-    New-Item -ItemType Directory -Force -Path $extract | Out-Null
-    & $sevenZip x -y "-o$extract" $archive | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Could not extract mpv runtime archive (exit code $LASTEXITCODE)."
-    }
+    Expand-Archive -LiteralPath $archive -DestinationPath $extract
     $libmpv = Get-ChildItem -LiteralPath $extract -Filter libmpv-2.dll -Recurse |
         Select-Object -First 1
     if (-not $libmpv) {
@@ -101,6 +93,10 @@ try {
         -Value $url -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $Destination "SOURCE_SHA256") `
         -Value $expectedArchiveSha256 -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $Destination "UPSTREAM_RELEASE") `
+        -Value "https://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/20260903" -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $Destination "UPSTREAM_ARCHIVE_SHA256") `
+        -Value $upstreamArchiveSha256 -Encoding ascii
 }
 finally {
     if (Test-Path -LiteralPath $extract) {

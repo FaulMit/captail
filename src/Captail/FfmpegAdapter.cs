@@ -50,6 +50,63 @@ public sealed class FfmpegAdapter
 
     public bool IsAvailable => File.Exists(_ffmpegPath) && File.Exists(_ffprobePath);
 
+    internal async Task ConcatReplaySegmentsAsync(
+        IReadOnlyList<string> segments, string destination, int maximumSeconds, IReadOnlyList<string> audioTrackNames,
+        CancellationToken cancellationToken)
+    {
+        string manifest = Path.Combine(Path.GetDirectoryName(segments[0])!, $"concat_{Guid.NewGuid():N}.txt");
+        string temporary = Path.Combine(Path.GetDirectoryName(destination)!,
+            Path.GetFileNameWithoutExtension(destination) + ".tmp" + Path.GetExtension(destination));
+        try
+        {
+            var lines = new List<string> { "ffconcat version 1.0" };
+            double total = 0;
+            var probeTimer = Stopwatch.StartNew();
+            Log.Event(DiagnosticLevel.Info, "FFmpeg", "segments.probe-begin", new { count = segments.Count });
+            foreach (string segment in segments)
+            {
+                // Owned, generated ASCII basenames avoid concat syntax injection and path escaping.
+                string name = Path.GetFileName(segment);
+                if (name.Any(c => !char.IsAsciiLetterOrDigit(c) && c is not '_' and not '-' and not '.'))
+                    throw new InvalidOperationException("Invalid disk replay segment filename.");
+                double duration = (await ReadDurationAsync(segment, cancellationToken).ConfigureAwait(false)).TotalSeconds;
+                if (duration <= 0)
+                    throw new InvalidOperationException("Disk replay segment has no duration.");
+                lines.Add($"file '{name}'");
+                lines.Add("duration " + duration.ToString("0.######", CultureInfo.InvariantCulture));
+                total += duration;
+            }
+            Log.Event(DiagnosticLevel.Info, "FFmpeg", "segments.probe-completed",
+                new { count = segments.Count, encodedSeconds = total, elapsedMs = probeTimer.ElapsedMilliseconds });
+            await File.WriteAllLinesAsync(manifest, lines, cancellationToken).ConfigureAwait(false);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            var arguments = new List<string> { "-v", "error", "-nostdin", "-f", "concat", "-safe", "1" };
+            if (total > maximumSeconds)
+            {
+                arguments.Add("-ss");
+                arguments.Add((total - maximumSeconds).ToString("0.######", CultureInfo.InvariantCulture));
+            }
+            arguments.AddRange(["-i", manifest, "-map", "0", "-c", "copy", "-avoid_negative_ts", "make_zero"]);
+            for (int index = 0; index < audioTrackNames.Count; index++)
+                arguments.AddRange([$"-metadata:s:a:{index}", $"title={audioTrackNames[index]}",
+                    $"-metadata:s:a:{index}", $"handler_name={audioTrackNames[index]}"]);
+            if (Path.GetExtension(destination).Equals(".mp4", StringComparison.OrdinalIgnoreCase))
+                arguments.AddRange(["-movflags", "+faststart"]);
+            arguments.AddRange(["-y", temporary]);
+            Log.Event(DiagnosticLevel.Info, "FFmpeg", "segments.remux-begin",
+                new { count = segments.Count, encodedSeconds = total, maximumSeconds, destination });
+            await RunAsync(_ffmpegPath, arguments, TimeSpan.FromMinutes(2), cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            File.Move(temporary, destination);
+            Log.Event(DiagnosticLevel.Info, "FFmpeg", "segments.remux-completed", new { destination });
+        }
+        finally
+        {
+            TryDeleteWorkingFile(manifest);
+            TryDeleteWorkingFile(temporary);
+        }
+    }
+
     public async Task<TimeSpan> ReadDurationAsync(
         string path,
         CancellationToken cancellationToken = default)
@@ -836,7 +893,10 @@ public sealed class FfmpegAdapter
         CancellationToken cancellationToken)
     {
         if (!File.Exists(executable))
+        {
+            Log.Event(DiagnosticLevel.Error, "FFmpeg", "process.runtime-missing", new { executable });
             throw new FileNotFoundException("Bundled FFmpeg runtime is unavailable.", executable);
+        }
 
         var startInfo = new ProcessStartInfo
         {
@@ -849,12 +909,31 @@ public sealed class FfmpegAdapter
         foreach (string argument in arguments)
             startInfo.ArgumentList.Add(argument);
 
+        string invocation = Guid.NewGuid().ToString("N")[..8];
+        var elapsed = Stopwatch.StartNew();
+        Log.Event(DiagnosticLevel.Info, "FFmpeg", "process.launch", new
+        {
+            invocation, tool = Path.GetFileName(executable), limitSeconds = timeout.TotalSeconds,
+            arguments = arguments.Select(argument =>
+                argument.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+                argument.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ? "<url>" : argument).ToArray(),
+        });
         using var process = new Process { StartInfo = startInfo };
-        if (!process.Start())
-            throw new InvalidOperationException($"Could not start {Path.GetFileName(executable)}.");
+        try
+        {
+            if (!process.Start())
+                throw new InvalidOperationException($"Could not start {Path.GetFileName(executable)}.");
+        }
+        catch (Exception exception)
+        {
+            Log.Event(DiagnosticLevel.Error, "FFmpeg", "process.start-failed",
+                new { invocation, tool = Path.GetFileName(executable) }, exception: exception);
+            throw;
+        }
 
-        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        Task<string> standardError = process.StandardError.ReadToEndAsync(cancellationToken);
+        Log.Event(DiagnosticLevel.Debug, "FFmpeg", "process.started", new { invocation, childPid = process.Id });
+        Task<string> standardOutput = process.StandardOutput.ReadToEndAsync();
+        Task<string> standardError = ReadErrorTailAsync(process.StandardError);
         using var timeoutSource = new CancellationTokenSource(timeout);
         using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken,
@@ -871,15 +950,54 @@ public sealed class FfmpegAdapter
                     : error.Trim();
                 throw new InvalidOperationException(message);
             }
+            Log.Event(DiagnosticLevel.Debug, "FFmpeg", "process.exited", new
+            {
+                invocation, childPid = process.Id, process.ExitCode,
+                elapsedMs = elapsed.ElapsedMilliseconds, stdoutChars = output.Length, stderr = error,
+            });
             return output;
         }
-        catch (OperationCanceledException)
+        catch (Exception exception)
         {
             TryKill(process);
-            if (timeoutSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
-                throw new TimeoutException($"{Path.GetFileName(executable)} timed out after {timeout.TotalSeconds:0} seconds.");
+            string errorTail;
+            try { errorTail = await standardError.WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false); }
+            catch { errorTail = "[stderr unavailable after termination]"; }
+            bool cancelled = exception is OperationCanceledException && cancellationToken.IsCancellationRequested;
+            Log.Event(cancelled ? DiagnosticLevel.Info : DiagnosticLevel.Error, "FFmpeg",
+                cancelled ? "process.cancelled" : "process.failed", new
+            {
+                invocation, childPid = process.Id, elapsedMs = elapsed.ElapsedMilliseconds,
+                tool = Path.GetFileName(executable), errorType = exception.GetType().Name,
+                hresult = $"0x{exception.HResult:X8}",
+                exitCode = process.HasExited ? process.ExitCode : (int?)null,
+                limitSeconds = timeout.TotalSeconds, timedOut = timeoutSource.IsCancellationRequested,
+                cancelled, stderr = errorTail,
+                error = exception.Message,
+            });
+            if (exception is OperationCanceledException && timeoutSource.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+                throw new TimeoutException($"{Path.GetFileName(executable)} timed out after {timeout.TotalSeconds:0} seconds.", exception);
             throw;
         }
+    }
+
+    private static async Task<string> ReadErrorTailAsync(StreamReader reader)
+    {
+        const int limit = 8192;
+        var tail = new System.Text.StringBuilder();
+        char[] buffer = new char[2048];
+        int read;
+        bool truncated = false;
+        while ((read = await reader.ReadAsync(buffer).ConfigureAwait(false)) > 0)
+        {
+            tail.Append(buffer, 0, read);
+            if (tail.Length > limit)
+            {
+                tail.Remove(0, tail.Length - limit);
+                truncated = true;
+            }
+        }
+        return (truncated ? "[stderr tail] " : "") + tail;
     }
 
     private static void TryKill(Process process)

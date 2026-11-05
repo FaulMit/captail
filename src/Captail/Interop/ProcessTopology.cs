@@ -56,6 +56,24 @@ internal sealed class ProcessSnapshot
 
     internal IReadOnlyCollection<ProcessNode> Nodes => _nodes.Values.ToArray();
 
+    internal SeparateAudioEnvironment? AudioEnvironment { get; private set; }
+
+    internal static ProcessSnapshot CaptureWithAudio()
+    {
+        ProcessSnapshot snapshot = Capture();
+        snapshot.AudioEnvironment = SeparateAudioEnvironment.Capture();
+        return snapshot;
+    }
+
+    internal ProcessSnapshot WithAudioEnvironment(SeparateAudioEnvironment environment)
+    {
+        AudioEnvironment = environment;
+        return this;
+    }
+
+    internal bool IsInTree(ProcessNode node, ProcessIdentity root) =>
+        node.Identity == root || HasAncestor(node, root);
+
     internal static ProcessSnapshot CreateSynthetic(IEnumerable<ProcessNode> nodes) => new(nodes);
 
     internal static ProcessSnapshot Capture()
@@ -150,6 +168,12 @@ internal sealed class ProcessSnapshot
             .Where(node => targets.ContainsKey(node.Executable))
             .Select(node => new RoutedProcessRoot(node, targets[node.Executable]))
             .ToArray();
+        return SelectRoutedRoots(candidates);
+    }
+
+    internal RoutedProcessSelection SelectRoutedRoots(IEnumerable<RoutedProcessRoot> roots)
+    {
+        RoutedProcessRoot[] candidates = roots.ToArray();
         if (candidates.Length == 0)
             return new RoutedProcessSelection([], 0);
 

@@ -77,18 +77,20 @@ internal sealed class ProcessAudioReconciler : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         ProcessAudioTarget[] requested = executableTargets.ToArray();
-        var targets = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var targets = new Dictionary<ProcessIdentity, RoutedProcessRoot>();
         foreach (ProcessAudioTarget target in requested)
         {
-            if (target.Track is >= 1 and <= 6)
-                targets.TryAdd(target.Executable, target.Track);
+            if (target.Track is not (>= 1 and <= 6))
+                continue;
+            string executable = Config.NormalizeExecutableName(target.Executable);
+            foreach (ProcessNode node in snapshot.Nodes.Where(node =>
+                         string.Equals(node.Executable, executable, StringComparison.OrdinalIgnoreCase) &&
+                         (target.Identity is null || target.Identity == node.Identity)))
+                targets.TryAdd(node.Identity, new RoutedProcessRoot(node, target.Track));
         }
 
-        RoutedProcessSelection selection = snapshot.SelectRoutedRoots(targets);
-        RoutedProcessRoot[] desiredRoots = selection.Roots.Where(root => requested.Any(target =>
-            string.Equals(Config.NormalizeExecutableName(target.Executable),
-                Config.NormalizeExecutableName(root.Node.Executable), StringComparison.OrdinalIgnoreCase) &&
-            (target.Identity is null || target.Identity == root.Node.Identity))).ToArray();
+        RoutedProcessSelection selection = snapshot.SelectRoutedRoots(targets.Values);
+        RoutedProcessRoot[] desiredRoots = selection.Roots.ToArray();
         var desired = desiredRoots.ToDictionary(
             root => root.Node.Identity,
             root => root.Track);

@@ -29,5 +29,5 @@ internal static class ObsLogBridge
     internal static void Remove() => captail_remove_obs_log_handler();
 
     private static void Write(int level, string message) =>
-        Log.Write($"libobs[{level}]: {message}");
+        Log.Native(level, message);
 }

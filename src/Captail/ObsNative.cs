@@ -91,6 +91,13 @@ internal static class ObsNative
     internal static extern void obs_wait_for_destroy_queue();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern nint obs_get_module(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern nint obs_get_module_lib(nint module);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static extern bool obs_initialized();
 
@@ -174,7 +181,7 @@ internal static class ObsNative
     internal static extern nint obs_get_audio();
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
-    internal static extern nint obs_scene_create(
+    internal static extern nint obs_scene_create_private(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string name);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
@@ -309,6 +316,9 @@ internal static class ObsNative
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     internal static extern void obs_output_release(nint output);
+
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
+    internal static extern void obs_output_update(nint output, nint settings);
 
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)]
     [return: MarshalAs(UnmanagedType.I1)]

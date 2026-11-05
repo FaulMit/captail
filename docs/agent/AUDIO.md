@@ -14,6 +14,21 @@ track 2 silent. For multiple independent instances of the detected executable,
 the oldest root is used consistently for inclusion and exclusion; other
 instances remain on the system track. PID creation time protects restarts.
 
+The local test build automatically detects a Voicemeeter input session together
+with a live Voicemeeter output process. Separate mode then records original
+application renderers on System and keeps the detected game on Game, excluding
+the mixer re-renderer. Ordinary outputs retain global game exclusion. The
+protection stays selected until pipeline shutdown, including mixer restarts and
+temporary endpoint discovery failures. Quiet sessions remain attached while
+their process identity lives. Session discovery runs on the background monitor
+and scans every active render endpoint, including per-app Windows overrides.
+
+This compatibility path is experimental and is not universal virtual-device
+support. Ownerless Windows System Sounds sessions cannot identify their original
+renderer; their capture is not guaranteed. Mixer-only hardware/network inputs
+and mixer DSP are not reconstructed. A newly discovered renderer can lose its
+onset before the monitor attaches. NGENUITY requires separate hardware validation.
+
 In explicit Game Capture, mixed mode routes the executable detected by the
 video hook through process loopback. This follows games that use a non-default
 Windows output device. If process loopback is unavailable, Captail keeps the
@@ -34,6 +49,7 @@ up to six tracks for both.
 - `ProcessTopology`: executable roots and child-process grouping.
 - `ProcessAudioReconciler`: desired routes versus active OBS sources.
 - `ProcessAudioMonitor`: health/recovery cadence.
+- `SeparateAudioRouting`: automatic original-stream routing for Voicemeeter.
 - `ProcessAudioRoutingWindow`: selection and track UI.
 - `native/ProcessAudio`: Captail OBS process-loopback source.
 - `ObsReplayEngine`: mixers, track names, and source ownership.

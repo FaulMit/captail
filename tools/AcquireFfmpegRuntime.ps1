@@ -9,22 +9,31 @@ param(
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 $version = "n9.0.1-84-g946fcce07b"
-$releaseTag = "autobuild-2026-09-18-13-22"
+$upstreamReleaseTag = "autobuild-2026-09-18-13-22"
+$releaseTag = "runtime-assets-20260923"
 $isStatic = $Flavor -eq "Static"
 $archiveName = if ($isStatic) {
-    "ffmpeg-$version-win64-lgpl-9.0.zip"
+    "captail-ffmpeg-9.0.1-static.zip"
 }
 else {
-    "ffmpeg-$version-win64-lgpl-shared-9.0.zip"
+    "captail-ffmpeg-9.0.1-shared.zip"
 }
 $expectedArchiveSha256 = if ($isStatic) {
+    "caa82e5c5540bed005806a2ab8891e7a24aa2d3ca84f5d34ff18cf010e237536"
+}
+else {
+    "675a7772d369f09928da8b23ef8b975114ba754f09136ccbe63ec1d7150e0cee"
+}
+# Upstream autobuild retention removed the original archives. The mirror contains
+# unchanged validated binaries; retain upstream provenance separately.
+$upstreamArchiveSha256 = if ($isStatic) {
     "e17c2a1313bec165f12f5a73d07447b03292bbd7a9153af9de901e981e0109d6"
 }
 else {
     "a2a50423b631cb51e91c2668c16a4807197c50d1f5fc56dd4516ca188a0d731f"
 }
 $url =
-    "https://github.com/BtbN/FFmpeg-Builds/releases/download/" +
+    "https://github.com/FaulMit/captail/releases/download/" +
     "$releaseTag/$archiveName"
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "runtime"))
@@ -110,6 +119,10 @@ try {
         -Value $url -Encoding UTF8
     Set-Content -LiteralPath (Join-Path $Destination "SOURCE_SHA256") `
         -Value $expectedArchiveSha256 -Encoding ascii
+    Set-Content -LiteralPath (Join-Path $Destination "UPSTREAM_RELEASE") `
+        -Value "https://github.com/BtbN/FFmpeg-Builds/releases/tag/$upstreamReleaseTag" -Encoding UTF8
+    Set-Content -LiteralPath (Join-Path $Destination "UPSTREAM_ARCHIVE_SHA256") `
+        -Value $upstreamArchiveSha256 -Encoding ascii
 }
 finally {
     if (Test-Path -LiteralPath $extract) {

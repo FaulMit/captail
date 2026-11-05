@@ -60,7 +60,8 @@ internal static class Program
 internal sealed record SourceRule(
     string Label,
     string Executable,
-    ProcessIdentity? Identity = null);
+    ProcessIdentity? Identity = null,
+    bool? ExcludeTarget = null);
 
 internal sealed class Options
 {
@@ -75,6 +76,7 @@ internal sealed class Options
     internal bool ExcludeTarget { get; init; }
     internal string? ProcessAudioPluginPath { get; init; }
     internal string? LogBridgePath { get; init; }
+    internal string? SeparateGameExecutable { get; init; }
 
     internal static Options Parse(string[] args)
     {
@@ -90,6 +92,7 @@ internal sealed class Options
         string? processAudioPluginPath = null;
         long creationTimeOffset = 0;
         bool excludeTarget = false;
+        string? separateGameExecutable = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -133,6 +136,10 @@ internal sealed class Options
                 case "--exclude-target":
                     excludeTarget = bool.Parse(value);
                     break;
+                case "--separate-game":
+                    separateGameExecutable = value;
+                    watchedExecutables.Add(value);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown argument: {args[i - 1]}");
             }
@@ -159,6 +166,7 @@ internal sealed class Options
             WatchedExecutables = watchedExecutables,
             CreationTimeOffset = creationTimeOffset,
             ExcludeTarget = excludeTarget,
+            SeparateGameExecutable = separateGameExecutable,
             ProcessAudioPluginPath = processAudioPluginPath,
             LogBridgePath = bridgePath,
         };
@@ -210,6 +218,9 @@ internal sealed class ObsSession : IDisposable
     private int _dynamicProbeNumber;
     private bool _obsStarted;
     private bool _disposed;
+    private readonly SeparateAudioRouting _separateRouting = new();
+    private nint _separateSystemProbe;
+    private ProcessIdentity? _separateSystemIdentity;
 
     internal ObsSession(Options options)
     {
@@ -305,13 +316,44 @@ internal sealed class ObsSession : IDisposable
         }
 
         _nextReconcileMilliseconds = _clock.ElapsedMilliseconds + 250;
-        ProcessSnapshot snapshot = Task.Run(ProcessSnapshot.Capture)
+        ProcessSnapshot snapshot = Task.Run(_options.SeparateGameExecutable is null
+                ? ProcessSnapshot.Capture : (Func<ProcessSnapshot>)ProcessSnapshot.CaptureWithAudio)
             .GetAwaiter()
             .GetResult();
-        ProcessAudioReconcileResult result = _reconciler.Reconcile(
-            snapshot,
-            _options.WatchedExecutables.Select(executable =>
-                new ProcessAudioTarget(executable, 1)));
+        IEnumerable<ProcessAudioTarget> targets = _options.WatchedExecutables.Select(executable =>
+            new ProcessAudioTarget(executable, 1));
+        if (_options.SeparateGameExecutable is string game)
+        {
+            ProcessIdentity? identity = snapshot.SelectIndependentRoots([game])
+                .OrderBy(node => node.Identity.CreationTime)
+                .Select(node => (ProcessIdentity?)node.Identity).FirstOrDefault();
+            IReadOnlyList<ProcessAudioTarget>? originals = _separateRouting.Build(
+                snapshot, identity, checked((uint)Environment.ProcessId));
+            if (originals is not null)
+            {
+                if (_separateSystemProbe != 0)
+                    DestroyProbe(_separateSystemProbe);
+                _separateSystemProbe = 0;
+                _separateSystemIdentity = null;
+                targets = originals;
+            }
+            else if (identity is ProcessIdentity found)
+            {
+                if (_separateSystemProbe == 0 || _separateSystemIdentity != found)
+                {
+                    if (_separateSystemProbe != 0)
+                        DestroyProbe(_separateSystemProbe);
+                    _separateSystemProbe = CreateProbe(
+                        new SourceRule($"system-global-{++_dynamicProbeNumber}", game, found, true),
+                        _options.Frequencies).Source;
+                    _separateSystemIdentity = found;
+                }
+                targets = [new ProcessAudioTarget(game, 2) { Identity = found }];
+            }
+            else
+                targets = [];
+        }
+        ProcessAudioReconcileResult result = _reconciler.Reconcile(snapshot, targets);
         Console.WriteLine(
             $"RECONCILE elapsed_ms={_clock.ElapsedMilliseconds} " +
             $"desired={result.DesiredSources} active={result.ActiveSources} " +
@@ -329,7 +371,7 @@ internal sealed class ObsSession : IDisposable
             {
                 sourceId = "captail_process_audio_capture";
                 ObsNative.obs_data_set_int(settings, "target_pid", identity.ProcessId);
-                ObsNative.obs_data_set_bool(settings, "exclude_target", _options.ExcludeTarget);
+                ObsNative.obs_data_set_bool(settings, "exclude_target", rule.ExcludeTarget ?? _options.ExcludeTarget);
                 ObsNative.obs_data_set_int(
                     settings,
                     "target_creation_time",
@@ -446,14 +488,15 @@ internal sealed class ObsSession : IDisposable
         }
     }
 
-    private nint CreatePidProbe(ProcessIdentity identity, int _)
+    private nint CreatePidProbe(ProcessIdentity identity, int track)
     {
         ProcessIdentity sourceIdentity = identity with
         {
             CreationTime = checked(identity.CreationTime + _options.CreationTimeOffset),
         };
         SourceRule rule = new(
-            $"pid-root-{++_dynamicProbeNumber}",
+            _options.SeparateGameExecutable is null ? $"pid-root-{++_dynamicProbeNumber}" :
+                $"{(track == 2 ? "game" : "system")}-{identity.ProcessId}-{++_dynamicProbeNumber}",
             "pid-aware",
             sourceIdentity);
         return CreateProbe(rule, _options.Frequencies).Source;

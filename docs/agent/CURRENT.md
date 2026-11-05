@@ -1,32 +1,32 @@
 # Current development handoff
 
-Snapshot date: 2026-09-23
+Snapshot date: 2026-11-05
 
 Verify the live branch, HEAD, and changed paths with `GetAgentContext.ps1` before acting on this snapshot.
 
 ## Release candidate
 
-- Branch: `codex/bugfix-capture-player`.
-- Base: `56f60fa` (`Release Captail 0.2.3`).
-- Candidate version: `0.2.4`.
-- Player and trim editor now share one window, including timeline, audio rows, range selection, output settings, and save actions.
-- README and Store listing use six new screenshots from the candidate build. The obsolete standalone editor screenshot was removed.
-- The batch also includes replay navigation, export fixes, capture improvements, updated media runtimes, .NET 10, and accent icons.
+- Branch: `release/0.3.0`, based on `abe84a7` from `main`.
+- Candidate version: `0.3.0`.
+- Includes accumulated local test changes: recording presets, advanced settings, quick panel, instant screenshots, disk replay, Bulgarian, localized track labels, persistent trim editor, audio routing, and capture recovery.
+- Preserve the existing README showcase video. Do not add application screenshots or regenerate listing images during this release.
+- `CHANGELOG.md` supplies GitHub notes; Store EN/RU notes describe the same release scope.
 
 ## Validation
 
 - Release solution build: zero warnings and errors.
-- Strict analyzer build and focused capture/player, UI, localization, Store workflow, dependency, and agent-context checks passed.
-- Local Portable ZIP and Store MSIX upload packages built and validated.
-- Native AV1 3840x2160 240 FPS recording saved; standalone FFmpeg decoded the video without errors.
-- Combined player/editor was inspected with a derived AV1 4K 240 FPS showcase fixture containing two audio tracks.
+- Focused capture/player, audio, hotkey, startup, dependency, Store workflow, and agent-context contracts passed.
+- Runtime preset, localization, diagnostics, replay-library, process-audio planning, and quick-panel checks passed.
+- Store metadata validation passed for two locales and the six existing images.
+- Consult candidate `.qa/` logs and GitHub Actions for final runtime and package results before publishing.
 
 ## Open verification
 
-- Embedded player playback of the new native recording was not confirmed.
-- The dedicated codec QA harness stalled during source startup, including with H.264; investigate separately.
-- Real-game capture performance and Microsoft Store certification require their respective environments.
+- Long disk-buffer saves on slow drives remain a known limitation; no save-speed fix is claimed.
+- Physical dual-mode display behavior and actual games require testing on affected hardware.
+- Voicemeeter Separate tracks routing does not establish support for every virtual mixer.
+- Microsoft Store certification and rollout continue after successful submission.
 
 ## Next checkpoint
 
-Merge the release candidate, publish GitHub `v0.2.4`, then submit the Store package and synchronized six-image listing.
+Finish candidate validation, publish GitHub `v0.3.0` from `main`, and submit the Store package with synchronized EN/RU notes and existing listing images.

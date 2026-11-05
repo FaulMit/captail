@@ -90,6 +90,7 @@ jobs:
               $enValues[$entry.Key] = [string]$entry.'#text'
             }
             $semanticExpectations = @{
+              bg = @{ 'L.Storage.FreeOn' = '{0} свободни на {1}'; 'L.Storage.Free' = '{0} свободни'; 'L.Video.Monitor' = 'Монитор'; 'L.Storage.ReplayFolder' = 'Папка с повторения'; 'L.Audio.OneMixed' = 'Една смесена писта' }
               de = @{ 'L.Storage.FreeOn' = '{0} frei auf {1}'; 'L.Storage.Free' = '{0} frei'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Replay-Ordner'; 'L.Audio.OneMixed' = 'Eine gemischte Spur' }
               en = @{ 'L.Storage.FreeOn' = '{0} free on {1}'; 'L.Storage.Free' = '{0} free'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Replay folder'; 'L.Audio.OneMixed' = 'One mixed track' }
               es = @{ 'L.Storage.FreeOn' = '{0} libres en {1}'; 'L.Storage.Free' = '{0} libres'; 'L.Video.Monitor' = 'Monitor'; 'L.Storage.ReplayFolder' = 'Carpeta de repeticiones'; 'L.Audio.OneMixed' = 'Una pista mixta' }

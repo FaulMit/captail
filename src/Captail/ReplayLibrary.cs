@@ -533,6 +533,17 @@ public sealed class ReplayLibrary
 
     internal static bool IsInternalWorkingFile(string path)
     {
+        // OBS may add collision suffixes such as .tmp_2.mp4. The whole buffer
+        // directory is internal, regardless of individual segment filenames.
+        string? directory = Path.GetDirectoryName(path);
+        if (directory is not null && directory.Split(
+                [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+                StringSplitOptions.RemoveEmptyEntries)
+            .Contains(".captail-buffer", StringComparer.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
         string name = Path.GetFileName(path);
         return name.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) ||
                name.Contains(".tmp.", StringComparison.OrdinalIgnoreCase) ||

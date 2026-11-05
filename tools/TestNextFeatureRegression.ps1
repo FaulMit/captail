@@ -25,6 +25,7 @@ $settingsXaml = Read-Text "src\Captail\SettingsWindow.xaml"
 $app = Read-Text "src\Captail\App.xaml.cs"
 $config = Read-Text "src\Captail\Config.cs"
 $engine = Read-Text "src\Captail\ObsReplayEngine.cs"
+$borderless = Read-Text "src\Captail\BorderlessCaptureAccess.cs"
 $obsNative = Read-Text "src\Captail\ObsNative.cs"
 $manifest = Read-Text "packaging\msix\AppxManifest.xml.template"
 $player = Read-Text "src\Captail\ClipEditorWindow.xaml.cs"
@@ -41,17 +42,23 @@ Require $settings 'ExternalLinkLauncher\.OpenAsync' `
     "Footer links must use one testable shell launcher."
 
 Require $engine `
-    'WindowsGraphicsCaptureMinimumBuild\s*=\s*18362' `
-    "Desktop capture is missing the Windows 10 1903 WGC support boundary."
+    'WindowsGraphicsCaptureMinimumBuild\s*=\s*22000' `
+    "Desktop capture must limit the WGC preference to Windows 11 and newer."
 Require $engine `
-    'osVersion\.Build\s*>=\s*WindowsGraphicsCaptureMinimumBuild[\s\S]{0,100}\?\s*MonitorCaptureMethodWgc[\s\S]{0,100}:\s*MonitorCaptureMethodAuto' `
-    "Desktop capture must prefer WGC on Windows 10 1903+ and retain Auto fallback for older systems."
+    '\?\s*MonitorCaptureMethodWgc\s*:\s*MonitorCaptureMethodDxgi' `
+    "Unavailable borderless capture must force DXGI so OBS Auto cannot select WGC."
 Require $engine `
     'windowsGraphicsCaptureReady\s*&&[\s\S]{0,180}MonitorCaptureMethodWgc' `
-    "Desktop capture must fall back to Auto when WGC preflight cannot complete."
-Require $app `
+    "Desktop capture must gate WGC on completed borderless preflight."
+Require $borderless `
     'GraphicsCaptureAccess\.RequestAccessAsync\([\s\S]{0,100}GraphicsCaptureAccessKind\.Borderless' `
     "Windows 11 must request borderless WGC access on the UI thread before OBS starts."
+Require $borderless 'Status\s*==\s*AppCapabilityAccessStatus\.Allowed' `
+    "Borderless capture must reject every status except Allowed."
+Require $borderless 'ApiInformation\.IsPropertyPresent' `
+    "Borderless capture must check API support before requesting access."
+Require $app 'await BorderlessCaptureAccess\.ProbeAsync\(\)' `
+    "Application startup must use the tested borderless preflight."
 Require $engine `
     '_preferredMonitorCaptureMethod\s*==\s*MonitorCaptureMethodWgc[\s\S]{0,100}\?\s*MonitorCaptureMethodAuto' `
     "Desktop capture must start on Auto before switching the live source to WGC."
@@ -153,10 +160,10 @@ Reject $player `
     'RecentReplay_Click[\s\S]{0,420}TogglePlaybackAsync\(\)' `
     "Clicking the active replay row must not pause playback."
 Reject $player `
-    'LoadReplayAsync\(ReplayClip clip\)[\s\S]{0,180}!_previewMode' `
+    'LoadReplayAsync\(\s*ReplayClip clip[^)]*\)[\s\S]{0,180}!_previewMode' `
     "Replay navigation must work from the visible editor, not only Preview mode."
 Require $player `
-    'LoadReplayAsync\(ReplayClip clip\)[\s\S]{0,500}SetReplayNavigationButtonsEnabled\(false, false\)[\s\S]*?finally[\s\S]{0,300}UpdateReplayNavigationState\(\)' `
+    'LoadReplayAsync\(\s*ReplayClip clip[^)]*\)[\s\S]{0,500}SetReplayNavigationButtonsEnabled\(false, false\)[\s\S]*?finally[\s\S]{0,300}UpdateReplayNavigationState\(\)' `
     "Replay navigation must disable buttons while loading and restore them in finally."
 Require $player `
     '_\s*=\s*CompleteReplayEnrichmentAsync\(clip, replayLoadVersion\)' `

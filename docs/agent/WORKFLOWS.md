@@ -21,9 +21,16 @@ Do not restore on every edit when the lock file and SDK are unchanged.
 | UI | `TestReportedUiRuntimeRegressions.ps1`, `TestStartupUiSurfaces.ps1`, `TestLocalizedLayout.ps1` |
 | Distribution | Store isolation tests and `TestStoreReleaseWorkflow.ps1` |
 | Context docs | `TestAgentContext.ps1` |
+| Diagnostics | `dotnet run --project .\tools\DiagnosticsQa -c Release`; capture saves also require disk runtime QA |
 
 Run scripts as `./tools/<name>`. Runtime `--qa-*` entry points live in
 `App.xaml.cs`; use them when a static contract cannot prove behavior.
+
+For monitor hotplug or dual-mode changes, run `TestDisplayTopology.ps1`. This
+injects topology changes into the production engine while using real OBS desktop
+capture, checks replay/Auto and recording/WGC, decodes saved frames, and verifies
+notification placement. It does not switch physical display modes; specific
+monitor/driver acceptance still requires that hardware.
 
 ## Installed test build
 
@@ -42,8 +49,8 @@ Follow `docs/RELEASING.md`. Required before dispatch:
 
 - version and dated changelog section;
 - generated release notes preview;
-- complete real screenshot baseline from exact candidate;
-- significant-feature screenshots;
+- preserve the existing README video and do not add application screenshots;
+- validate changed workflows on the release candidate;
 - local build/package validation.
 
 GitHub release binaries come from the pinned Actions workflow. Never replace
@@ -60,5 +67,6 @@ explicit user request.
 
 ## Screenshots
 
-Follow `docs/SCREENSHOTS.md`. Every release gets a fresh real baseline from the
-exact candidate. Showcase settings require hardware AV1, 4K, and 240 FPS.
+The README uses a showcase video. Preserve it during releases and do not add
+application screenshots. Store listing images are maintained separately;
+`docs/SCREENSHOTS.md` describes the tooling when new images are requested.

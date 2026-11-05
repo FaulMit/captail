@@ -541,8 +541,45 @@
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                               Padding="16,0,10,16">
                     <StackPanel>
-                        <TextBlock Text="{DynamicResource L.Section.Replay}" Style="{StaticResource SectionHeaderText}" Margin="2,8,2,8"/>
-                        <Border Style="{StaticResource SettingsGroup}">
+                        <StackPanel Orientation="Horizontal" Margin="2,8,2,8">
+                            <TextBlock Text="{DynamicResource L.Section.Presets}" Style="{StaticResource SectionHeaderText}" Margin="0"/>
+                            <Button x:Name="RecordingPresetsHelpButton" Style="{StaticResource HelpIconButton}"
+                                    AutomationProperties.Name="{DynamicResource L.Section.Presets}">
+                                <Button.ToolTip>
+                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                        <StackPanel>
+                                            <TextBlock Text="{DynamicResource L.Section.Presets}" Style="{StaticResource HelpTipTitle}"/>
+                                            <TextBlock Text="{DynamicResource L.Help.RecordingPresets}" Style="{StaticResource HelpTipBody}"/>
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Button.ToolTip>
+                            </Button>
+                        </StackPanel>
+                        <Border x:Name="RecordingPresetsGroup" Style="{StaticResource SettingsGroup}">
+                            <StackPanel Margin="13,11">
+                                <ComboBox x:Name="RecordingPresetBox" Style="{StaticResource DarkCombo}"
+                                          AutomationProperties.Name="{DynamicResource L.Section.Presets}"
+                                          SelectionChanged="RecordingPresetBox_SelectionChanged"/>
+                                <TextBlock x:Name="RecordingPresetModifiedText" Text="{DynamicResource L.Preset.Modified}"
+                                           Foreground="{DynamicResource AccentBrush}" FontSize="11" Margin="0,5,0,0" Visibility="Collapsed"/>
+                                <TextBlock Text="{DynamicResource L.Preset.Name}" Style="{StaticResource SecondaryText}" Margin="0,10,0,4"/>
+                                <TextBox x:Name="RecordingPresetNameBox" Style="{StaticResource DarkTextBox}" MaxLength="60"
+                                         FontFamily="{StaticResource FontUi}" FontSize="12"
+                                         AutomationProperties.Name="{DynamicResource L.Preset.Name}"/>
+                                <UniformGrid Rows="1" Margin="0,8,0,0">
+                                    <Button x:Name="SaveRecordingPresetButton" Style="{StaticResource SubtleButton}"
+                                            Margin="0,0,4,0" Content="{DynamicResource L.Preset.SaveAs}" Click="SaveRecordingPreset_Click"/>
+                                    <Button x:Name="UpdateRecordingPresetButton" Style="{StaticResource SubtleButton}"
+                                            Margin="2,0" Content="{DynamicResource L.Preset.Update}" Click="UpdateRecordingPreset_Click"/>
+                                    <Button x:Name="DeleteRecordingPresetButton" Style="{StaticResource SubtleButton}"
+                                            Margin="4,0,0,0" Content="{DynamicResource L.Preset.Delete}" Click="DeleteRecordingPreset_Click"/>
+                                </UniformGrid>
+                                <TextBlock Text="{DynamicResource L.Preset.Hint}" Style="{StaticResource SecondaryText}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,9,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{DynamicResource L.Section.Recording}" Style="{StaticResource SectionHeaderText}" Margin="2,8,2,8"/>
+                        <Border x:Name="RecordingSettingsGroup" Style="{StaticResource SettingsGroup}">
                             <StackPanel>
                                 <Grid Margin="13,11">
                                     <TextBlock x:Name="CaptureEnabledLabel"
@@ -654,6 +691,37 @@
                                     </Border>
                                 </Grid>
                                 <StackPanel x:Name="ReplayOnlySettings">
+                                <StackPanel x:Name="DiskReplayBufferRow" Visibility="Collapsed">
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                    <Grid Margin="13,11">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Margin="0,0,12,0">
+                                            <Grid HorizontalAlignment="Left">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{DynamicResource L.Advanced.DiskReplayBuffer}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                                <Button x:Name="DiskReplayBufferHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}">
+                                                    <Button.ToolTip>
+                                                        <ToolTip Style="{StaticResource HelpToolTip}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{DynamicResource L.Advanced.DiskReplayBuffer}" Style="{StaticResource HelpTipTitle}"/>
+                                                                <TextBlock Text="{DynamicResource L.Help.DiskReplayBuffer}" Style="{StaticResource HelpTipBody}"/>
+                                                            </StackPanel>
+                                                        </ToolTip>
+                                                    </Button.ToolTip>
+                                                </Button>
+                                            </Grid>
+                                            <TextBlock Text="{DynamicResource L.Advanced.DiskReplayBufferHint}" Style="{StaticResource SecondaryText}"
+                                                       TextWrapping="Wrap" MaxWidth="285"/>
+                                        </StackPanel>
+                                        <ToggleButton x:Name="DiskReplayBufferBox" Grid.Column="1" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </StackPanel>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <StackPanel Margin="13,11">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
@@ -663,23 +731,44 @@
                                                 <ToolTip Style="{StaticResource HelpToolTip}">
                                                     <StackPanel>
                                                         <TextBlock Text="{DynamicResource L.Replay.BufferLength}" Style="{StaticResource HelpTipTitle}"/>
-                                                        <TextBlock Text="{DynamicResource L.Help.BufferLength}" Style="{StaticResource HelpTipBody}"/>
+                                                        <TextBlock x:Name="BufferLengthHelpText" Text="{DynamicResource L.Help.BufferLength}" Style="{StaticResource HelpTipBody}"/>
                                                     </StackPanel>
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
                                     </StackPanel>
-                                    <Border Style="{StaticResource SegmentStrip}">
+                                    <Border x:Name="StandardBufferLengthControl" Style="{StaticResource SegmentStrip}">
                                         <UniformGrid x:Name="BufferOptions" Rows="1">
-                                            <RadioButton GroupName="Buffer" Tag="15" Content="{DynamicResource L.Duration.15s}" Style="{StaticResource SegmentButton}"/>
-                                            <RadioButton GroupName="Buffer" Tag="30" Content="{DynamicResource L.Duration.30s}" Style="{StaticResource SegmentButton}"/>
-                                            <RadioButton GroupName="Buffer" Tag="60" Content="{DynamicResource L.Duration.1m}" Style="{StaticResource SegmentButton}"/>
-                                            <RadioButton GroupName="Buffer" Tag="120" Content="{DynamicResource L.Duration.2m}" Style="{StaticResource SegmentButton}"/>
-                                            <RadioButton GroupName="Buffer" Tag="300" Content="{DynamicResource L.Duration.5m}" Style="{StaticResource SegmentButton}"/>
-                                            <RadioButton GroupName="Buffer" Tag="600" Content="{DynamicResource L.Duration.10m}" Style="{StaticResource SegmentButton}"/>
-                                            <RadioButton GroupName="Buffer" Tag="900" Content="{DynamicResource L.Duration.15m}" Style="{StaticResource SegmentButton}"/>
+                                            <RadioButton GroupName="Buffer" Tag="15" Content="{DynamicResource L.Duration.15s}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
+                                            <RadioButton GroupName="Buffer" Tag="30" Content="{DynamicResource L.Duration.30s}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
+                                            <RadioButton GroupName="Buffer" Tag="60" Content="{DynamicResource L.Duration.1m}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
+                                            <RadioButton GroupName="Buffer" Tag="120" Content="{DynamicResource L.Duration.2m}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
+                                            <RadioButton GroupName="Buffer" Tag="300" Content="{DynamicResource L.Duration.5m}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
+                                            <RadioButton GroupName="Buffer" Tag="600" Content="{DynamicResource L.Duration.10m}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
+                                            <RadioButton GroupName="Buffer" Tag="900" Content="{DynamicResource L.Duration.15m}" Style="{StaticResource SegmentButton}" Checked="BufferOption_Checked"/>
                                         </UniformGrid>
                                     </Border>
+                                    <StackPanel x:Name="CustomBufferLengthControl" Visibility="Collapsed">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="110"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox x:Name="CustomBufferMinutesBox" Style="{StaticResource DarkTextBox}" MaxLength="9"
+                                                     FontFamily="{StaticResource FontUi}" FontSize="12"
+                                                     AutomationProperties.Name="{DynamicResource L.Advanced.BufferMinutes}"
+                                                     TextChanged="CustomBufferMinutes_TextChanged"/>
+                                            <TextBlock Grid.Column="1" Text="{DynamicResource L.Advanced.BufferMinutes}" Style="{StaticResource SecondaryText}"
+                                                       Margin="10,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                        </Grid>
+                                        <TextBlock Text="{DynamicResource L.Advanced.BufferMinutesHint}" Style="{StaticResource SecondaryText}"
+                                                   FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                        <TextBlock x:Name="CustomBufferErrorText" Text="{DynamicResource L.Advanced.BufferMinutesError}"
+                                                   Foreground="{DynamicResource ErrorBrush}" FontSize="11" TextWrapping="Wrap"
+                                                   Margin="0,5,0,0" Visibility="Collapsed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="CustomBufferSummaryText" Style="{StaticResource SecondaryText}"
+                                               FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0" Visibility="Collapsed"/>
                                 </StackPanel>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <Grid Margin="13,11">
@@ -702,7 +791,7 @@
                                                     <ToolTip Style="{StaticResource HelpToolTip}">
                                                         <StackPanel>
                                                             <TextBlock Text="{DynamicResource L.Replay.BufferLimit}" Style="{StaticResource HelpTipTitle}"/>
-                                                            <TextBlock Text="{DynamicResource L.Help.BufferLimit}" Style="{StaticResource HelpTipBody}"/>
+                                                            <TextBlock x:Name="BufferLimitHelpText" Text="{DynamicResource L.Help.BufferLimit}" Style="{StaticResource HelpTipBody}"/>
                                                         </StackPanel>
                                                     </ToolTip>
                                                 </Button.ToolTip>
@@ -731,6 +820,20 @@
                                     <TextBlock Text="{DynamicResource L.Replay.StartWindows}" Style="{StaticResource RowLabelText}"/>
                                     <ToggleButton x:Name="AutostartBox" HorizontalAlignment="Right"
                                                   Style="{StaticResource ToggleSwitch}"/>
+                                </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Margin="0,0,12,0">
+                                        <TextBlock Text="{DynamicResource L.Screenshot.Enable}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{DynamicResource L.Screenshot.Hint}" Style="{StaticResource SecondaryText}"
+                                                   TextWrapping="Wrap" MaxWidth="285"/>
+                                    </StackPanel>
+                                    <ToggleButton x:Name="InstantScreenshotsBox" Grid.Column="1"
+                                                  Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center"/>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -828,6 +931,175 @@
                                         <ComboBoxItem Tag="80" Content="{DynamicResource L.Video.Mbps80}"/>
                                     </ComboBox>
                                 </Grid>
+                                <StackPanel x:Name="AdvancedVideoSettings" Visibility="Collapsed">
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                    <Grid Margin="13,11">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                        <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource L.Advanced.RateControl}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                            <Button x:Name="RateControlHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.RateControl}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Advanced.RateControl}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.RateControl}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </Grid>
+                                        <ComboBox x:Name="RateControlBox" Grid.Column="1" Style="{StaticResource DarkCombo}">
+                                            <ComboBoxItem Tag="cbr" Content="CBR"/><ComboBoxItem Tag="cqp" Content="CQP"/>
+                                        </ComboBox>
+                                    </Grid>
+                                    <Grid x:Name="ConstantQualityRow" Margin="13,0,13,11" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,8,0">
+                                            <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{DynamicResource L.Advanced.ConstantQuality}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                                <Button x:Name="ConstantQualityHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.ConstantQuality}">
+                                                    <Button.ToolTip>
+                                                        <ToolTip Style="{StaticResource HelpToolTip}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{DynamicResource L.Advanced.ConstantQuality}" Style="{StaticResource HelpTipTitle}"/>
+                                                                <TextBlock Text="{DynamicResource L.Help.ConstantQuality}" Style="{StaticResource HelpTipBody}"/>
+                                                            </StackPanel>
+                                                        </ToolTip>
+                                                    </Button.ToolTip>
+                                                </Button>
+                                            </Grid>
+                                            <TextBlock Text="{DynamicResource L.Advanced.QualityHint}" Style="{StaticResource SecondaryText}" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <Slider x:Name="ConstantQualitySlider" Grid.Column="1" Minimum="1" Maximum="51" Value="22" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                Style="{StaticResource VolumeSlider}" ToolTip="{Binding Value, RelativeSource={RelativeSource Self}, StringFormat=F0}"/>
+                                    </Grid>
+                                    <TextBlock x:Name="ConstantQualityValueText" Margin="13,0,13,11" Style="{StaticResource MonoText}"
+                                               HorizontalAlignment="Right" Text="{Binding ElementName=ConstantQualitySlider, Path=Value, StringFormat=F0}" Visibility="Collapsed"/>
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                    <Grid Margin="13,11">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                        <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource L.Advanced.EncoderPreset}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                            <Button x:Name="EncoderPresetHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.EncoderPreset}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Advanced.EncoderPreset}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.EncoderPreset}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </Grid>
+                                        <Grid Grid.Column="1">
+                                            <ComboBox x:Name="NvencPresetBox" Style="{StaticResource DarkCombo}"/>
+                                            <ComboBox x:Name="AmfPresetBox" Style="{StaticResource DarkCombo}" Visibility="Collapsed"/>
+                                            <ComboBox x:Name="QsvPresetBox" Style="{StaticResource DarkCombo}" Visibility="Collapsed"/>
+                                        </Grid>
+                                    </Grid>
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                    <Grid Margin="13,11">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                        <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource L.Advanced.Keyframes}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                            <Button x:Name="KeyframesHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.Keyframes}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Advanced.Keyframes}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.Keyframes}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </Grid>
+                                        <ComboBox x:Name="KeyframeIntervalBox" Grid.Column="1" Style="{StaticResource DarkCombo}"/>
+                                    </Grid>
+                                    <TextBlock x:Name="KeyframeLimitHintText" Text="{DynamicResource L.Advanced.KeyframesLimited}" Style="{StaticResource SecondaryText}"
+                                               FontSize="11" TextWrapping="Wrap" Margin="13,0,13,11" Visibility="Collapsed"/>
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                    <Grid Margin="13,11">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                        <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource L.Advanced.BFrames}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                            <Button x:Name="BFramesHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.BFrames}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Advanced.BFrames}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.BFrames}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </Grid>
+                                        <ComboBox x:Name="BFramesBox" Grid.Column="1" Style="{StaticResource DarkCombo}"/>
+                                    </Grid>
+                                    <TextBlock x:Name="BFramesLimitHintText" Text="{DynamicResource L.Advanced.BFramesLimited}" Style="{StaticResource SecondaryText}"
+                                               FontSize="11" TextWrapping="Wrap" Margin="13,0,13,11" Visibility="Collapsed"/>
+                                    <StackPanel x:Name="NvencAdvancedSettings">
+                                        <Border Style="{StaticResource RowDivider}"/>
+                                        <Grid Margin="13,11">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                            <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{DynamicResource L.Advanced.Multipass}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                                <Button x:Name="MultipassHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.Multipass}">
+                                                    <Button.ToolTip>
+                                                        <ToolTip Style="{StaticResource HelpToolTip}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{DynamicResource L.Advanced.Multipass}" Style="{StaticResource HelpTipTitle}"/>
+                                                                <TextBlock Text="{DynamicResource L.Help.Multipass}" Style="{StaticResource HelpTipBody}"/>
+                                                            </StackPanel>
+                                                        </ToolTip>
+                                                    </Button.ToolTip>
+                                                </Button>
+                                            </Grid>
+                                            <ComboBox x:Name="MultipassBox" Grid.Column="1" Style="{StaticResource DarkCombo}"/>
+                                        </Grid>
+                                        <Grid Margin="13,0,13,11">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{DynamicResource L.Advanced.LookAhead}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                                <Button x:Name="LookAheadHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.LookAhead}">
+                                                    <Button.ToolTip>
+                                                        <ToolTip Style="{StaticResource HelpToolTip}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{DynamicResource L.Advanced.LookAhead}" Style="{StaticResource HelpTipTitle}"/>
+                                                                <TextBlock Text="{DynamicResource L.Help.LookAhead}" Style="{StaticResource HelpTipBody}"/>
+                                                            </StackPanel>
+                                                        </ToolTip>
+                                                    </Button.ToolTip>
+                                                </Button>
+                                            </Grid>
+                                            <ToggleButton x:Name="LookAheadBox" Grid.Column="1" Style="{StaticResource ToggleSwitch}" HorizontalAlignment="Right"/>
+                                        </Grid>
+                                        <Grid Margin="13,0,13,11">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                            <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                                <TextBlock Text="{DynamicResource L.Advanced.AdaptiveQuantization}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                                <Button x:Name="AdaptiveQuantizationHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.AdaptiveQuantization}">
+                                                    <Button.ToolTip>
+                                                        <ToolTip Style="{StaticResource HelpToolTip}">
+                                                            <StackPanel>
+                                                                <TextBlock Text="{DynamicResource L.Advanced.AdaptiveQuantization}" Style="{StaticResource HelpTipTitle}"/>
+                                                                <TextBlock Text="{DynamicResource L.Help.AdaptiveQuantization}" Style="{StaticResource HelpTipBody}"/>
+                                                            </StackPanel>
+                                                        </ToolTip>
+                                                    </Button.ToolTip>
+                                                </Button>
+                                            </Grid>
+                                            <ComboBox x:Name="AdaptiveQuantizationBox" Grid.Column="1" Style="{StaticResource DarkCombo}"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </StackPanel>
                                 <Border Style="{StaticResource RowDivider}"/>
                                 <Grid Margin="13,11">
                                     <Grid.ColumnDefinitions>
@@ -1089,6 +1361,27 @@
                                         <ComboBoxItem Tag="opus" Content="Opus · MKV"/>
                                     </ComboBox>
                                 </Grid>
+                                <StackPanel x:Name="AdvancedAudioSettings" Visibility="Collapsed">
+                                    <Border Style="{StaticResource RowDivider}"/>
+                                    <Grid Margin="13,11">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="170"/></Grid.ColumnDefinitions>
+                                        <Grid VerticalAlignment="Center" HorizontalAlignment="Left" Margin="0,0,8,0">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                            <TextBlock Text="{DynamicResource L.Advanced.AudioBitrate}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                            <Button x:Name="AudioBitrateHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}" AutomationProperties.Name="{DynamicResource L.Advanced.AudioBitrate}">
+                                                <Button.ToolTip>
+                                                    <ToolTip Style="{StaticResource HelpToolTip}">
+                                                        <StackPanel>
+                                                            <TextBlock Text="{DynamicResource L.Advanced.AudioBitrate}" Style="{StaticResource HelpTipTitle}"/>
+                                                            <TextBlock Text="{DynamicResource L.Help.AudioBitrate}" Style="{StaticResource HelpTipBody}"/>
+                                                        </StackPanel>
+                                                    </ToolTip>
+                                                </Button.ToolTip>
+                                            </Button>
+                                        </Grid>
+                                        <ComboBox x:Name="AudioBitrateBox" Grid.Column="1" Style="{StaticResource DarkCombo}"/>
+                                    </Grid>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -1137,6 +1430,7 @@
                         <TextBlock Text="{DynamicResource L.Section.Appearance}"
                                    Style="{StaticResource SectionHeaderText}"/>
                         <Border Style="{StaticResource SettingsGroup}">
+                            <StackPanel>
                             <Grid Margin="13,11">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -1179,6 +1473,24 @@
                                     </UniformGrid>
                                 </Border>
                             </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource L.QuickPanel.Side}" Style="{StaticResource RowLabelText}"/>
+                                        <TextBlock Text="{DynamicResource L.QuickPanel.SideHint}"
+                                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="190"/>
+                                    </StackPanel>
+                                    <ComboBox x:Name="QuickPanelSideBox" Grid.Column="1"
+                                              Width="128" Style="{StaticResource DarkCombo}">
+                                        <ComboBoxItem Tag="left" Content="{DynamicResource L.QuickPanel.Left}"/>
+                                        <ComboBoxItem Tag="right" Content="{DynamicResource L.QuickPanel.Right}"/>
+                                    </ComboBox>
+                                </Grid>
+                            </StackPanel>
                         </Border>
 
                         <TextBlock Text="{DynamicResource L.Section.Hotkeys}" Style="{StaticResource SectionHeaderText}"/>
@@ -1217,7 +1529,66 @@
                                                 Tag="toggle" Click="HotkeyCapture_Click"/>
                                     </Grid>
                                 </StackPanel>
+                                <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{DynamicResource L.QuickPanel.Hotkey}" Style="{StaticResource RowLabelText}"/>
+                                        <TextBlock Text="{DynamicResource L.QuickPanel.HotkeyHint}"
+                                                   Style="{StaticResource SecondaryText}" TextWrapping="Wrap" MaxWidth="190"/>
+                                    </StackPanel>
+                                    <Button x:Name="QuickPanelHotkeyButton" Grid.Column="1"
+                                            Style="{StaticResource SubtleButton}" MinWidth="128"
+                                            Tag="quick-panel" Click="HotkeyCapture_Click"/>
+                                </Grid>
+                                <Border Style="{StaticResource RowDivider}"/>
+                                <Grid Margin="13,11">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="190"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{DynamicResource L.Screenshot.Hotkey}" Style="{StaticResource RowLabelText}"
+                                               TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                                    <Button x:Name="ScreenshotHotkeyButton" Grid.Column="1" Style="{StaticResource SubtleButton}" MinWidth="128"
+                                            Tag="screenshot" Click="HotkeyCapture_Click"/>
+                                </Grid>
                             </StackPanel>
+                        </Border>
+                        <Border x:Name="AdvancedSettingsGroup" Style="{StaticResource SettingsGroup}" Margin="0,12,0,0">
+                            <Grid Margin="13,11">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,12,0">
+                                    <Grid VerticalAlignment="Center" HorizontalAlignment="Left">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{DynamicResource L.Advanced.Enable}" Style="{StaticResource RowLabelText}" TextWrapping="Wrap"/>
+                                        <Button x:Name="AdvancedSettingsHelpButton" Grid.Column="1" Style="{StaticResource HelpIconButton}"
+                                                AutomationProperties.Name="{DynamicResource L.Advanced.Enable}">
+                                            <Button.ToolTip>
+                                                <ToolTip Style="{StaticResource HelpToolTip}">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{DynamicResource L.Advanced.Enable}" Style="{StaticResource HelpTipTitle}"/>
+                                                        <TextBlock Text="{DynamicResource L.Help.AdvancedSettings}" Style="{StaticResource HelpTipBody}"/>
+                                                    </StackPanel>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </Grid>
+                                    <TextBlock Text="{DynamicResource L.Advanced.Hint}" Style="{StaticResource SecondaryText}"
+                                               FontSize="11" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                </StackPanel>
+                                <ToggleButton x:Name="AdvancedSettingsBox" Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                              VerticalAlignment="Center" Click="AdvancedSettings_Click"
+                                              AutomationProperties.Name="{DynamicResource L.Advanced.Enable}"/>
+                            </Grid>
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
@@ -1226,6 +1597,18 @@
             <Border Grid.Row="2" BorderBrush="{StaticResource DividerBrush}"
                     BorderThickness="0,1,0,0" Margin="16,0">
                 <Grid>
+                    <Button x:Name="SupportUsButton"
+                            HorizontalAlignment="Center" Margin="0,3"
+                            Style="{StaticResource FooterLinkButton}"
+                            Click="SupportUs_Click"
+                            AutomationProperties.Name="{DynamicResource L.Footer.SupportUs}">
+                        <StackPanel Orientation="Horizontal">
+                            <Image Source="{StaticResource IconSupportHeart}"
+                                   Width="14" Height="14" Stretch="Uniform"/>
+                            <TextBlock Text="{DynamicResource L.Footer.SupportUs}"
+                                       Margin="6,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                     <ToggleButton x:Name="AboutButton"
                                   HorizontalAlignment="Right"
                                   Style="{StaticResource FooterAboutButton}"

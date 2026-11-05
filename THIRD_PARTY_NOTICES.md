@@ -2,6 +2,35 @@
 
 Captail dynamically uses and may redistribute selected components from OBS Studio 32.2.2.
 
+## Azure Heart icon / theSVG
+
+- Source: https://thesvg.org/icon/azure-heart
+- SVG: https://github.com/glincker/thesvg/blob/main/public/icons/azure-heart/default.svg
+- Adaptation: SVG geometry and gradients converted to a WPF vector drawing.
+- License: MIT, https://github.com/glincker/thesvg/blob/main/LICENSE
+
+MIT License
+
+Copyright (c) 2025 thesvg.org
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 ## OBS Studio / libobs
 
 - Project: https://github.com/obsproject/obs-studio
@@ -10,6 +39,11 @@ Captail dynamically uses and may redistribute selected components from OBS Studi
 - Local license text: `LICENSE`
 
 `tools/AcquireObsRuntime.ps1` prepares the runtime. Distributions contain only components required for libobs, Replay Buffer, Windows capture, WASAPI audio, and supported hardware encoders.
+
+`libobs-winrt.dll` is rebuilt from the OBS Studio 32.2.2 sources in
+`native/ObsWinrt`, with null checks that make repeated capture-resource release
+safe. Source provenance and original hashes are recorded in
+`native/ObsWinrt/README.md`. The same GPL-2.0-or-later license applies.
 
 Captail's `native/ProcessAudio` module narrowly adapts the process-loopback
 activation, audio format, silent-buffer, timestamp, and packet-delivery portions
@@ -27,6 +61,12 @@ public libobs headers used to compile the module.
 - License: GNU Lesser General Public License 2.1 or later; optional components retain their own licenses
 
 `tools/AcquireFfmpegRuntime.ps1` downloads a pinned, SHA-256-verified build. Captail uses it for clip metadata, thumbnails, and non-destructive trimming.
+
+The validated FFmpeg and libmpv binaries are preserved without modification in
+the `runtime-assets-20260923` dependency release in `FaulMit/captail`, because
+the upstream autobuild archives expired. The mirror includes upstream source
+references, original archive hashes, and per-file checksums. Acquisition scripts
+verify the repackaged archives using separate pinned SHA-256 hashes.
 
 ## mpv / libmpv
 

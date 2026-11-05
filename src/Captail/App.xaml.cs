@@ -11,7 +11,6 @@ using System.Windows.Interop;
 using System.Windows.Threading;
 using Captail.Interop;
 using H.NotifyIcon;
-using Windows.Graphics.Capture;
 
 namespace Captail;
 
@@ -29,6 +28,7 @@ public partial class App : Application
     private HotkeyManager? _hotkeys;
     private string _boundHotkey = "";
     private string _boundToggleHotkey = "";
+    private QuickPanelWindow? _quickPanel;
     private TaskbarIcon? _tray;
     private bool? _trayActiveState;
     private MenuItem? _saveMenuItem;
@@ -42,8 +42,13 @@ public partial class App : Application
     private CancellationTokenSource? _activationServerCts;
     private string _activationPipeName = "";
     private string? _pendingUiError;
-    private DispatcherTimer? _healthTimer;
-    private DispatcherTimer? _captureStateTimer;
+    private CaptureMonitor? _captureMonitor;
+    private int _availableReplaySeconds;
+    private int _uiStateUpdatePending;
+    private int _captureRecoveryRestartRequested;
+    private DisplayHdrMonitor? _displayHdrMonitor;
+    private readonly CancellationTokenSource _displayHdrMonitorStop = new();
+    private int _displayHdrApplyInProgress;
     private DateTime _pipelineStartedUtc;
     private DateTime _nextRecoveryUtc;
     private int _recoveryFailures;
@@ -58,6 +63,7 @@ public partial class App : Application
     private readonly UpdateService _updateService = new();
     private DispatcherTimer? _updateShutdownTimer;
     private int _saving;
+    private int _takingScreenshot;
     private EncoderCapabilities? _capabilities;
     private readonly SemaphoreSlim _pipelineGate = new(1, 1);
     private readonly SingleThreadTaskScheduler _obsTaskScheduler =
@@ -85,6 +91,7 @@ public partial class App : Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        AppDiagnostics.Install(this);
         base.OnStartup(e);
         ConfigureShellIdentity();
 
@@ -141,7 +148,8 @@ public partial class App : Application
                 StringComparer.OrdinalIgnoreCase);
             bool replaySegmentsTest = e.Args.Contains(
                 "--qa-replay-segments",
-                StringComparer.OrdinalIgnoreCase);
+                StringComparer.OrdinalIgnoreCase) || e.Args.Contains(
+                "--qa-disk-replay-segments", StringComparer.OrdinalIgnoreCase);
             bool fileRetryTest = e.Args.Contains(
                 "--qa-file-retry",
                 StringComparer.OrdinalIgnoreCase);
@@ -290,9 +298,12 @@ public partial class App : Application
             }
 
             AppDataPaths.PrepareStoreData();
+            AppDiagnostics.Start(e.Args);
             _storePackageLifecycle = StorePackageLifecycle.Start(
                 OnStorePackageStopping);
             _config = Config.Load();
+            AppDiagnostics.SetOutputDirectory(_config.OutputDirectory);
+            Log.Event(DiagnosticLevel.Info, "Settings", "configuration.loaded", AppDiagnostics.Configuration(_config));
             Localization.SetLanguage(_config.Language);
             ApplyAccent(_config.AccentColor);
             Localization.Changed += OnLanguageChanged;
@@ -348,7 +359,7 @@ public partial class App : Application
             }
             if (replaySegmentsTest)
             {
-                RunReplaySegmentsTest();
+                RunReplaySegmentsTest(e.Args.Contains("--qa-disk-replay-segments", StringComparer.OrdinalIgnoreCase));
                 return;
             }
             if (fileRetryTest)
@@ -457,6 +468,25 @@ public partial class App : Application
                             OverlayTone.Success,
                             60_000));
                 }
+                if (e.Args.Contains("--qa-quick-panel", StringComparer.OrdinalIgnoreCase) ||
+                    e.Args.Contains("--qa-quick-panel-left", StringComparer.OrdinalIgnoreCase))
+                    _ = Dispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+                        () =>
+                        {
+                            try
+                            {
+                                if (e.Args.Contains("--qa-quick-panel-left",
+                                    StringComparer.OrdinalIgnoreCase))
+                                    _config!.QuickPanelSide = "left";
+                                ToggleQuickPanel();
+                                Log.Write($"QUICK_PANEL_QA shown={_quickPanel?.IsVisible}");
+                            }
+                            catch (Exception exception)
+                            {
+                                Log.Write($"QUICK_PANEL_QA FAIL: {exception}");
+                            }
+                            Log.Flush();
+                        });
                 if (recordingIndicatorTest)
                 {
                     _recordingIndicator = new ReplayStatusIndicatorWindow
@@ -478,13 +508,21 @@ public partial class App : Application
                 return;
             }
 
+            _displayHdrMonitor = new DisplayHdrMonitor();
+            _displayHdrMonitor.Changed += OnDisplayHdrChanged;
+            try { await _displayHdrMonitor.StartAsync().WaitAsync(TimeSpan.FromSeconds(2)); }
+            catch (TimeoutException)
+            {
+                Log.Event(DiagnosticLevel.Warning, "Capture", "display.hdr.initial-query-pending");
+            }
             CreateTrayIcon();
             BindHotkeyAtStartup();
-            StartHealthMonitor();
-            StartCaptureStateMonitor();
+            StartCaptureMonitor();
             StartActivationServer();
             if (!backgroundLaunch)
                 OpenSettings();
+
+            await PrepareCapturePermissionsAtStartupAsync(backgroundLaunch);
 
             if (_config.ReplayEnabled &&
                 await TryStartPipelineAsync(showError: true))
@@ -507,6 +545,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
+            Log.Event(DiagnosticLevel.Fatal, "Runtime", "session.start-failed", exception: exception);
             MessageBox.Show(
                 Localization.Format("L.App.StartError", exception.Message),
                 Localization.Text("L.Brand"),
@@ -589,6 +628,8 @@ public partial class App : Application
             ["ja-JP"] = "ja",
             ["ko-KR"] = "ko",
             ["pl-PL"] = "pl",
+            ["bg-BG"] = "bg",
+            ["bg_BG"] = "bg",
             ["tr-TR"] = "en",
             [""] = "en",
         };
@@ -604,10 +645,12 @@ public partial class App : Application
         bool cultureNormalizationPassed =
             Localization.NormalizeLanguage("fr-CA") == "fr" &&
             Localization.NormalizeLanguage("de-DE") == "de" &&
+            Localization.NormalizeLanguage("bg-BG") == "bg" &&
             Localization.NormalizeLanguage("unsupported") == "en";
         bool firstRunDetectionPassed =
             Localization.ResolveInitialLanguage(null, "uk-UA") == "uk" &&
             Localization.ResolveInitialLanguage("", "es-MX") == "es" &&
+            Localization.ResolveInitialLanguage(null, "bg-BG") == "bg" &&
             Localization.ResolveInitialLanguage("ru", "uk-UA") == "ru" &&
             Localization.ResolveInitialLanguage(null, "tr-TR") == "en";
         string originalLanguage = Localization.Language;
@@ -751,6 +794,7 @@ public partial class App : Application
         string transcodedPath = Path.Combine(
             directory,
             "transcoded-source" + Path.GetExtension(fullPath));
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
         try
         {
             File.Copy(fullPath, workingPath);
@@ -885,6 +929,44 @@ public partial class App : Application
                 $"{exportedVideo?.Width}x{exportedVideo?.Height}/" +
                 $"{exportedAudio.Count}audio, " +
                 $"leftovers={internalFiles.Length}");
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            foreach (bool overwrite in new[] { false, true })
+            foreach (bool mergeAudio in new[] { false, true })
+            {
+                string editorPath = Path.Combine(directory,
+                    $"editor-{overwrite}-{mergeAudio}" + Path.GetExtension(fullPath));
+                File.Copy(fullPath, editorPath);
+                var editorFile = new FileInfo(editorPath);
+                var editorClip = new ReplayClip(editorPath, editorFile.Name, null,
+                    editorFile.LastWriteTime, editorFile.Length, originalDuration, null);
+                int saves = 0;
+                var editor = new ClipEditorWindow(library, directory, editorClip,
+                    _ => saves++, ClipWindowMode.Preview);
+                (bool Passed, string Details) result = (false, "Editor QA did not finish.");
+                var completion = new TaskCompletionSource();
+                editor.Loaded += async (_, _) =>
+                {
+                    try
+                    {
+                        result = await editor.RunSavePersistenceQaAsync(overwrite, mergeAudio);
+                    }
+                    catch (Exception exception)
+                    {
+                        result = (false, exception.ToString());
+                    }
+                    finally
+                    {
+                        editor.Close();
+                        completion.SetResult();
+                    }
+                };
+                editor.ShowDialog();
+                await completion.Task;
+                bool editorPassed = result.Passed && saves == 2;
+                passed &= editorPassed;
+                Log.Write($"EDITOR_SAVE_PERSISTENCE_TEST {(editorPassed ? "PASS" : "FAIL")}: " +
+                    $"{result.Details}, saves={saves}");
+            }
             Shutdown(passed ? 0 : 21);
         }
         catch (Exception exception)
@@ -1195,10 +1277,10 @@ public partial class App : Application
                 ObsReplayEngine.RecommendedNvencBFrames("hevc", true) == 0 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", true) == 2 &&
                 ObsReplayEngine.RecommendedNvencBFrames("h264", false) == 0 &&
-                legacyWindowsCaptureMethod == 0 &&
-                windows10CaptureMethod == 2 &&
+                legacyWindowsCaptureMethod == 1 &&
+                windows10CaptureMethod == 1 &&
                 windows11CaptureMethod == 2 &&
-                windows11FallbackCaptureMethod == 0 &&
+                windows11FallbackCaptureMethod == 1 &&
                 invalidConfig.PipelineEquals(hotkeyOnlyChange) &&
                 invalidConfig.PipelineEquals(outputFolderChange) &&
                 invalidConfig.PipelineEquals(replayOrganizationChange) &&
@@ -1318,6 +1400,32 @@ public partial class App : Application
                 }
 
                 await Task.Delay(TimeSpan.FromSeconds(2));
+                if (audioTracks && args.Contains(
+                    "--qa-microphone-gain", StringComparer.OrdinalIgnoreCase))
+                {
+                    int framesBefore = await RunOnObsThreadAsync(
+                        () => _obs!.EncodedFrameCount);
+                    _config.MicrophoneBoostDb = 0;
+                    float minimumGain = await RunOnObsThreadAsync(
+                        () => _obs!.UpdateMicrophoneGain());
+                    _config.MicrophoneBoostDb = 20;
+                    float maximumGain = await RunOnObsThreadAsync(
+                        () => _obs!.UpdateMicrophoneGain());
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    int framesAfter = await RunOnObsThreadAsync(
+                        () => _obs!.EncodedFrameCount);
+                    bool outputActive = await RunOnObsThreadAsync(
+                        () => _obs!.IsActive);
+                    bool gainPassed = Math.Abs(minimumGain - 0.63f) < 0.001f &&
+                                      Math.Abs(maximumGain - 6.3f) < 0.001f &&
+                                      framesAfter > framesBefore && outputActive;
+                    allPassed &= gainPassed;
+                    Log.Write($"MICROPHONE_GAIN_TEST {(gainPassed ? "PASS" : "FAIL")}: " +
+                        $"gain={minimumGain:0.000}->{maximumGain:0.000}, " +
+                        $"frames={framesBefore}->{framesAfter}, active={outputActive}");
+                    _config.MicrophoneBoostDb = 12;
+                    await RunOnObsThreadAsync(() => _obs!.UpdateMicrophoneGain());
+                }
                 bool sourceChanged = routedAudio
                     ? await RunOnObsThreadAsync(() => _obs!.RefreshCaptureState())
                     : _obs!.RefreshCaptureState();
@@ -1488,7 +1596,7 @@ public partial class App : Application
                 CaptureMicrophone = false,
                 OutputDirectory = root,
             };
-            StartHealthMonitor();
+            StartCaptureMonitor();
             if (!await TryStartPipelineAsync(showError: false))
                 throw new InvalidOperationException("The initial OBS pipeline did not start.");
 
@@ -1743,7 +1851,9 @@ public partial class App : Application
         {
             _hotkeys = new HotkeyManager(
                 _config.Hotkey,
-                _config.ToggleReplayHotkey);
+                _config.ToggleReplayHotkey,
+                _config.QuickPanelHotkey,
+                _config.InstantScreenshotsEnabled ? _config.ScreenshotHotkey : null);
             SubscribeHotkeys();
         }
         catch (Exception exception)
@@ -1760,8 +1870,121 @@ public partial class App : Application
 
     private void SubscribeHotkeys()
     {
-        _hotkeys!.SaveRequested += SaveReplay;
+        _hotkeys!.SaveRequested += () => SaveReplay("hotkey");
         _hotkeys.ToggleRequested += ToggleReplayFromHotkey;
+        _hotkeys.QuickPanelRequested += ToggleQuickPanel;
+        _hotkeys.ScreenshotRequested += RequestInstantScreenshot;
+    }
+
+    private void RequestInstantScreenshot()
+    {
+        if (_settingsWindow?.IsCapturingHotkey == true)
+            return;
+        // Return to the keyboard hook immediately; capture and PNG encoding run off-thread.
+        Dispatcher.BeginInvoke(TakeInstantScreenshotAsync);
+    }
+
+    private async void TakeInstantScreenshotAsync()
+    {
+        if (_config?.InstantScreenshotsEnabled != true ||
+            Volatile.Read(ref _exiting) != 0 ||
+            Interlocked.CompareExchange(ref _takingScreenshot, 1, 0) != 0)
+            return;
+        try
+        {
+            var timer = Stopwatch.StartNew();
+            string path = await InstantScreenshot.SaveAsync(_config);
+            Log.Write($"Instant screenshot saved ({timer.ElapsedMilliseconds} ms): {path}");
+            if (Volatile.Read(ref _exiting) == 0)
+                ShowOverlayNotification("✓", Localization.Text("L.Screenshot.Saved"),
+                    Path.GetFileName(path), OverlayTone.Success, 1800);
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"Instant screenshot failed: {exception}");
+            if (Volatile.Read(ref _exiting) == 0)
+                ShowOverlayNotification("!", Localization.Text("L.Screenshot.Failed"),
+                    exception.Message, OverlayTone.Warning);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _takingScreenshot, 0);
+        }
+    }
+
+    private void ToggleQuickPanel()
+    {
+        if (_config is null || Volatile.Read(ref _exiting) != 0)
+            return;
+        Log.Event(DiagnosticLevel.Info, "UI", "quick-panel.toggle-request",
+            new { visible = _quickPanel?.IsVisible ?? false });
+        _quickPanel ??= new QuickPanelWindow(
+            _config,
+            () => IsReplayRunning,
+            codec => _capabilities?.Supports(codec) ?? true,
+            ApplyQuickPanelConfigAsync,
+            SetQuickPanelMicBoostAsync,
+            SetReplayEnabledAsync,
+            SetAudioSourcesAsync,
+            SaveReplay,
+            OpenSettings,
+            OpenOutputFolderAsync);
+        _quickPanel.TogglePanel();
+        Log.Event(DiagnosticLevel.Info, "UI", "quick-panel.toggle-completed",
+            new { visible = _quickPanel.IsVisible, active = _quickPanel.IsActive });
+    }
+
+    private async Task<bool> ApplyQuickPanelConfigAsync(Config candidate)
+    {
+        bool autostart = await Autostart.IsEnabledAsync();
+        bool applied = await ApplySettingsAsync(candidate, autostart);
+        if (applied)
+            _settingsWindow?.RefreshFromConfigIfSafe();
+        return applied;
+    }
+
+    private async Task<bool> SetQuickPanelMicBoostAsync(int boostDb)
+    {
+        if (_config is null || Volatile.Read(ref _exiting) != 0)
+            return false;
+        await _pipelineGate.WaitAsync();
+        try
+        {
+            int normalized = Math.Clamp(boostDb, 0, 20);
+            int previous = _config.MicrophoneBoostDb;
+            if (normalized == previous)
+                return true;
+
+            _config.MicrophoneBoostDb = normalized;
+            ObsReplayEngine? engine = _obs;
+            try
+            {
+                if (engine is not null)
+                    await RunOnObsThreadAsync(() => engine.UpdateMicrophoneGain());
+                _config.Save();
+                _settingsWindow?.RefreshFromConfigIfSafe();
+                return true;
+            }
+            catch (Exception exception)
+            {
+                _config.MicrophoneBoostDb = previous;
+                try
+                {
+                    if (engine is not null)
+                        await RunOnObsThreadAsync(() => engine.UpdateMicrophoneGain());
+                }
+                catch (Exception rollbackException)
+                {
+                    Log.Write($"Microphone gain rollback failed: {rollbackException}");
+                }
+                Log.Write($"Quick panel microphone gain failed: {exception}");
+                return false;
+            }
+        }
+        finally
+        {
+            _pipelineGate.Release();
+        }
     }
 
     private void ToggleReplayFromHotkey() => _ = ToggleReplayAsync();
@@ -1792,11 +2015,14 @@ public partial class App : Application
         try
         {
             string requestedCodec = _config!.Codec;
-            engine = new ObsReplayEngine(_config);
+            engine = new ObsReplayEngine(_config, _windowsGraphicsCaptureReady,
+                CaptureInterop.EnumerateMonitors,
+                _displayHdrMonitor is { } hdrMonitor ? hdrMonitor.Read : null);
             engine.Faulted += reason => OnPipelineFault(engine, reason);
             engine.Start();
             _obs = engine;
             _replayRunning = true;
+            Volatile.Write(ref _availableReplaySeconds, 0);
             _capabilities = engine.Capabilities;
             if (!string.Equals(
                     requestedCodec,
@@ -1840,6 +2066,7 @@ public partial class App : Application
         _obs = null;
         _replayRunning = false;
         _captureDescription = null;
+        Volatile.Write(ref _availableReplaySeconds, 0);
         try
         {
             engine?.Dispose();
@@ -1870,29 +2097,40 @@ public partial class App : Application
 
         ObsReplayEngine? engine = null;
         var stopwatch = Stopwatch.StartNew();
+        using var diagnostic = Log.BeginOperation("pipeline.start", AppDiagnostics.Configuration(_config!));
+        AppDiagnostics.SetOutputDirectory(_config!.OutputDirectory);
         try
         {
+            diagnostic.Stage("capture-access");
             string requestedCodec = _config!.Codec;
             _windowsGraphicsCaptureReady =
                 await PrepareWindowsGraphicsCaptureAsync();
             engine = new ObsReplayEngine(
                 _config,
-                _windowsGraphicsCaptureReady);
+                _windowsGraphicsCaptureReady,
+                CaptureInterop.EnumerateMonitors,
+                _displayHdrMonitor is { } hdrMonitor ? hdrMonitor.Read : null);
             engine.Faulted += reason => OnPipelineFault(engine, reason);
             string description = await RunOnObsThreadAsync(() =>
             {
+                diagnostic.Stage("native-start");
                 engine.Start();
+                engine.WriteDiagnosticState("started");
                 return engine.Description;
             });
             _obs = engine;
             _replayRunning = true;
             _captureDescription = description;
+            Volatile.Write(ref _availableReplaySeconds, 0);
+            OnDisplayHdrChanged();
             _capabilities = engine.Capabilities;
             _processAudioAvailability = engine.ProcessAudioAvailability;
             if (engine.RequiresProcessAudioMonitoring)
             {
                 _processAudioMonitor = new ProcessAudioMonitor(
-                    ProcessSnapshot.Capture,
+                    ObsReplayEngine.UsesSeparateGameAudio(_config)
+                        ? ProcessSnapshot.CaptureWithAudio
+                        : ProcessSnapshot.Capture,
                     snapshot => RunOnObsThreadAsync(
                         () => engine.ReconcileProcessAudio(snapshot)),
                     Log.Write,
@@ -1909,11 +2147,13 @@ public partial class App : Application
             _nextRecoveryUtc = DateTime.MinValue;
             _recoveryFailures = 0;
             Log.Write($"OBS pipeline started in {stopwatch.ElapsedMilliseconds} ms.");
+            diagnostic.Complete(new { description });
             UpdateUiState();
             return true;
         }
         catch (Exception exception)
         {
+            diagnostic.Fail(exception);
             if (engine is not null)
             {
                 _capabilities = engine.Capabilities;
@@ -1954,8 +2194,33 @@ public partial class App : Application
         }
     }
 
+    private async Task PrepareCapturePermissionsAtStartupAsync(bool backgroundLaunch)
+    {
+        if (backgroundLaunch || _uiOnly)
+            return;
+
+        // Serialize with user-triggered starts so a click during consent cannot
+        // start capture before permission preflight completes.
+        await _pipelineGate.WaitAsync();
+        try
+        {
+            if (Volatile.Read(ref _exiting) == 0)
+                _windowsGraphicsCaptureReady = await PrepareWindowsGraphicsCaptureAsync();
+        }
+        finally
+        {
+            _pipelineGate.Release();
+        }
+    }
+
     private Task<bool> PrepareWindowsGraphicsCaptureAsync()
     {
+        // Recovery reuses the established permission/backend choice. Do not
+        // wait for the UI dispatcher to repeat a completed startup preflight.
+        if (_config is null || _config.CaptureSource == "game")
+            return Task.FromResult(true);
+        if (_borderlessCaptureAccessPrepared)
+            return Task.FromResult(_windowsGraphicsCaptureReady);
         if (Dispatcher.CheckAccess())
             return PrepareWindowsGraphicsCaptureCoreAsync();
 
@@ -1971,8 +2236,7 @@ public partial class App : Application
             string.Equals(
                 _config.CaptureSource,
                 "game",
-                StringComparison.OrdinalIgnoreCase) ||
-            Environment.OSVersion.Version.Build < 22000)
+                StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -1983,21 +2247,21 @@ public partial class App : Application
         _borderlessCaptureAccessPrepared = true;
         try
         {
-            var request = GraphicsCaptureAccess.RequestAccessAsync(
-                    GraphicsCaptureAccessKind.Borderless)
-                .AsTask();
-            var status = await request.WaitAsync(TimeSpan.FromSeconds(15));
-            _windowsGraphicsCaptureReady =
-                status.ToString() != "UserPromptRequired";
-            Log.Write(
-                $"WGC borderless preflight: status={status}; " +
-                $"ready={_windowsGraphicsCaptureReady}.");
+            BorderlessCaptureAccess.Result result = await BorderlessCaptureAccess.ProbeAsync();
+            _windowsGraphicsCaptureReady = result.Ready;
+            Log.Event(
+                result.Error is null ? DiagnosticLevel.Info : DiagnosticLevel.Warning,
+                "Capture",
+                $"WGC borderless preflight: supported={result.Supported}; " +
+                $"status={result.Status?.ToString() ?? "not-requested"}; " +
+                $"ready={_windowsGraphicsCaptureReady}; " +
+                $"error={result.Error ?? "none"}.");
         }
         catch (Exception exception)
         {
             _windowsGraphicsCaptureReady = false;
             Log.Write(
-                "WGC borderless preflight failed; using Auto/DXGI: " +
+                "WGC borderless preflight failed; using DXGI: " +
                 exception.Message);
         }
 
@@ -2016,9 +2280,13 @@ public partial class App : Application
         if (engine is null)
             return;
 
+        Volatile.Write(ref _availableReplaySeconds, 0);
+
         var stopwatch = Stopwatch.StartNew();
+        using var diagnostic = Log.BeginOperation("pipeline.stop", new { recordingPath, state = engine.CachedDiagnosticState });
         try
         {
+            diagnostic.Stage("native-dispose");
             await RunOnObsThreadAsync(engine.Dispose);
             Log.Write($"OBS pipeline stopped in {stopwatch.ElapsedMilliseconds} ms.");
             if (!string.IsNullOrWhiteSpace(recordingPath) &&
@@ -2029,11 +2297,13 @@ public partial class App : Application
                     recordingPath,
                     recordingGame);
                 Log.Write($"Continuous recording saved: {routed}");
-                _settingsWindow?.NotifyReplaySaved(routed);
+                PostCaptureUi(() => _settingsWindow?.NotifyReplaySaved(routed));
             }
+            diagnostic.Complete();
         }
         catch (Exception exception)
         {
+            diagnostic.Fail(exception);
             Log.Write($"OBS pipeline shutdown failed: {exception}");
         }
     }
@@ -2388,28 +2658,92 @@ public partial class App : Application
         }
     }
 
-    private void StartHealthMonitor()
+    private void StartCaptureMonitor()
     {
-        _healthTimer = new DispatcherTimer
+        _captureMonitor ??= new CaptureMonitor(async (health, stopping) =>
         {
-            Interval = TimeSpan.FromSeconds(2),
-        };
-        _healthTimer.Tick += async (_, _) => await MonitorPipelineSafeAsync();
-        _healthTimer.Start();
+            await RefreshAutomaticCaptureStateSafeAsync(stopping).ConfigureAwait(false);
+            if (health && !stopping.IsCancellationRequested)
+                await MonitorPipelineSafeAsync(stopping).ConfigureAwait(false);
+        }, () => _uiOnly || Volatile.Read(ref _exiting) != 0 || _config?.ReplayEnabled != true
+            ? TimeSpan.Zero : _obsTaskScheduler.BusyDuration, OnCaptureMonitorTimeout);
     }
 
-    private void StartCaptureStateMonitor()
+    private void OnCaptureMonitorTimeout(string detail)
     {
-        _captureStateTimer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromMilliseconds(500),
-        };
-        _captureStateTimer.Tick += async (_, _) =>
-            await RefreshAutomaticCaptureStateSafeAsync();
-        _captureStateTimer.Start();
+        if (_uiOnly || Volatile.Read(ref _exiting) != 0 || _config?.ReplayEnabled != true)
+            return;
+        Log.Event(DiagnosticLevel.Error, "Capture", "capture.monitor.timeout",
+            new { detail, state = _obs?.CachedDiagnosticState, saving = Volatile.Read(ref _saving) != 0 });
+        // The OBS worker may be inside a native call while holding the pipeline
+        // gate. Reuse process recovery without waiting for that gate or WPF.
+        if (TryRestartAfterHungCaptureRecovery(detail)) return;
+        _pendingUiError = Localization.Text("L.Notify.RecoveryUnavailableTitle");
+        PostCaptureUi(() => _settingsWindow?.ShowError(
+            Localization.Text("L.Notify.RecoveryFailedTitle"), _pendingUiError));
     }
 
-    private async Task RefreshAutomaticCaptureStateSafeAsync()
+    private void OnDisplayHdrChanged()
+    {
+        if (Volatile.Read(ref _exiting) != 0 ||
+            Interlocked.CompareExchange(ref _displayHdrApplyInProgress, 1, 0) != 0)
+            return;
+        _ = ApplyDisplayHdrChangesSafeAsync();
+    }
+
+    private async Task ApplyDisplayHdrChangesSafeAsync()
+    {
+        DisplayHdrMonitor? monitor = _displayHdrMonitor;
+        CancellationToken stopping = _displayHdrMonitorStop.Token;
+        long appliedVersion = -1;
+        try
+        {
+            if (monitor is null) return;
+            do
+            {
+                appliedVersion = monitor.Version;
+                // Observation continues while a save/restart holds this gate.
+                await _pipelineGate.WaitAsync(stopping).ConfigureAwait(false);
+                try
+                {
+                    if (Volatile.Read(ref _exiting) != 0) return;
+                    ObsReplayEngine? engine = _obs;
+                    if (engine is not null)
+                        await RunOnObsThreadAsync(() =>
+                        {
+                            if (Volatile.Read(ref _exiting) == 0 && ReferenceEquals(engine, _obs))
+                                engine.RefreshDisplayColorState();
+                        }).ConfigureAwait(false);
+                }
+                finally { _pipelineGate.Release(); }
+            } while (!stopping.IsCancellationRequested && monitor.Version != appliedVersion);
+        }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            appliedVersion = monitor?.Version ?? -1;
+            Log.Event(DiagnosticLevel.Warning, "Capture", "display.hdr.apply-failed",
+                new { exception.Message });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _displayHdrApplyInProgress, 0);
+            if (!stopping.IsCancellationRequested && monitor is not null &&
+                ReferenceEquals(monitor, _displayHdrMonitor) && monitor.Version != appliedVersion)
+                OnDisplayHdrChanged();
+        }
+    }
+
+    private void StopDisplayHdrMonitor()
+    {
+        DisplayHdrMonitor? monitor = Interlocked.Exchange(ref _displayHdrMonitor, null);
+        _displayHdrMonitorStop.Cancel();
+        if (monitor is null) return;
+        monitor.Changed -= OnDisplayHdrChanged;
+        monitor.Dispose();
+    }
+
+    private async Task RefreshAutomaticCaptureStateSafeAsync(CancellationToken stopping = default)
     {
         if (_uiOnly ||
             Volatile.Read(ref _exiting) != 0 ||
@@ -2423,19 +2757,24 @@ public partial class App : Application
             RefreshReplayOffGameWarning();
             if (!IsReplayRunning)
                 return;
-            if (!await _pipelineGate.WaitAsync(0))
+            if (!await _pipelineGate.WaitAsync(0, stopping).ConfigureAwait(false))
                 return;
             try
             {
                 ObsReplayEngine? engine = _obs;
                 if (engine is null)
                     return;
-                (bool changed, string description) =
+                (bool changed, string description, int monitorIndex, int available) =
                     await RunOnObsThreadAsync(() =>
                     {
+                        stopping.ThrowIfCancellationRequested();
                         bool sourceChanged = engine.RefreshCaptureState();
-                        return (sourceChanged, engine.Description);
-                    });
+                        engine.WriteDiagnosticState("health", periodic: true);
+                        return (sourceChanged, engine.Description, engine.CaptureMonitorIndex, engine.AvailableReplaySeconds);
+                    }).ConfigureAwait(false);
+                stopping.ThrowIfCancellationRequested();
+                Volatile.Write(ref _availableReplaySeconds, available);
+                SynchronizeCaptureMonitor(engine, changed, monitorIndex);
                 if (changed && ReferenceEquals(engine, _obs))
                 {
                     _captureDescription = description;
@@ -2447,6 +2786,7 @@ public partial class App : Application
                 _pipelineGate.Release();
             }
         }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             Log.Write($"Capture source monitor failed: {exception.Message}");
@@ -2524,19 +2864,33 @@ public partial class App : Application
             5200);
     }
 
-    private async Task MonitorPipelineSafeAsync()
+    private void SynchronizeCaptureMonitor(ObsReplayEngine engine, bool changed, int monitorIndex)
+    {
+        if (!ReferenceEquals(engine, _obs) || !engine.IsAutomaticCapture || _config is null)
+            return;
+        bool indexChanged = _config.MonitorIndex != monitorIndex;
+        _config.MonitorIndex = monitorIndex;
+        if (changed || indexChanged)
+            PostCaptureUi(() =>
+            {
+                if (ReferenceEquals(engine, _obs)) _settingsWindow?.RefreshMonitorChoices();
+            });
+    }
+
+    private async Task MonitorPipelineSafeAsync(CancellationToken stopping = default)
     {
         try
         {
-            await MonitorPipelineAsync();
+            await MonitorPipelineAsync(stopping).ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (stopping.IsCancellationRequested) { throw; }
         catch (Exception exception)
         {
             Log.Write($"Health monitor failed: {exception}");
         }
     }
 
-    private async Task MonitorPipelineAsync()
+    private async Task MonitorPipelineAsync(CancellationToken stopping = default)
     {
         if (_uiOnly ||
             _config?.ReplayEnabled != true ||
@@ -2546,7 +2900,7 @@ public partial class App : Application
             return;
         }
 
-        if (!await _pipelineGate.WaitAsync(0))
+        if (!await _pipelineGate.WaitAsync(0, stopping).ConfigureAwait(false))
             return;
 
         string? recoveryReason = null;
@@ -2562,14 +2916,19 @@ public partial class App : Application
             {
                 bool checkHealth = DateTime.UtcNow - _pipelineStartedUtc >=
                                    TimeSpan.FromSeconds(8);
-                (bool healthy, string? description) =
+                (bool healthy, string? description, bool changed, int monitorIndex) =
                     await RunOnObsThreadAsync(() =>
                     {
-                        engine.RefreshCaptureState();
+                        stopping.ThrowIfCancellationRequested();
+                        bool sourceChanged = engine.RefreshCaptureState();
                         return (
                             checkHealth ? engine.IsHealthy : true,
-                            engine.Description);
-                    });
+                            engine.Description,
+                            sourceChanged,
+                            engine.CaptureMonitorIndex);
+                    }).ConfigureAwait(false);
+                stopping.ThrowIfCancellationRequested();
+                SynchronizeCaptureMonitor(engine, changed, monitorIndex);
                 if (healthy)
                     _captureDescription = description;
                 else
@@ -2583,17 +2942,17 @@ public partial class App : Application
         }
 
         if (recoveryReason is not null)
-            await RecoverPipelineAsync(recoveryReason);
+            _ = RecoverPipelineSafeAsync(recoveryReason);
         else
             UpdateUiState();
     }
 
     private void OnPipelineFault(ObsReplayEngine source, string reason)
     {
-        Dispatcher.BeginInvoke(() =>
+        _ = Task.Run(async () =>
         {
-            if (ReferenceEquals(source, _obs))
-                _ = RecoverPipelineSafeAsync(reason);
+            if (Volatile.Read(ref _exiting) == 0 && ReferenceEquals(source, _obs))
+                await RecoverPipelineSafeAsync(reason).ConfigureAwait(false);
         });
     }
 
@@ -2607,15 +2966,15 @@ public partial class App : Application
         {
             Log.Write($"Pipeline recovery failed unexpectedly: {exception}");
             _pendingUiError = exception.Message;
-            _settingsWindow?.ShowError(
+            PostCaptureUi(() => _settingsWindow?.ShowError(
                 Localization.Text("L.Notify.RecoveryFailedTitle"),
-                exception.Message);
+                exception.Message));
         }
     }
 
     private async Task RecoverPipelineAsync(string reason)
     {
-        if (_config?.ReplayEnabled != true ||
+        if (Volatile.Read(ref _exiting) != 0 || _config?.ReplayEnabled != true ||
             DateTime.UtcNow < _nextRecoveryUtc ||
             Interlocked.Exchange(ref _recoveryInProgress, 1) != 0)
         {
@@ -2628,10 +2987,15 @@ public partial class App : Application
             UpdateReplayIndicator();
             await _pipelineGate.WaitAsync();
             gateHeld = true;
-            if (_config?.ReplayEnabled != true)
+            if (Volatile.Read(ref _exiting) != 0 || _config?.ReplayEnabled != true)
                 return;
 
             Log.Write($"Watchdog: {reason}");
+            Log.Event(DiagnosticLevel.Warning, "Capture", "capture.recovery-request", new
+            {
+                reason, failures = _recoveryFailures, state = _obs?.CachedDiagnosticState,
+                saving = Volatile.Read(ref _saving) != 0,
+            });
             ShowOverlayNotification(
                 "↻",
                 Localization.Text("L.Notify.RecoveryTitle"),
@@ -2678,11 +3042,11 @@ public partial class App : Application
                 reason,
                 delaySeconds);
             _pendingUiError = message;
-            _settingsWindow?.UpdateRecoveryState(
-                Localization.Format("L.Notify.RetryIn", delaySeconds));
-            _settingsWindow?.ShowError(
-                Localization.Text("L.Notify.RecoveryFailedTitle"),
-                message);
+            PostCaptureUi(() =>
+            {
+                _settingsWindow?.UpdateRecoveryState(Localization.Format("L.Notify.RetryIn", delaySeconds));
+                _settingsWindow?.ShowError(Localization.Text("L.Notify.RecoveryFailedTitle"), message);
+            });
             ShowOverlayNotification(
                 "!",
                 Localization.Text("L.Notify.RecoveryUnavailableTitle"),
@@ -2714,7 +3078,7 @@ public partial class App : Application
                     ? "L.Tray.ToggleRecording"
                     : "L.Tray.Save"),
             _config!.Hotkey);
-        _saveMenuItem.Click += (_, _) => SaveReplay();
+        _saveMenuItem.Click += (_, _) => SaveReplay("tray");
         menu.Items.Add(_saveMenuItem);
 
         _toggleMenuItem = CreateMenuItem(
@@ -2968,6 +3332,8 @@ public partial class App : Application
 
     private async Task<bool> SetReplayEnabledGuardedAsync(bool? requestedState)
     {
+        Log.Event(DiagnosticLevel.Info, "Capture", "capture.toggle-request",
+            new { requestedState, running = IsReplayRunning, configuration = _config is null ? null : AppDiagnostics.Configuration(_config) });
         await _pipelineGate.WaitAsync();
         bool enabled = requestedState ?? !_config!.ReplayEnabled;
         bool previousEnabled = _config!.ReplayEnabled;
@@ -3231,16 +3597,20 @@ public partial class App : Application
         }
 #endif
 
+        if (Interlocked.CompareExchange(ref _captureRecoveryRestartRequested, 1, 0) != 0)
+            return true;
         try
         {
             if (Process.Start(startInfo) is null)
             {
+                Interlocked.Exchange(ref _captureRecoveryRestartRequested, 0);
                 Log.Write("Capture recovery restart process did not start.");
                 return false;
             }
         }
         catch (Exception exception)
         {
+            Interlocked.Exchange(ref _captureRecoveryRestartRequested, 0);
             Log.Write(
                 "Capture recovery restart process failed: " +
                 exception.Message);
@@ -3261,6 +3631,7 @@ public partial class App : Application
         bool autostartEnabled)
     {
         candidate.Normalize();
+        Log.Event(DiagnosticLevel.Info, "Settings", "configuration.apply-request", AppDiagnostics.Configuration(candidate));
         if (_uiOnly)
         {
             _config!.CopyFrom(candidate);
@@ -3321,6 +3692,7 @@ public partial class App : Application
 
             await Autostart.SetEnabledAsync(autostartEnabled);
             _config.Save();
+            AppDiagnostics.SetOutputDirectory(_config.OutputDirectory);
             UpdateUiState();
 
             bool recordingMode = string.Equals(
@@ -3385,12 +3757,16 @@ public partial class App : Application
     {
         if (_hotkeys is null)
         {
-            _hotkeys = new HotkeyManager(config.Hotkey, config.ToggleReplayHotkey);
+            _hotkeys = new HotkeyManager(
+                config.Hotkey, config.ToggleReplayHotkey, config.QuickPanelHotkey,
+                config.InstantScreenshotsEnabled ? config.ScreenshotHotkey : null);
             SubscribeHotkeys();
         }
         else
         {
-            _hotkeys.Rebind(config.Hotkey, config.ToggleReplayHotkey);
+            _hotkeys.Rebind(
+                config.Hotkey, config.ToggleReplayHotkey, config.QuickPanelHotkey,
+                config.InstantScreenshotsEnabled ? config.ScreenshotHotkey : null);
         }
         _boundHotkey = config.Hotkey;
         _boundToggleHotkey = config.ToggleReplayHotkey;
@@ -3408,8 +3784,29 @@ public partial class App : Application
         }
     }
 
+    private void PostCaptureUi(Action action)
+    {
+        if (Volatile.Read(ref _exiting) != 0 ||
+            Dispatcher.HasShutdownStarted || Dispatcher.HasShutdownFinished) return;
+        if (Dispatcher.CheckAccess()) action();
+        else Dispatcher.BeginInvoke(DispatcherPriority.Background, () =>
+        {
+            if (Volatile.Read(ref _exiting) == 0) action();
+        });
+    }
+
     private void UpdateUiState()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            if (Interlocked.Exchange(ref _uiStateUpdatePending, 1) == 0)
+                PostCaptureUi(() =>
+                {
+                    Interlocked.Exchange(ref _uiStateUpdatePending, 0);
+                    UpdateUiState();
+                });
+            return;
+        }
         bool active = IsReplayRunning;
         bool recordingMode = string.Equals(
             _config?.CaptureMode,
@@ -3417,7 +3814,9 @@ public partial class App : Application
             StringComparison.Ordinal);
         string codec = _obs?.ActiveCodec ?? _config?.Codec ?? "h264";
         int availableReplaySeconds = active
-            ? _obs?.AvailableReplaySeconds ?? _config!.BufferSeconds
+            ? _captureMonitor is null
+                ? _obs?.AvailableReplaySeconds ?? _config!.BufferSeconds
+                : Volatile.Read(ref _availableReplaySeconds)
             : 0;
         if (_capabilities is not null)
             _settingsWindow?.UpdateCapabilities(_capabilities);
@@ -3426,6 +3825,7 @@ public partial class App : Application
             codec,
             _captureDescription,
             availableReplaySeconds);
+        _quickPanel?.Refresh();
         if (_tray is not null)
         {
             if (_trayActiveState != active)
@@ -3460,6 +3860,11 @@ public partial class App : Application
 
     private void UpdateReplayIndicator()
     {
+        if (!Dispatcher.CheckAccess())
+        {
+            PostCaptureUi(UpdateReplayIndicator);
+            return;
+        }
         if (_uiOnly || Volatile.Read(ref _exiting) != 0 ||
             _config?.ShowRecordingIndicator != true ||
             _config.ReplayEnabled != true)
@@ -3503,7 +3908,16 @@ public partial class App : Application
     }
 
     private void SaveReplay()
+        => SaveReplay("ui");
+
+    private void SaveReplay(string source)
     {
+        Log.Event(DiagnosticLevel.Info, "Replay", "replay.request", new
+        {
+            source, running = IsReplayRunning, busy = Volatile.Read(ref _saving) != 0,
+            exiting = Volatile.Read(ref _exiting) != 0, mode = _config?.CaptureMode,
+            diskPreference = _config?.DiskReplayBufferEnabled,
+        });
         if (string.Equals(
                 _config?.CaptureMode,
                 "recording",
@@ -3524,12 +3938,20 @@ public partial class App : Application
             return;
         }
         if (Interlocked.Exchange(ref _saving, 1) == 1)
+        {
+            Log.Event(DiagnosticLevel.Warning, "Replay", "replay.request-ignored", new { reason = "save-in-progress", source });
             return;
+        }
         _ = SaveReplayCoreAsync(engine);
     }
 
     private async Task SaveReplayCoreAsync(ObsReplayEngine engine)
     {
+        using var diagnostic = Log.BeginOperation("replay.save", new
+        {
+            configuration = AppDiagnostics.Configuration(_config!),
+            engine = engine.CachedDiagnosticState,
+        });
         try
         {
             int availableReplaySeconds = Math.Max(
@@ -3548,7 +3970,8 @@ public partial class App : Application
                     FormatDuration(availableReplaySeconds)),
                 OverlayTone.Neutral,
                 30_000);
-            string path = await SaveReplayGuardedAsync(engine);
+            string path = await SaveReplayGuardedAsync(engine, diagnostic);
+            diagnostic.Complete(new { path, bytes = Log.FileSize(path) });
             _settingsWindow?.NotifyReplaySaved(path);
             ShowReplaySavedIndicator();
             ShowOverlayNotification(
@@ -3559,6 +3982,7 @@ public partial class App : Application
         }
         catch (Exception exception)
         {
+            diagnostic.Fail(exception);
             Log.Write($"Replay save failed: {exception}");
             ShowOverlayNotification(
                 "!",
@@ -3572,11 +3996,13 @@ public partial class App : Application
         }
     }
 
-    private async Task<string> SaveReplayGuardedAsync(ObsReplayEngine engine)
+    private async Task<string> SaveReplayGuardedAsync(ObsReplayEngine engine, DiagnosticOperation? diagnostic = null)
     {
+        diagnostic?.Stage("wait-pipeline-gate");
         await _pipelineGate.WaitAsync().ConfigureAwait(false);
         try
         {
+            diagnostic?.Stage("pipeline-gate-acquired");
             if (!ReferenceEquals(engine, _obs) || !IsReplayRunning ||
                 Volatile.Read(ref _exiting) != 0)
             {
@@ -3584,18 +4010,25 @@ public partial class App : Application
                     Localization.Text("L.Notify.EnableBeforeSave"));
             }
             ReplaySaveOperation operation = await RunOnObsThreadAsync(
-                    () => engine.BeginSaveReplay())
+                    () =>
+                    {
+                        engine.WriteDiagnosticState("before-save");
+                        return engine.BeginSaveReplay();
+                    })
                 .ConfigureAwait(false);
+            diagnostic?.Stage("wait-snapshot");
             bool snapshotStarted = await WaitForSaveSnapshotAsync(
                     engine,
                     operation)
                 .ConfigureAwait(false);
             if (snapshotStarted)
             {
+                diagnostic?.Stage("advance-window");
                 await RunOnObsThreadAsync(engine.ResetReplayWindow)
                     .ConfigureAwait(false);
             }
 
+            diagnostic?.Stage("wait-file-completion", new { snapshotStarted });
             string path = await operation.Completion.ConfigureAwait(false);
             if (!snapshotStarted)
             {
@@ -3607,6 +4040,7 @@ public partial class App : Application
             }
             try
             {
+                diagnostic?.Stage("route-file", new { path, operation.GameExecutable });
                 return ReplayPaths.RouteSavedReplay(
                     _config!,
                     path,
@@ -3727,7 +4161,7 @@ public partial class App : Application
         }
     }
 
-    private async void RunReplaySegmentsTest()
+    private async void RunReplaySegmentsTest(bool diskReplay = false)
     {
         try
         {
@@ -3739,6 +4173,7 @@ public partial class App : Application
             {
                 ReplayEnabled = true,
                 BufferSeconds = 15,
+                DiskReplayBufferEnabled = diskReplay,
                 FrameRate = 30,
                 BitrateMbps = 8,
                 Codec = "h264",
@@ -3769,7 +4204,7 @@ public partial class App : Application
                 availableAfterSecond <= 1;
             Log.Write(
                 $"OBS_SEGMENT_TEST {(passed ? "PASS" : "FAIL")}: " +
-                $"first={first}, second={second}, " +
+                $"disk={diskReplay}, first={first}, second={second}, " +
                 $"availableAfterFirst={availableAfterFirst}s, " +
                 $"availableAfterSecond={availableAfterSecond}s");
             await StopPipelineCoreAsync();
@@ -3889,8 +4324,9 @@ public partial class App : Application
         if (Interlocked.Exchange(ref _exiting, 1) != 0)
             return;
 
-        _healthTimer?.Stop();
-        _captureStateTimer?.Stop();
+        if (Interlocked.Exchange(ref _captureMonitor, null) is { } captureMonitor)
+            await captureMonitor.DisposeAsync();
+        StopDisplayHdrMonitor();
         await _pipelineGate.WaitAsync();
         try
         {
@@ -3941,14 +4377,15 @@ public partial class App : Application
         bool gracefulShutdownCompleted =
             Interlocked.Exchange(ref _exiting, 1) != 0 && _obs is null;
         Localization.Changed -= OnLanguageChanged;
-        _healthTimer?.Stop();
-        _captureStateTimer?.Stop();
+        StopDisplayHdrMonitor();
+        Interlocked.Exchange(ref _captureMonitor, null)?.Dispose();
         _updateShutdownTimer?.Stop();
         _activationServerCts?.Cancel();
         _activationServerCts?.Dispose();
         _storePackageLifecycle?.Dispose();
         _storePackageLifecycle = null;
         _settingsWindow?.Close();
+        _quickPanel?.ClosePermanently();
         _hotkeys?.Dispose();
         _tray?.Dispose();
         _tray = null;
@@ -3975,6 +4412,7 @@ public partial class App : Application
                 _pipelineGate.Release();
         }
         _obsTaskScheduler.Dispose();
+        _displayHdrMonitorStop.Dispose();
         _overlayNotification?.ClosePermanently();
         _recordingIndicator?.ClosePermanently();
         if (_singleInstanceMutex is not null)
@@ -3989,6 +4427,9 @@ public partial class App : Application
             }
             _singleInstanceMutex.Dispose();
         }
+        Log.Event(DiagnosticLevel.Info, "Runtime", "session.exit", new { e.ApplicationExitCode, gracefulShutdownCompleted });
+        AppDiagnostics.Stop();
+        Log.Close();
         base.OnExit(e);
     }
 

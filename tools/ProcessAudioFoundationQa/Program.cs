@@ -13,12 +13,35 @@ internal static class Program
     {
         try
         {
+            string? legacy = args.FirstOrDefault(arg => arg.StartsWith("--separate-capture-legacy="));
+            if (legacy is not null)
+            {
+                SeparateCaptureQa.Run(legacy["--separate-capture-legacy=".Length..], legacy: true);
+                return 0;
+            }
+            string? capture = args.FirstOrDefault(arg => arg.StartsWith("--separate-capture="));
+            if (capture is not null)
+            {
+                SeparateCaptureQa.Run(capture["--separate-capture=".Length..]);
+                return 0;
+            }
             if (args.Contains("--overlay-accent"))
             {
                 Run("notification uses selected accent", NotificationUsesSelectedAccent);
                 return 0;
             }
+            if (args.Contains("--game-selection"))
+            {
+                Run("foreground game selection excludes ShareX", ForegroundGameSelection);
+                return 0;
+            }
+            if (args.Contains("--separate-mixer"))
+            {
+                Run("automatic separate mixer routing", AutomaticSeparateMixerRouting);
+                return 0;
+            }
             Run("normalized executable matching", NormalizedExecutableMatching);
+            Run("foreground game selection excludes ShareX", ForegroundGameSelection);
             Run("independent same-name roots", IndependentSameNameRoots);
             Run("same-name descendant deduplication", SameNameDescendantDeduplication);
             Run("same-track ancestor deduplication", SameTrackAncestorDeduplication);
@@ -37,6 +60,7 @@ internal static class Program
             Run("simple audio topology regression", SimpleAudioTopologyRegression);
             Run("detected game audio routing", DetectedGameAudioRouting);
             Run("separate game identity restriction", SeparateGameIdentityRestriction);
+            Run("automatic separate mixer routing", AutomaticSeparateMixerRouting);
             Run("replay recording mode classification", ReplayRecordingModeClassification);
             Run("polling reacquisition cadence", PollingReacquisitionCadence);
             Run("process audio health notifications", ProcessAudioHealthNotifications);
@@ -70,6 +94,43 @@ internal static class Program
             .ToArray();
         Equal(1, roots.Length);
         Equal(10u, roots[0].Identity.ProcessId);
+    }
+
+    private static void ForegroundGameSelection()
+    {
+        foreach (string executable in new[] { "ShareX.exe", "SHAREX.EXE", "aseprite.exe", "obs64.exe", "chrome.exe" })
+        {
+            if (ObsReplayEngine.ShouldWakeGameCapture(new CaptureInterop.ForegroundAppInfo(
+                    executable, @"D:\SteamLibrary\steamapps\common\Tools\" + executable, true)))
+                throw new InvalidOperationException($"Non-game foreground accepted: {executable}");
+            Equal(false, ObsReplayEngine.ShouldUseAutomaticGameCapture(executable, executable, true));
+        }
+        Equal(true, ObsReplayEngine.ShouldWakeGameCapture(new CaptureInterop.ForegroundAppInfo(
+            "NewUnknownGame.exe", @"C:\Games\NewUnknownGame.exe", true)));
+        Equal(true, ObsReplayEngine.ShouldWakeGameCapture(new CaptureInterop.ForegroundAppInfo(
+            "cs2.exe", @"D:\SteamLibrary\steamapps\common\CS2\cs2.exe", false)));
+        Equal(false, ObsReplayEngine.ShouldUseAutomaticGameCapture("cs2.exe", "ShareX.exe", true));
+        Equal(false, ObsReplayEngine.ShouldUseAutomaticGameCapture("cs2.exe", "dota2.exe", true));
+        Equal(true, ObsReplayEngine.ShouldUseAutomaticGameCapture("dota2.exe", "DOTA2.exe", true));
+        var game = new CaptureInterop.ForegroundAppInfo("NewUnknownGame.exe", @"C:\Games\NewUnknownGame.exe", true)
+        {
+            Window = 123, Title = "New: Game #1", WindowClass = "UnityWndClass",
+        };
+        Equal("New#3A Game #221:UnityWndClass:NewUnknownGame.exe", ObsReplayEngine.GameCaptureWindowSetting(game));
+        Equal("", ObsReplayEngine.GameCaptureWindowSetting(game with { Window = 0 }));
+        Equal("", ObsReplayEngine.GameCaptureWindowSetting(game with { Executable = "ShareX.exe" }));
+        foreach (string windowClass in new[] { "WindowsForms10.Window.8.app.0.abc", "HwndWrapper[Tool.exe]", "Chrome_WidgetWin_1", "#32770" })
+        {
+            var tool = game with { Executable = "UnknownTool.exe", WindowClass = windowClass };
+            Equal(false, ObsReplayEngine.ShouldWakeGameCapture(tool));
+            Equal(false, ObsReplayEngine.ShouldUseForegroundGameCapture("UnknownTool.exe", tool, true));
+            Equal("", ObsReplayEngine.GameCaptureWindowSetting(tool));
+        }
+        Equal(true, ObsReplayEngine.ShouldUseForegroundGameCapture(game.Executable, game, true));
+        Equal(false, ObsReplayEngine.ShouldUseForegroundGameCapture("cs2.exe", game, true));
+        Equal(false, ObsReplayEngine.ShouldUseForegroundGameCapture(game.Executable, game, false));
+        Equal(true, ObsReplayEngine.ShouldWakeGameCapture(game with { Executable = "dota2.exe", IsFullscreen = false }));
+        Equal(true, ObsReplayEngine.ShouldWakeGameCapture(game with { IsFullscreen = false }));
     }
 
     private static void IndependentSameNameRoots()
@@ -179,6 +240,71 @@ internal static class Program
         Equal(false, ObsReplayEngine.IsAudioRoutingAvailable(config, AdvancedProcessAudioAvailability.SourceUnavailable));
         config.SeparateAudioTracks = false;
         Equal(true, ObsReplayEngine.IsAudioRoutingAvailable(config, AdvancedProcessAudioAvailability.SourceUnavailable));
+    }
+
+    private static void AutomaticSeparateMixerRouting()
+    {
+        var policy = new SeparateAudioRouting();
+        ProcessSnapshot snapshot = Snapshot(
+            Node(10, 100, 0, "game.exe"),
+            Node(11, 110, 10, "game-helper.exe"),
+            Node(20, 200, 0, "browser.exe"),
+            Node(21, 210, 20, "browser.exe"),
+            Node(30, 300, 0, "voicemeeterpro_x64.exe"),
+            Node(40, 400, 0, "discord.exe"));
+        Equal(true, policy.Build(snapshot, new(10, 100), 99) is null);
+        snapshot.WithAudioEnvironment(new SeparateAudioEnvironment([
+            new(10, "virtual", "Voicemeeter Input (VB-Audio Voicemeeter VAIO)", false),
+            new(11, "virtual", "Voicemeeter Input (VB-Audio Voicemeeter VAIO)", false),
+            new(20, "virtual", "Voicemeeter Input (VB-Audio Voicemeeter VAIO)", false),
+            new(21, "virtual", "Voicemeeter Input (VB-Audio Voicemeeter VAIO)", false),
+            new(30, "physical", "Headphones", false),
+            new(40, "physical", "Speakers", false),
+        ], true));
+        IReadOnlyList<ProcessAudioTarget>? routes = policy.Build(snapshot, new(10, 100), 99);
+        Equal(true, routes is not null);
+        using var reconciler = new ProcessAudioReconciler(
+            (identity, _) => (nint)identity.ProcessId, _ => { });
+        reconciler.Reconcile(snapshot, routes!);
+        SequenceEqual([10u, 20u, 40u], reconciler.ActiveIdentities
+            .Select(identity => identity.ProcessId).Order());
+        Equal(2, reconciler.ActiveTracks[new(10, 100)]);
+        Equal(1, reconciler.ActiveTracks[new(20, 200)]);
+        Equal(1, reconciler.ActiveTracks[new(40, 400)]);
+
+        // Keep original streams when an endpoint temporarily disappears. A quiet
+        // session must not need to become audible before it is captured again.
+        snapshot.WithAudioEnvironment(new SeparateAudioEnvironment([], false));
+        reconciler.Reconcile(snapshot, policy.Build(snapshot, new(10, 100), 99)!);
+        SequenceEqual([10u, 20u, 40u], reconciler.ActiveIdentities.Select(x => x.ProcessId).Order());
+
+        // Focus loss moves the former game to System, without retaining a copy
+        // on Game. Regaining focus restores its original track.
+        reconciler.Reconcile(snapshot, policy.Build(snapshot, null, 99)!);
+        Equal(1, reconciler.ActiveTracks[new(10, 100)]);
+        reconciler.Reconcile(snapshot, policy.Build(snapshot, new(10, 100), 99)!);
+        Equal(2, reconciler.ActiveTracks[new(10, 100)]);
+
+        // Identity-qualified targets may route independent same-name processes
+        // to different tracks. Filter identities before deduplicating ancestors.
+        ProcessSnapshot instances = Snapshot(Node(50, 500, 0, "game.exe"),
+            Node(51, 510, 50, "game.exe"), Node(60, 600, 0, "game.exe"));
+        reconciler.Reconcile(instances, [
+            new ProcessAudioTarget("game.exe", 2) { Identity = new(51, 510) },
+            new ProcessAudioTarget("game.exe", 1) { Identity = new(60, 600) },
+        ]);
+        Equal(2, reconciler.ActiveTracks.Count);
+        Equal(2, reconciler.ActiveTracks[new(51, 510)]);
+        Equal(1, reconciler.ActiveTracks[new(60, 600)]);
+
+        var control = new SeparateAudioRouting();
+        ProcessSnapshot direct = Snapshot(Node(10, 100, 0, "game.exe"),
+            Node(30, 300, 0, "voicemeeterpro_x64.exe"));
+        direct.WithAudioEnvironment(new SeparateAudioEnvironment([
+            new(10, "physical", "Headphones", false),
+            new(30, "physical", "Headphones", false),
+        ], true));
+        Equal(true, control.Build(direct, new(10, 100), 99) is null);
     }
 
     private static void ReplayRecordingModeClassification()

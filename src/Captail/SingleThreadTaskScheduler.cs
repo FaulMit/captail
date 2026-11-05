@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace Captail;
 
@@ -7,6 +8,16 @@ internal sealed class SingleThreadTaskScheduler : TaskScheduler, IDisposable
     private readonly BlockingCollection<Task> _tasks = new();
     private readonly Thread _thread;
     private int _disposed;
+    private long _runningSince;
+
+    internal TimeSpan BusyDuration
+    {
+        get
+        {
+            long since = Volatile.Read(ref _runningSince);
+            return since != 0 ? Stopwatch.GetElapsedTime(since) : TimeSpan.Zero;
+        }
+    }
 
     internal SingleThreadTaskScheduler(string threadName)
     {
@@ -45,7 +56,11 @@ internal sealed class SingleThreadTaskScheduler : TaskScheduler, IDisposable
     private void Run()
     {
         foreach (Task task in _tasks.GetConsumingEnumerable())
-            TryExecuteTask(task);
+        {
+            Volatile.Write(ref _runningSince, Stopwatch.GetTimestamp());
+            try { TryExecuteTask(task); }
+            finally { Volatile.Write(ref _runningSince, 0); }
+        }
     }
 
     public void Dispose()

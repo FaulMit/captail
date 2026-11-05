@@ -3,10 +3,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace Captail;
 
-/// <summary>Global hotkeys for saving a replay and toggling the replay buffer.</summary>
+/// <summary>Global hotkeys for replay actions and the quick panel.</summary>
 [SuppressMessage("Usage", "CA2216:Disposable types should declare finalizer",
     Justification = "HwndSource and keyboard hooks must be released on the UI thread; a finalizer cannot safely dispose them.")]
 public sealed class HotkeyManager : IDisposable
@@ -37,6 +38,9 @@ public sealed class HotkeyManager : IDisposable
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int virtualKey);
 
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandle(string? moduleName);
 
@@ -48,6 +52,9 @@ public sealed class HotkeyManager : IDisposable
     private const int WhKeyboardLl = 13;
     private const int SaveHotkeyId = 1;
     private const int ToggleHotkeyId = 2;
+    private const int QuickPanelHotkeyId = 3;
+    private const int ScreenshotHotkeyId = 4;
+    private const uint MOD_NOREPEAT = 0x4000;
     private const uint MOD_ALT = 0x0001;
     private const uint MOD_CONTROL = 0x0002;
     private const uint MOD_SHIFT = 0x0004;
@@ -61,14 +68,22 @@ public sealed class HotkeyManager : IDisposable
     private readonly LowLevelKeyboardProc _keyboardHookProc;
     private (uint Modifiers, uint Vk)? _saveBinding;
     private (uint Modifiers, uint Vk)? _toggleBinding;
+    private (uint Modifiers, uint Vk)? _quickPanelBinding;
+    private (uint Modifiers, uint Vk)? _screenshotBinding;
     private nint _keyboardHook;
     private bool _savePressed;
     private bool _togglePressed;
+    private bool _quickPanelPressed;
+    private bool _screenshotPressed;
+    private int _bindingGeneration;
 
     public event Action? SaveRequested;
     public event Action? ToggleRequested;
+    public event Action? QuickPanelRequested;
+    public event Action? ScreenshotRequested;
 
-    public HotkeyManager(string saveHotkey, string toggleHotkey)
+    public HotkeyManager(string saveHotkey, string toggleHotkey,
+        string quickPanelHotkey = "Ctrl+Shift+F11", string? screenshotHotkey = null)
     {
         _keyboardHookProc = KeyboardHookCallback;
         _source = new HwndSource(new HwndSourceParameters("CaptailHotkeys")
@@ -78,22 +93,40 @@ public sealed class HotkeyManager : IDisposable
             WindowStyle = 0,
             HwndSourceHook = WndProc,
         });
-        Rebind(saveHotkey, toggleHotkey);
+        try
+        {
+            Rebind(saveHotkey, toggleHotkey, quickPanelHotkey, screenshotHotkey);
+        }
+        catch
+        {
+            UnregisterCurrent();
+            _source.Dispose();
+            throw;
+        }
     }
 
-    public void Rebind(string saveHotkey, string toggleHotkey)
+    public void Rebind(string saveHotkey, string toggleHotkey,
+        string quickPanelHotkey = "Ctrl+Shift+F11", string? screenshotHotkey = null)
     {
         var newSave = Parse(saveHotkey);
         var newToggle = Parse(toggleHotkey);
-        if (newSave == newToggle)
+        var newQuickPanel = Parse(quickPanelHotkey);
+        (uint Modifiers, uint Vk)? newScreenshot = screenshotHotkey is null
+            ? null : Parse(screenshotHotkey);
+        if (newSave == newToggle || newSave == newQuickPanel ||
+            newToggle == newQuickPanel || newScreenshot == newSave ||
+            newScreenshot == newToggle || newScreenshot == newQuickPanel)
             throw new InvalidOperationException(
                 Localization.Text("L.Hotkey.MustDiffer"));
 
-        if (_saveBinding == newSave && _toggleBinding == newToggle)
+        if (_saveBinding == newSave && _toggleBinding == newToggle &&
+            _quickPanelBinding == newQuickPanel && _screenshotBinding == newScreenshot)
             return;
 
         var oldSave = _saveBinding;
         var oldToggle = _toggleBinding;
+        var oldQuickPanel = _quickPanelBinding;
+        var oldScreenshot = _screenshotBinding;
         UnregisterCurrent();
 
         try
@@ -108,12 +141,23 @@ public sealed class HotkeyManager : IDisposable
                     Localization.Format("L.Hotkey.Occupied", toggleHotkey));
 
             _toggleBinding = newToggle;
+            if (!RegisterBinding(QuickPanelHotkeyId, newQuickPanel))
+                throw new InvalidOperationException(
+                    Localization.Format("L.Hotkey.Occupied", quickPanelHotkey));
+            _quickPanelBinding = newQuickPanel;
+            if (newScreenshot is { } screenshot)
+            {
+                if (!RegisterBinding(ScreenshotHotkeyId, screenshot))
+                    throw new InvalidOperationException(
+                        Localization.Format("L.Hotkey.Occupied", screenshotHotkey!));
+                _screenshotBinding = screenshot;
+            }
             EnsureKeyboardHook();
         }
         catch
         {
             UnregisterCurrent();
-            Restore(oldSave, oldToggle);
+            Restore(oldSave, oldToggle, oldQuickPanel, oldScreenshot);
             throw;
         }
     }
@@ -143,7 +187,8 @@ public sealed class HotkeyManager : IDisposable
         }
     }
 
-    private void Restore((uint Modifiers, uint Vk)? save, (uint Modifiers, uint Vk)? toggle)
+    private void Restore((uint Modifiers, uint Vk)? save, (uint Modifiers, uint Vk)? toggle,
+        (uint Modifiers, uint Vk)? quickPanel, (uint Modifiers, uint Vk)? screenshot)
     {
         if (save is { } saveBinding &&
             RegisterBinding(SaveHotkeyId, saveBinding))
@@ -156,6 +201,12 @@ public sealed class HotkeyManager : IDisposable
         {
             _toggleBinding = toggleBinding;
         }
+        if (quickPanel is { } quickPanelBinding &&
+            RegisterBinding(QuickPanelHotkeyId, quickPanelBinding))
+            _quickPanelBinding = quickPanelBinding;
+        if (screenshot is { } screenshotBinding &&
+            RegisterBinding(ScreenshotHotkeyId, screenshotBinding))
+            _screenshotBinding = screenshotBinding;
 
         try
         {
@@ -163,16 +214,21 @@ public sealed class HotkeyManager : IDisposable
         }
         catch (Exception exception)
         {
-            Log.Write($"Could not restore extended hotkey hook: {exception.Message}");
+            Log.Write($"Could not restore global keyboard hook: {exception.Message}");
         }
     }
 
     private void UnregisterCurrent()
     {
+        _bindingGeneration++;
         if (_saveBinding is { } save && !IsExtendedFunctionKey(save.Vk))
             UnregisterHotKey(_source.Handle, SaveHotkeyId);
         if (_toggleBinding is { } toggle && !IsExtendedFunctionKey(toggle.Vk))
             UnregisterHotKey(_source.Handle, ToggleHotkeyId);
+        if (_quickPanelBinding is { } quickPanel && !IsExtendedFunctionKey(quickPanel.Vk))
+            UnregisterHotKey(_source.Handle, QuickPanelHotkeyId);
+        if (_screenshotBinding is { } screenshot && !IsExtendedFunctionKey(screenshot.Vk))
+            UnregisterHotKey(_source.Handle, ScreenshotHotkeyId);
         if (_keyboardHook != 0)
         {
             UnhookWindowsHookEx(_keyboardHook);
@@ -180,19 +236,26 @@ public sealed class HotkeyManager : IDisposable
         }
         _saveBinding = null;
         _toggleBinding = null;
+        _quickPanelBinding = null;
+        _screenshotBinding = null;
         _savePressed = false;
         _togglePressed = false;
+        _quickPanelPressed = false;
+        _screenshotPressed = false;
     }
 
     private bool RegisterBinding(int id, (uint Modifiers, uint Vk) binding) =>
         IsExtendedFunctionKey(binding.Vk) ||
-        RegisterHotKey(_source.Handle, id, binding.Modifiers, binding.Vk);
+        RegisterHotKey(_source.Handle, id,
+            binding.Modifiers | (id is QuickPanelHotkeyId or ScreenshotHotkeyId ? MOD_NOREPEAT : 0), binding.Vk);
 
     private void EnsureKeyboardHook()
     {
         bool needed =
             (_saveBinding is { } save && IsExtendedFunctionKey(save.Vk)) ||
-            (_toggleBinding is { } toggle && IsExtendedFunctionKey(toggle.Vk));
+            (_toggleBinding is { } toggle && IsExtendedFunctionKey(toggle.Vk)) ||
+            _quickPanelBinding.HasValue ||
+            _screenshotBinding.HasValue;
         if (!needed || _keyboardHook != 0)
             return;
 
@@ -204,7 +267,7 @@ public sealed class HotkeyManager : IDisposable
         if (_keyboardHook == 0)
             throw new Win32Exception(
                 Marshal.GetLastWin32Error(),
-                "Could not install extended function-key hook.");
+                "Could not install global keyboard hook.");
     }
 
     private nint KeyboardHookCallback(int code, nint wParam, nint lParam)
@@ -228,6 +291,16 @@ public sealed class HotkeyManager : IDisposable
     private bool ProcessLowLevelKey(uint virtualKey, uint modifiers, bool isDown)
     {
         bool handled = false;
+        if (_screenshotBinding is { } screenshot && virtualKey == screenshot.Vk)
+        {
+            bool wasPressed = _screenshotPressed;
+            _screenshotPressed = isDown;
+            if (isDown && !wasPressed && modifiers == screenshot.Modifiers)
+            {
+                ScreenshotRequested?.Invoke();
+                handled = true;
+            }
+        }
         if (_saveBinding is { } save &&
             IsExtendedFunctionKey(save.Vk) &&
             virtualKey == save.Vk)
@@ -260,7 +333,38 @@ public sealed class HotkeyManager : IDisposable
             }
         }
 
+        if (_quickPanelBinding is { } quickPanel && virtualKey == quickPanel.Vk)
+        {
+            bool wasPressed = _quickPanelPressed;
+            _quickPanelPressed = isDown;
+            if (isDown && !wasPressed && modifiers == quickPanel.Modifiers)
+            {
+                QueueQuickPanelRequest(quickPanel);
+                handled = true;
+            }
+        }
+
         return handled;
+    }
+
+    private void QueueQuickPanelRequest((uint Modifiers, uint Vk) binding)
+    {
+        int generation = _bindingGeneration;
+        nint foreground = GetForegroundWindow();
+        if (_source.Dispatcher.HasShutdownStarted || _source.Dispatcher.HasShutdownFinished)
+            return;
+
+        // Return from WH_KEYBOARD_LL before creating or activating WPF windows.
+        // Windows can silently remove a hook whose callback takes too long.
+        _source.Dispatcher.BeginInvoke(DispatcherPriority.Normal, () =>
+        {
+            if (generation != _bindingGeneration || _quickPanelBinding != binding)
+                return;
+            Log.Event(DiagnosticLevel.Info, "Hotkeys", "quick-panel.request",
+                new { route = "keyboard-hook", binding.Vk, binding.Modifiers,
+                    foreground = $"0x{foreground:X}" });
+            QuickPanelRequested?.Invoke();
+        });
     }
 
     private static uint ReadModifierMask()
@@ -286,9 +390,11 @@ public sealed class HotkeyManager : IDisposable
     {
         int saveCount = 0;
         int toggleCount = 0;
-        using var manager = new HotkeyManager("F23", "Ctrl+F24");
+        int quickPanelCount = 0;
+        using var manager = new HotkeyManager("F23", "Ctrl+F24", "Shift+F22");
         manager.SaveRequested += () => saveCount++;
         manager.ToggleRequested += () => toggleCount++;
+        manager.QuickPanelRequested += () => quickPanelCount++;
 
         manager.ProcessLowLevelKey(0x86, 0, isDown: true);
         manager.ProcessLowLevelKey(0x86, 0, isDown: true);
@@ -303,14 +409,25 @@ public sealed class HotkeyManager : IDisposable
         manager.ProcessLowLevelKey(0x87, MOD_CONTROL, isDown: true);
         manager.ProcessLowLevelKey(0x87, MOD_CONTROL, isDown: false);
 
+        manager.ProcessLowLevelKey(0x85, MOD_SHIFT, isDown: true);
+        manager.ProcessLowLevelKey(0x85, MOD_SHIFT, isDown: true);
+        manager.ProcessLowLevelKey(0x85, MOD_SHIFT, isDown: false);
+
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.ApplicationIdle,
+            () => frame.Continue = false);
+        Dispatcher.PushFrame(frame);
+
         bool passed = manager._keyboardHook != 0 &&
                       manager._saveBinding?.Vk == 0x86 &&
                       manager._toggleBinding?.Vk == 0x87 &&
-                      saveCount == 2 && toggleCount == 1;
+                      manager._quickPanelBinding?.Vk == 0x85 &&
+                      saveCount == 2 && toggleCount == 1 && quickPanelCount == 1;
         details = $"hook={manager._keyboardHook != 0}, " +
                   $"saveVk=0x{manager._saveBinding?.Vk:X2}, " +
                   $"toggleVk=0x{manager._toggleBinding?.Vk:X2}, " +
-                  $"saveCount={saveCount}, toggleCount={toggleCount}";
+                  $"saveCount={saveCount}, toggleCount={toggleCount}, " +
+                  $"quickPanelCount={quickPanelCount}";
         return passed;
     }
 #endif
@@ -357,6 +474,15 @@ public sealed class HotkeyManager : IDisposable
             SaveRequested?.Invoke();
         else if (wParam == ToggleHotkeyId)
             ToggleRequested?.Invoke();
+        else if (wParam == QuickPanelHotkeyId)
+        {
+            // Registration reserves the combination. The keyboard hook is the
+            // sole dispatch route, so delayed WM_HOTKEY cannot close the panel.
+        }
+        else if (wParam == ScreenshotHotkeyId)
+        {
+            // The low-level hook already dispatched this press, including in fullscreen games.
+        }
         else
             return 0;
 

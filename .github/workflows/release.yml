@@ -57,12 +57,12 @@ jobs:
         run: |
           $releaseJson = gh release list `
             --repo "$env:GITHUB_REPOSITORY" `
-            --limit 1 `
+            --limit 100 `
             --json tagName
           if ($LASTEXITCODE -ne 0) {
             throw "Could not determine the previous release."
           }
-          $releases = @($releaseJson | ConvertFrom-Json)
+          $releases = @($releaseJson | ConvertFrom-Json | Where-Object { $_.tagName -match '^v\d+\.\d+\.\d+$' })
           $previousTag = if ($releases.Count -gt 0) { $releases[0].tagName } else { "" }
           $notesPath = Join-Path $env:RUNNER_TEMP "captail-$env:VERSION-release-notes.md"
           ./tools/New-ReleaseNotes.ps1 `

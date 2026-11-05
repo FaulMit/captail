@@ -19,8 +19,15 @@ function Assert-Contains(
 }
 
 $app = Read-Text "src\Captail\App.xaml.cs"
+$config = Read-Text "src\Captail\Config.cs"
 $indicator = Read-Text "src\Captail\ReplayStatusIndicatorWindow.xaml.cs"
 $settings = Read-Text "src\Captail\SettingsWindow.xaml"
+
+Assert-Contains $config 'ReplayEnabled\s*\{\s*get;\s*set;\s*\}\s*=\s*false' `
+    "Fresh installations must start with replay disabled."
+Assert-Contains $app `
+    'await PrepareCapturePermissionsAtStartupAsync\(backgroundLaunch\);\s*if\s*\(_config\.ReplayEnabled' `
+    "Startup must prepare permissions before checking whether replay is enabled."
 
 Assert-Contains $app `
     '_tray\.ForceCreate\(enablesEfficiencyMode:\s*false\)' `

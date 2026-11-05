@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace Captail;
 
@@ -18,7 +19,16 @@ internal static class DiagnosticLogExporter
         @"fallback|ignored|stopped|started|pipeline|capture|encoder|gpu",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex LibObsLinePattern = new(
-        @"^\d{2}:\d{2}:\d{2}\.\d{3}\s+libobs\[",
+        @"^(?:\d{2}:\d{2}:\d{2}\.\d{3}\s+libobs\[|" +
+        @"\d{4}-\d{2}-\d{2}T\S+\s+\[\w+\]\s+\[OBS\])",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex FailurePattern = new(
+        @"[-.]failed\b|[-.]timeout\b|\bfailed(?=\s|:|$)|exception\.(?:unhandled|dispatcher|unobserved-task)",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex JsonStringPattern = new(
+        "\"(?:\\\\.|[^\"\\\\])*\"", RegexOptions.Compiled);
+    private static readonly Regex JsonSensitivePropertyPattern = new(
+        "\"[^\"]*(?:deviceid|devicename|device_id|device_name|window_title|title|monitor_id|authorization|bearer|token|secret|password|api[_-]?key)[^\"]*\"\\s*:\\s*(?:\"(?:\\\\.|[^\"\\\\])*\"|[^,}\\]\\s]+)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly Regex SensitiveKeyPattern = new(
         @"\b(authorization|bearer|token|secret|password|api[_-]?key)" +
@@ -64,7 +74,7 @@ internal static class DiagnosticLogExporter
         try
         {
             Log.Flush();
-            return CreateExcerpt(Log.Path);
+            return CreateExcerpt(Log.CurrentPath);
         }
         catch (Exception exception)
         {
@@ -75,7 +85,8 @@ internal static class DiagnosticLogExporter
 
     internal static string CreateExcerpt(string path)
     {
-        string tail = ReadTail(path);
+        // Rotation must not erase the incident from an otherwise nearly empty tail.
+        string tail = ReadTail(path + ".1") + Environment.NewLine + ReadTail(path);
         if (string.IsNullOrWhiteSpace(tail))
             return "No recent diagnostic log was available.";
 
@@ -88,6 +99,9 @@ internal static class DiagnosticLogExporter
         if (lines.Length == 0)
             return "No safe recent diagnostic lines were available.";
 
+        int failureIndex = Array.FindLastIndex(lines, line => FailurePattern.IsMatch(line));
+        string? failedOperation = failureIndex < 0 ? null :
+            Regex.Match(lines[failureIndex], @"\bop=([a-f0-9]+)").Groups[1].Value;
         int[] selectedIndices = lines
             .Select((line, index) => (line, index))
             .Where(item => PriorityLinePattern.IsMatch(item.line))
@@ -95,27 +109,32 @@ internal static class DiagnosticLogExporter
             .Select(item => item.index)
             .Concat(Enumerable.Range(Math.Max(0, lines.Length - 18),
                 Math.Min(18, lines.Length)))
+            .Concat(Enumerable.Range(0, lines.Length).Where(index =>
+                FailurePattern.IsMatch(lines[index]) ||
+                !string.IsNullOrEmpty(failedOperation) && lines[index].Contains("op=" + failedOperation, StringComparison.Ordinal)))
             .Distinct()
-            .Order()
+            .OrderBy(index => FailurePattern.IsMatch(lines[index]) ? 0 :
+                !string.IsNullOrEmpty(failedOperation) && lines[index].Contains("op=" + failedOperation, StringComparison.Ordinal) ? 1 : 2)
+            .ThenByDescending(index => index)
             .ToArray();
 
         int budget = MaxExcerptChars - Header.Length - Environment.NewLine.Length;
-        var chosen = new List<string>();
-        for (int index = selectedIndices.Length - 1; index >= 0; index--)
+        var chosen = new List<(int Index, string Line)>();
+        foreach (int index in selectedIndices)
         {
-            string line = lines[selectedIndices[index]];
+            string line = lines[index];
             int cost = line.Length + Environment.NewLine.Length;
             if (cost > budget && chosen.Count > 0)
                 continue;
             if (cost > budget)
                 line = line[..Math.Max(1, budget - 1)] + "…";
-            chosen.Add(line);
+            chosen.Add((index, line));
             budget -= Math.Min(cost, budget);
             if (budget <= 0)
                 break;
         }
-        chosen.Reverse();
-        return Header + Environment.NewLine + string.Join(Environment.NewLine, chosen);
+        return Header + Environment.NewLine + string.Join(Environment.NewLine,
+            chosen.OrderBy(item => item.Index).Select(item => item.Line));
     }
 
     private static string ReadTail(string path)
@@ -147,6 +166,26 @@ internal static class DiagnosticLogExporter
 
     private static string SanitizeLine(string line)
     {
+        string sanitized = JsonSensitivePropertyPattern.Replace(line, match =>
+            match.Value[..(match.Value.IndexOf(':') + 1)] + "\"<redacted>\"");
+        sanitized = JsonStringPattern.Replace(sanitized, match =>
+        {
+            try
+            {
+                string value = JsonSerializer.Deserialize<string>(match.Value) ?? "";
+                return JsonSerializer.Serialize(SanitizeText(value));
+            }
+            catch (JsonException) { return match.Value; }
+        });
+        sanitized = SanitizeText(sanitized);
+        // Keep operation correlation; process/session metadata is redundant in the short public excerpt.
+        sanitized = Regex.Replace(sanitized, @" session=[a-f0-9]+ pid=\d+ tid=\d+", "");
+        sanitized = sanitized.Trim();
+        return sanitized.Length <= MaxLineChars ? sanitized : sanitized[..(MaxLineChars - 1)] + "…";
+    }
+
+    private static string SanitizeText(string line)
+    {
         string sanitized = ControlCharactersPattern.Replace(line, "");
         sanitized = SensitiveKeyPattern.Replace(
             sanitized,
@@ -167,10 +206,7 @@ internal static class DiagnosticLogExporter
             sanitized,
             Environment.MachineName,
             "<machine>");
-        sanitized = sanitized.Trim();
-        return sanitized.Length <= MaxLineChars
-            ? sanitized
-            : sanitized[..(MaxLineChars - 1)] + "…";
+        return sanitized;
     }
 
     private static string ReplaceMachineIdentity(

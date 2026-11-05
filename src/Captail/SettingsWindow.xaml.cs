@@ -38,6 +38,8 @@ public partial class SettingsWindow : Window
     private string _outputDirectory;
     private string _pendingSaveHotkey;
     private string _pendingToggleHotkey;
+    private string _pendingQuickPanelHotkey;
+    private string _pendingScreenshotHotkey;
     private Button? _capturingHotkeyButton;
     private bool _updatingUi;
     private bool _runtimeActive;
@@ -70,6 +72,7 @@ public partial class SettingsWindow : Window
     private int _dashboardAudioBuildVersion;
 
     public bool Applied { get; private set; }
+    internal bool IsCapturingHotkey => _capturingHotkeyButton is not null;
 
     internal SettingsWindow(
         Config config,
@@ -101,6 +104,8 @@ public partial class SettingsWindow : Window
         _outputDirectory = config.OutputDirectory;
         _pendingSaveHotkey = config.Hotkey;
         _pendingToggleHotkey = config.ToggleReplayHotkey;
+        _pendingQuickPanelHotkey = config.QuickPanelHotkey;
+        _pendingScreenshotHotkey = config.ScreenshotHotkey;
         _runtimeActive = runtimeActive;
         _pendingProcessAudioRoutes = CloneProcessAudioRoutes(config.ProcessAudioRoutes);
         _pendingAdvancedMicrophoneTrack = config.AdvancedMicrophoneTrack;
@@ -114,9 +119,11 @@ public partial class SettingsWindow : Window
         _diskTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
         _diskTimer.Tick += async (_, _) => await RefreshDiskAsync();
         Localization.Changed += OnLanguageChanged;
+        Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
         Closed += (_, _) =>
         {
             Localization.Changed -= OnLanguageChanged;
+            Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             _diskTimer.Stop();
             _lifetimeCts.Cancel();
             CloseDisplayIdentifiers();
@@ -202,6 +209,7 @@ public partial class SettingsWindow : Window
         HardwareEncoderText.ToolTip = capability is null
             ? HardwareEncoderText.Text
             : $"{_capabilities.AdapterName} · {capability.FamilyDisplayName}";
+        UpdateAdvancedSettingsState();
     }
 
     private static string ShortAdapterName(string adapterName) =>
@@ -302,6 +310,49 @@ public partial class SettingsWindow : Window
         UpdateAudioDeviceState();
     }
 
+    private void OnDisplaySettingsChanged(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (!_lifetimeCts.IsCancellationRequested)
+                RefreshMonitorChoices();
+        });
+    }
+
+    internal void RefreshMonitorChoices()
+    {
+        string selected = GetSelectedTag(MonitorBox, _config.MonitorIndex.ToString());
+        CaptureInterop.MonitorInfo? previous = _monitors.FirstOrDefault(m => m.Index.ToString() == selected);
+        List<CaptureInterop.MonitorInfo> monitors = CaptureInterop.EnumerateMonitors();
+        CaptureInterop.MonitorInfo? target = previous is null
+            ? monitors.FirstOrDefault(m => m.Index == _config.MonitorIndex)
+            : ObsReplayEngine.ResolveCaptureMonitor(monitors, previous, previous, _config.MonitorIndex);
+        bool wasUpdating = _updatingUi;
+        _updatingUi = true;
+        try
+        {
+            CloseDisplayIdentifiers();
+            _monitors = monitors;
+            MonitorBox.Items.Clear();
+            foreach (CaptureInterop.MonitorInfo monitor in monitors)
+                MonitorBox.Items.Add(new ComboBoxItem
+                {
+                    Tag = monitor.Index.ToString(),
+                    Content = Localization.Format("L.Video.MonitorFormat", monitor.Index + 1, monitor.Width, monitor.Height),
+                });
+            if (target is not null)
+                SelectByTag(MonitorBox, target.Index.ToString());
+            IdentifyDisplaysButton.IsEnabled = monitors.Count > 0;
+        }
+        finally { _updatingUi = wasUpdating; }
+    }
+
+    private void SetScreenshotCandidate(Config candidate)
+    {
+        candidate.InstantScreenshotsEnabled = InstantScreenshotsBox.IsChecked == true;
+        candidate.ScreenshotHotkey = _pendingScreenshotHotkey;
+    }
+
     private void IdentifyDisplays_Click(object sender, RoutedEventArgs e)
     {
         CloseDisplayIdentifiers();
@@ -398,57 +449,64 @@ public partial class SettingsWindow : Window
         UpdateAudioDeviceState();
     }
 
-    private void LoadSettingsControls()
+    private void LoadSettingsControls(Config? settings = null)
     {
+        Config source = settings ?? _config;
         _updatingUi = true;
         try
         {
-            SelectRadioByTag(DashboardCaptureModeOptions, _config.CaptureMode);
-            SelectRadioByTag(BufferOptions, _config.BufferSeconds.ToString());
-            SelectByTag(ReplaySizeLimitBox, _config.MaxReplaySizeMb.ToString());
-            SelectRadioByTag(FpsOptions, _config.FrameRate.ToString());
-            SelectByTag(CaptureSourceBox, _config.CaptureSource);
-            SelectByTag(CodecBox, _config.Codec);
-            SelectByTag(BitrateBox, _config.BitrateMbps.ToString());
-            SelectByTag(MonitorBox, _config.MonitorIndex.ToString());
-            SelectByTag(ResolutionBox, _config.RecordingResolution);
-            SelectByTag(AudioDeviceBox, _config.SystemAudioDeviceId);
-            SelectByTag(MicDeviceBox, _config.MicrophoneDeviceId);
-            SelectByTag(AudioCodecBox, _config.AudioCodec);
+            SelectRadioByTag(DashboardCaptureModeOptions, source.CaptureMode);
+            SelectByTag(ReplaySizeLimitBox, source.MaxReplaySizeMb.ToString());
+            SelectRadioByTag(FpsOptions, source.FrameRate.ToString());
+            SelectByTag(CaptureSourceBox, source.CaptureSource);
+            SelectByTag(CodecBox, source.Codec);
+            SelectByTag(BitrateBox, source.BitrateMbps.ToString());
+            SelectByTag(MonitorBox, source.MonitorIndex.ToString());
+            SelectByTag(ResolutionBox, source.RecordingResolution);
+            SelectByTag(AudioDeviceBox, source.SystemAudioDeviceId);
+            SelectByTag(MicDeviceBox, source.MicrophoneDeviceId);
+            SelectByTag(AudioCodecBox, source.AudioCodec);
             SelectByTag(
                 AudioTrackModeBox,
                 string.Equals(
-                    _config.AudioRoutingMode,
+                    source.AudioRoutingMode,
                     "advanced",
                     StringComparison.OrdinalIgnoreCase)
                     ? "advanced"
-                    : _config.SeparateAudioTracks ? "separate" : "mixed");
+                    : source.SeparateAudioTracks ? "separate" : "mixed");
 
             _pendingProcessAudioRoutes = CloneProcessAudioRoutes(
-                _config.ProcessAudioRoutes);
-            _pendingAdvancedMicrophoneTrack = _config.AdvancedMicrophoneTrack;
+                source.ProcessAudioRoutes);
+            _pendingAdvancedMicrophoneTrack = source.AdvancedMicrophoneTrack;
 
-            SettingsReplayToggle.IsChecked = _config.ReplayEnabled;
-            WarnGameOffBox.IsChecked = _config.WarnWhenGameStartsWithReplayOff;
-            RecordingIndicatorBox.IsChecked = _config.ShowRecordingIndicator;
+            SettingsReplayToggle.IsChecked = source.ReplayEnabled;
+            WarnGameOffBox.IsChecked = source.WarnWhenGameStartsWithReplayOff;
+            RecordingIndicatorBox.IsChecked = source.ShowRecordingIndicator;
             SelectRadioByTag(
                 RecordingIndicatorPositionOptions,
-                _config.RecordingIndicatorPosition);
-            SystemAudioBox.IsChecked = _config.CaptureSystemAudio;
-            MicBox.IsChecked = _config.CaptureMicrophone;
-            SystemVolumeSlider.Value = Math.Clamp(_config.SystemAudioVolume, 0, 100);
-            MicVolumeSlider.Value = Math.Clamp(_config.MicrophoneVolume, 0, 100);
-            MicBoostSlider.Value = Math.Clamp(_config.MicrophoneBoostDb, 0, 20);
-            OrganizeByGameBox.IsChecked = _config.OrganizeReplaysByGame;
-            SelectRadioByTag(AccentColorOptions, _config.AccentColor);
+                source.RecordingIndicatorPosition);
+            SystemAudioBox.IsChecked = source.CaptureSystemAudio;
+            MicBox.IsChecked = source.CaptureMicrophone;
+            SystemVolumeSlider.Value = Math.Clamp(source.SystemAudioVolume, 0, 100);
+            MicVolumeSlider.Value = Math.Clamp(source.MicrophoneVolume, 0, 100);
+            MicBoostSlider.Value = Math.Clamp(source.MicrophoneBoostDb, 0, 20);
+            OrganizeByGameBox.IsChecked = source.OrganizeReplaysByGame;
+            SelectRadioByTag(AccentColorOptions, source.AccentColor);
 
-            _pendingSaveHotkey = _config.Hotkey;
-            _pendingToggleHotkey = _config.ToggleReplayHotkey;
+            _pendingSaveHotkey = source.Hotkey;
+            _pendingToggleHotkey = source.ToggleReplayHotkey;
+            _pendingQuickPanelHotkey = source.QuickPanelHotkey;
+            _pendingScreenshotHotkey = source.ScreenshotHotkey;
             SaveHotkeyButton.Content = _pendingSaveHotkey;
             ToggleHotkeyButton.Content = _pendingToggleHotkey;
+            QuickPanelHotkeyButton.Content = _pendingQuickPanelHotkey;
+            ScreenshotHotkeyButton.Content = _pendingScreenshotHotkey;
+            InstantScreenshotsBox.IsChecked = source.InstantScreenshotsEnabled;
+            SelectByTag(QuickPanelSideBox, source.QuickPanelSide);
 
-            _outputDirectory = _config.OutputDirectory;
+            _outputDirectory = source.OutputDirectory;
             OutputDirText.Text = _outputDirectory;
+            LoadRecordingSettingsControls(source);
             UpdateAudioDeviceState();
             UpdateCaptureSourceState();
             UpdateAudioRoutingState();
@@ -980,13 +1038,21 @@ public partial class SettingsWindow : Window
             handledEventsToo: true);
     }
 
-    private void SettingsControl_Changed(object sender, RoutedEventArgs e) =>
+    private void SettingsControl_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_updatingUi)
+            UpdateAdvancedSettingsState();
         QueueSettingsDirtyRefresh();
+    }
 
     private void SettingsSelection_Changed(
         object sender,
-        SelectionChangedEventArgs e) =>
+        SelectionChangedEventArgs e)
+    {
+        if (!_updatingUi)
+            UpdateAdvancedSettingsState();
         QueueSettingsDirtyRefresh();
+    }
 
     private void SettingsValue_Changed(
         object sender,
@@ -1016,7 +1082,8 @@ public partial class SettingsWindow : Window
             return;
 
         Config pending = CreatePendingConfig();
-        bool dirty = !SettingsValuesEqual(pending, _config) ||
+        UpdateRecordingPresetState(pending);
+        bool dirty = IsBufferDurationInvalid() || !SettingsValuesEqual(pending, _config) ||
                      (AutostartBox.IsChecked == true) != _savedAutostartEnabled;
         SetSettingsDirty(dirty);
     }
@@ -1033,9 +1100,7 @@ public partial class SettingsWindow : Window
         candidate.RecordingIndicatorPosition = GetSelectedRadioTag(
             RecordingIndicatorPositionOptions,
             _config.RecordingIndicatorPosition);
-        candidate.BufferSeconds = GetSelectedRadioInt(
-            BufferOptions,
-            _config.BufferSeconds);
+        candidate.BufferSeconds = _pendingBufferSeconds;
         candidate.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
         candidate.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
         candidate.Codec = GetSelectedTag(CodecBox, _config.Codec);
@@ -1068,10 +1133,22 @@ public partial class SettingsWindow : Window
             _config.AccentColor);
         candidate.Hotkey = _pendingSaveHotkey;
         candidate.ToggleReplayHotkey = _pendingToggleHotkey;
+        candidate.QuickPanelHotkey = _pendingQuickPanelHotkey;
+        candidate.QuickPanelSide = GetSelectedTag(
+            QuickPanelSideBox, _config.QuickPanelSide);
+        SetScreenshotCandidate(candidate);
+        ReadRecordingSettingsControls(candidate);
         return candidate;
     }
 
     private static bool SettingsValuesEqual(Config left, Config right) =>
+        left.AdvancedSettingsEnabled == right.AdvancedSettingsEnabled &&
+        left.EncoderTuning == right.EncoderTuning &&
+        left.AudioBitrateKbps == right.AudioBitrateKbps &&
+        string.Equals(left.SelectedRecordingPresetId, right.SelectedRecordingPresetId, StringComparison.Ordinal) &&
+        RecordingPreset.LibraryEquals(left.RecordingPresets, right.RecordingPresets) &&
+        left.InstantScreenshotsEnabled == right.InstantScreenshotsEnabled &&
+        string.Equals(left.ScreenshotHotkey, right.ScreenshotHotkey, StringComparison.Ordinal) &&
         string.Equals(left.CaptureMode, right.CaptureMode, StringComparison.Ordinal) &&
         left.ReplayEnabled == right.ReplayEnabled &&
         left.WarnWhenGameStartsWithReplayOff == right.WarnWhenGameStartsWithReplayOff &&
@@ -1082,6 +1159,7 @@ public partial class SettingsWindow : Window
             StringComparison.Ordinal) &&
         left.BufferSeconds == right.BufferSeconds &&
         left.MaxReplaySizeMb == right.MaxReplaySizeMb &&
+        left.DiskReplayBufferEnabled == right.DiskReplayBufferEnabled &&
         string.Equals(left.CaptureSource, right.CaptureSource, StringComparison.Ordinal) &&
         string.Equals(left.Codec, right.Codec, StringComparison.Ordinal) &&
         left.BitrateMbps == right.BitrateMbps &&
@@ -1124,7 +1202,19 @@ public partial class SettingsWindow : Window
         string.Equals(
             left.ToggleReplayHotkey,
             right.ToggleReplayHotkey,
+            StringComparison.Ordinal) &&
+        string.Equals(left.QuickPanelHotkey, right.QuickPanelHotkey,
+            StringComparison.Ordinal) &&
+        string.Equals(left.QuickPanelSide, right.QuickPanelSide,
             StringComparison.Ordinal);
+
+    public void RefreshFromConfigIfSafe()
+    {
+        if (SettingsPanel.Visibility == Visibility.Visible && _settingsDirty)
+            return;
+        LoadSettingsControls();
+        UpdateRuntimeState(_runtimeActive);
+    }
 
     private static List<ProcessAudioRoute> CloneProcessAudioRoutes(
         IEnumerable<ProcessAudioRoute>? routes) =>
@@ -1366,6 +1456,17 @@ public partial class SettingsWindow : Window
         }
 
         UpdateLanguageMenuSelection();
+        Config pendingRecordingSettings = CreatePendingConfig();
+        bool wasUpdatingRecordingSettings = _updatingUi;
+        _updatingUi = true;
+        try
+        {
+            LoadRecordingSettingsControls(pendingRecordingSettings);
+        }
+        finally
+        {
+            _updatingUi = wasUpdatingRecordingSettings;
+        }
         _ = RunUiActionAsync(LoadDeviceListsAsync);
         ApplyHardwareCapabilities();
         UpdateCaptureModeState();
@@ -1388,6 +1489,19 @@ public partial class SettingsWindow : Window
         catch (Exception exception)
         {
             HandleUiActionError("Open GitHub repository", exception);
+        }
+    }
+
+    private async void SupportUs_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await ExternalLinkLauncher.OpenAsync("https://ko-fi.com/faulmit");
+            AnimatePress(SupportUsButton);
+        }
+        catch (Exception exception)
+        {
+            HandleUiActionError("Open project support page", exception);
         }
     }
 
@@ -2173,19 +2287,28 @@ public partial class SettingsWindow : Window
         }
 
         string hotkey = FormatHotkey(modifiers, key);
-        bool captureSave = Equals(_capturingHotkeyButton.Tag, "save");
-        string other = captureSave ? _pendingToggleHotkey : _pendingSaveHotkey;
-        if (!HotkeyManager.AreDistinct(hotkey, other))
+        string tag = _capturingHotkeyButton.Tag?.ToString() ?? "";
+        string[] others = tag switch
+        {
+            "save" => [_pendingToggleHotkey, _pendingQuickPanelHotkey, _pendingScreenshotHotkey],
+            "toggle" => [_pendingSaveHotkey, _pendingQuickPanelHotkey, _pendingScreenshotHotkey],
+            "screenshot" => [_pendingSaveHotkey, _pendingToggleHotkey, _pendingQuickPanelHotkey],
+            _ => [_pendingSaveHotkey, _pendingToggleHotkey, _pendingScreenshotHotkey],
+        };
+        if (others.Any(other => !HotkeyManager.AreDistinct(hotkey, other)))
         {
             _capturingHotkeyButton.Content =
                 Localization.Text("L.Hotkey.InUse");
             return;
         }
 
-        if (captureSave)
-            _pendingSaveHotkey = hotkey;
-        else
-            _pendingToggleHotkey = hotkey;
+        switch (tag)
+        {
+            case "save": _pendingSaveHotkey = hotkey; break;
+            case "toggle": _pendingToggleHotkey = hotkey; break;
+            case "screenshot": _pendingScreenshotHotkey = hotkey; break;
+            default: _pendingQuickPanelHotkey = hotkey; break;
+        }
         _capturingHotkeyButton.Content = hotkey;
         _capturingHotkeyButton = null;
         RefreshSettingsDirtyState();
@@ -2196,17 +2319,31 @@ public partial class SettingsWindow : Window
         if (_capturingHotkeyButton is null)
             return;
 
-        bool captureSave = Equals(_capturingHotkeyButton.Tag, "save");
-        _capturingHotkeyButton.Content = captureSave ? _pendingSaveHotkey : _pendingToggleHotkey;
+        _capturingHotkeyButton.Content = _capturingHotkeyButton.Tag?.ToString() switch
+        {
+            "save" => _pendingSaveHotkey,
+            "toggle" => _pendingToggleHotkey,
+            "screenshot" => _pendingScreenshotHotkey,
+            _ => _pendingQuickPanelHotkey,
+        };
         _capturingHotkeyButton = null;
     }
 
     private async void Apply_Click(object sender, RoutedEventArgs e)
     {
         CancelHotkeyCapture();
+        if (!ValidateBufferDuration())
+            return;
         if (!HotkeyManager.IsValid(_pendingSaveHotkey) ||
             !HotkeyManager.IsValid(_pendingToggleHotkey) ||
-            !HotkeyManager.AreDistinct(_pendingSaveHotkey, _pendingToggleHotkey))
+            !HotkeyManager.IsValid(_pendingQuickPanelHotkey) ||
+            !HotkeyManager.IsValid(_pendingScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(_pendingSaveHotkey, _pendingScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(_pendingToggleHotkey, _pendingScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(_pendingQuickPanelHotkey, _pendingScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(_pendingSaveHotkey, _pendingToggleHotkey) ||
+            !HotkeyManager.AreDistinct(_pendingSaveHotkey, _pendingQuickPanelHotkey) ||
+            !HotkeyManager.AreDistinct(_pendingToggleHotkey, _pendingQuickPanelHotkey))
         {
             ShowError(
                 Localization.Text("L.Error.HotkeysTitle"),
@@ -2269,8 +2406,7 @@ public partial class SettingsWindow : Window
         candidate.RecordingIndicatorPosition = GetSelectedRadioTag(
             RecordingIndicatorPositionOptions,
             _config.RecordingIndicatorPosition);
-        candidate.BufferSeconds =
-            GetSelectedRadioInt(BufferOptions, _config.BufferSeconds);
+        candidate.BufferSeconds = _pendingBufferSeconds;
         candidate.MaxReplaySizeMb = GetSelectedInt(ReplaySizeLimitBox, 0);
         candidate.CaptureSource = GetSelectedTag(CaptureSourceBox, "desktop");
         string selectedCodec = GetSelectedTag(CodecBox, _config.Codec);
@@ -2312,6 +2448,11 @@ public partial class SettingsWindow : Window
                 _config.AccentColor);
             candidate.Hotkey = _pendingSaveHotkey;
             candidate.ToggleReplayHotkey = _pendingToggleHotkey;
+            candidate.QuickPanelHotkey = _pendingQuickPanelHotkey;
+            candidate.QuickPanelSide = GetSelectedTag(
+                QuickPanelSideBox, _config.QuickPanelSide);
+            SetScreenshotCandidate(candidate);
+            ReadRecordingSettingsControls(candidate);
             candidate.Normalize();
 
             if (!await _applySettings(

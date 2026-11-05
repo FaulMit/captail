@@ -181,6 +181,8 @@ public partial class ClipEditorWindow : Window
 
     private async Task LoadRecentReplaysAsync()
     {
+        string? selectedGame = (GameFilter.SelectedItem as ReplayFilterOption)?.Value;
+        string? selectedMode = (RecordingModeFilter.SelectedItem as ReplayFilterOption)?.Value;
         IReadOnlyList<ReplayClip> clips = await _library.GetRecentAsync(
             _rootDirectory,
             int.MaxValue,
@@ -207,7 +209,8 @@ public partial class ClipEditorWindow : Window
                      .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(game => game))
             GameFilter.Items.Add(new ReplayFilterOption(game,
                 game.Length == 0 ? Localization.Text("L.Library.NoGame") : game));
-        GameFilter.SelectedIndex = 0;
+        GameFilter.SelectedItem = GameFilter.Items.Cast<ReplayFilterOption>()
+            .FirstOrDefault(item => item.Value == selectedGame) ?? GameFilter.Items[0];
         RecordingModeFilter.ItemsSource = new[]
         {
             new ReplayFilterOption(null, Localization.Text("L.Library.AllModes")),
@@ -215,7 +218,8 @@ public partial class ClipEditorWindow : Window
             new ReplayFilterOption("recording", Localization.Text("L.Library.ModeRecording")),
             new ReplayFilterOption("unknown", Localization.Text("L.Library.ModeUnknown")),
         };
-        RecordingModeFilter.SelectedIndex = 0;
+        RecordingModeFilter.SelectedItem = RecordingModeFilter.Items.Cast<ReplayFilterOption>()
+            .FirstOrDefault(item => item.Value == selectedMode) ?? RecordingModeFilter.Items[0];
         _updatingReplayFilters = false;
         ApplyReplayFilters();
     }
@@ -262,10 +266,13 @@ public partial class ClipEditorWindow : Window
     private void DeleteSelectedReplays_Click(object sender, RoutedEventArgs e) =>
         RequestDeleteReplays(RecentReplayItems.Where(item => item.IsMarked).ToArray());
 
-    private async Task LoadReplayAsync(ReplayClip clip)
+    private async Task LoadReplayAsync(
+        ReplayClip clip,
+        bool forceReload = false,
+        bool startPlayback = true)
     {
-        if (_playerLoading ||
-            string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase))
+        if (_playerLoading || (_saveInProgress && !forceReload) ||
+            (!forceReload && string.Equals(clip.Path, _clip.Path, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
@@ -306,12 +313,18 @@ public partial class ClipEditorWindow : Window
             PreviewImage.Visibility = Visibility.Collapsed;
             PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
             PreviewPlayer.Visibility = Visibility.Visible;
-            PreviewPlayer.Play();
-            _playing = true;
-            _playbackTimer.Start();
+            if (startPlayback)
+            {
+                PreviewPlayer.Play();
+                _playing = true;
+                _playbackTimer.Start();
+            }
             UpdateRangeText();
             UpdatePlayIcon();
-            _ = CompleteReplayEnrichmentAsync(clip, replayLoadVersion);
+            if (forceReload)
+                await CompleteReplayEnrichmentAsync(clip, replayLoadVersion);
+            else
+                _ = CompleteReplayEnrichmentAsync(clip, replayLoadVersion);
         }
         catch (Exception exception)
         {
@@ -431,7 +444,7 @@ public partial class ClipEditorWindow : Window
 
     private void RequestDeleteReplays(RecentReplayEntry[] entries)
     {
-        if (entries.Length == 0 || _deletingReplays || _playerLoading ||
+        if (entries.Length == 0 || _deletingReplays || _playerLoading || _saveInProgress ||
             DeleteRecentReplayOverlay.Visibility == Visibility.Visible)
             return;
         _pendingDeleteReplays = entries;
@@ -2057,6 +2070,23 @@ public partial class ClipEditorWindow : Window
         UpdateMergeAudioState();
     }
 
+    private async void UploadToYouTube_Click(object sender, RoutedEventArgs e)
+    {
+        if (_saveInProgress)
+            return;
+
+        OutputSettingsPopup.IsOpen = false;
+        try
+        {
+            await ExternalLinkLauncher.OpenAsync("https://studio.youtube.com/");
+        }
+        catch (Exception exception)
+        {
+            Log.Write($"YouTube Studio launch failed: {exception}");
+            EditorStatusText.Text = Localization.Text("L.Library.YouTubeStudioOpenFailed");
+        }
+    }
+
     private async void ExportAs_Click(object sender, RoutedEventArgs e)
     {
         if (_saveInProgress)
@@ -2117,6 +2147,10 @@ public partial class ClipEditorWindow : Window
         string destination,
         VideoOutputSettings outputSettings)
     {
+        using var diagnostic = Log.BeginOperation("clip.export", new
+        {
+            input = _clip.Path, destination, start = _selectionStart, end = _selectionEnd, outputSettings,
+        });
         _saveInProgress = true;
         OutputSettingsButton.IsEnabled = false;
         SaveTrimButton.IsEnabled = false;
@@ -2132,6 +2166,7 @@ public partial class ClipEditorWindow : Window
             ShowSavingOverlay();
             await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Render);
             await PreviewPlayer.StopAsync(_lifetimeCts.Token);
+            diagnostic.Stage("transcode");
             await _library.ExportTranscodedAsync(
                 _rootDirectory,
                 _clip,
@@ -2141,6 +2176,7 @@ public partial class ClipEditorWindow : Window
                 SelectedAudioStreamIndices(),
                 outputSettings,
                 _lifetimeCts.Token);
+            diagnostic.Complete(new { destination, bytes = Log.FileSize(destination) });
             HideSavingOverlay();
             EditorStatusText.Text = Localization.Text("L.Library.ExportedVideo");
             OutputSettingsButton.IsEnabled = true;
@@ -2149,12 +2185,14 @@ public partial class ClipEditorWindow : Window
             UpdateMergeAudioState();
             await InitializePreviewAsync();
         }
-        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (_lifetimeCts.IsCancellationRequested)
         {
+            diagnostic.Fail(exception);
             // Window is closing.
         }
         catch (Exception exception)
         {
+            diagnostic.Fail(exception);
             Log.Write($"Replay export failed: {exception}");
             HideSavingOverlay();
             EditorStatusText.Text = IsSharingViolation(exception)
@@ -2222,10 +2260,77 @@ public partial class ClipEditorWindow : Window
         await SaveTrimAsync(overwrite: true);
     }
 
+    internal async Task<(bool Passed, string Details)> RunSavePersistenceQaAsync(
+        bool overwrite,
+        bool mergeAudio)
+    {
+        DateTime deadline = DateTime.UtcNow.AddSeconds(20);
+        while ((_playerLoading || !PreviewPlayer.IsReady || !_outputSettingsInitialized) &&
+               DateTime.UtcNow < deadline)
+            await Task.Delay(50);
+        if (!PreviewPlayer.IsReady || !_outputSettingsInitialized)
+            return (false, "Initial player load failed.");
+
+        string originalPath = _clip.Path;
+        double originalDuration = _clip.Duration.TotalSeconds;
+        int originalTrackCount = AudioTracks.Count;
+        PauseNativePlayback();
+        MergeAudioCheckBox.IsChecked = mergeAudio;
+        RecordingModeFilter.SelectedItem = RecordingModeFilter.Items.Cast<ReplayFilterOption>()
+            .Single(item => item.Value == "unknown");
+        _selectionStart = 0.5;
+        _selectionEnd = originalDuration - 1;
+        if (overwrite)
+        {
+            RequestOverwrite_Click(this, new RoutedEventArgs());
+            CancelOverwrite(resumePlayback: false);
+        }
+        await SaveTrimAsync(overwrite);
+        bool stayedOpen = IsVisible && !_lifetimeCts.IsCancellationRequested;
+        if (!stayedOpen)
+            return (false, $"overwrite={overwrite}, stayedOpen=false");
+
+        bool ready = PreviewPlayer.IsReady && PreviewPlayer.Visibility == Visibility.Visible &&
+                     SavingOverlay.Visibility == Visibility.Collapsed &&
+                     SaveTrimButton.IsEnabled && OverwriteButton.IsEnabled;
+        bool sourceCorrect = _clip.Path == originalPath &&
+            (overwrite ? _clip.Duration.TotalSeconds < originalDuration :
+                Math.Abs(_clip.Duration.TotalSeconds - originalDuration) < 0.1);
+        bool rangeCorrect = !overwrite || (_selectionStart == 0 &&
+            Math.Abs(_selectionEnd - _clip.Duration.TotalSeconds) < 0.1);
+        bool sidebarCorrect = RecentReplayItems.Any(item => item.IsActive &&
+            item.Clip.Path == _clip.Path && item.Clip.SizeBytes == _clip.SizeBytes) &&
+            (RecordingModeFilter.SelectedItem as ReplayFilterOption)?.Value == "unknown";
+        bool tracksCorrect = !overwrite ||
+            AudioTracks.Count == (mergeAudio && originalTrackCount > 1 ? 1 : originalTrackCount);
+        await StartPlaybackAsync(_selectionStart);
+        double before = PreviewPlayer.PositionSeconds;
+        DateTime playbackDeadline = DateTime.UtcNow.AddSeconds(3);
+        while (PreviewPlayer.PositionSeconds <= before + 0.05 && DateTime.UtcNow < playbackDeadline)
+            await Task.Delay(100);
+        bool playback = PreviewPlayer.PositionSeconds > before + 0.05;
+        PauseNativePlayback();
+
+        // A second save catches stale duration, track selection, and file handles.
+        _selectionStart = 0.25;
+        _selectionEnd = _clip.Duration.TotalSeconds - 0.5;
+        await SaveTrimAsync(overwrite);
+        bool secondSave = IsVisible && PreviewPlayer.IsReady && !_saveInProgress;
+        bool passed = stayedOpen && ready && sourceCorrect && rangeCorrect &&
+                      sidebarCorrect && tracksCorrect && playback && secondSave;
+        return (passed, $"overwrite={overwrite}, merge={mergeAudio}, stayedOpen={stayedOpen}, ready={ready}, " +
+            $"source={sourceCorrect}, range={rangeCorrect}, sidebar={sidebarCorrect}, " +
+            $"tracks={tracksCorrect}, playback={playback}, secondSave={secondSave}");
+    }
+
     private async Task SaveTrimAsync(bool overwrite)
     {
         if (_saveInProgress)
             return;
+        using var diagnostic = Log.BeginOperation("clip.trim", new
+        {
+            input = _clip.Path, overwrite, start = _selectionStart, end = _selectionEnd,
+        });
         _saveInProgress = true;
         OutputSettingsPopup.IsOpen = false;
         OutputSettingsButton.IsEnabled = false;
@@ -2254,6 +2359,7 @@ public partial class ClipEditorWindow : Window
             TimeSpan start = TimeSpan.FromSeconds(_selectionStart);
             TimeSpan end = TimeSpan.FromSeconds(_selectionEnd);
             IReadOnlyList<int> audioStreams = SelectedAudioStreamIndices();
+            diagnostic.Stage("write-trim", new { audioStreams, outputSettings });
             string path = overwrite
                 ? await _library.TrimOverwriteAsync(
                     _rootDirectory,
@@ -2271,16 +2377,35 @@ public partial class ClipEditorWindow : Window
                     audioStreams,
                     outputSettings,
                     _lifetimeCts.Token);
+            diagnostic.Complete(new { path, bytes = Log.FileSize(path) });
             _onSaved(path);
-            DialogResult = true;
-            Close();
+            if (_previewMode || overwrite)
+                await LoadRecentReplaysAsync();
+            if (overwrite)
+            {
+                ReplayClip updatedClip = _allReplayItems.First(item =>
+                    string.Equals(item.Clip.Path, path, StringComparison.OrdinalIgnoreCase)).Clip;
+                await LoadReplayAsync(updatedClip, forceReload: true, startPlayback: false);
+            }
+            else
+            {
+                await InitializePreviewAsync();
+            }
+            HideSavingOverlay();
+            EditorStatusText.Text = Localization.Text("L.Library.Trimmed");
+            OutputSettingsButton.IsEnabled = true;
+            SaveTrimButton.IsEnabled = true;
+            OverwriteButton.IsEnabled = true;
+            UpdateMergeAudioState();
         }
-        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (_lifetimeCts.IsCancellationRequested)
         {
+            diagnostic.Fail(exception);
             // Window is closing.
         }
         catch (Exception exception)
         {
+            diagnostic.Fail(exception);
             Log.Write($"Replay trim failed: {exception}");
             HideSavingOverlay();
             EditorStatusText.Text = IsSharingViolation(exception)

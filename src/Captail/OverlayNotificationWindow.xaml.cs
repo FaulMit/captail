@@ -28,6 +28,7 @@ public partial class OverlayNotificationWindow : Window
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpShowWindow = 0x0040;
     private const uint GwHwndPrev = 3;
+    private const uint WdaExcludeFromCapture = 0x00000011;
     private static readonly nint HwndTopmost = new(-1);
 
     private readonly DispatcherTimer _hideTimer;
@@ -50,7 +51,7 @@ public partial class OverlayNotificationWindow : Window
         {
             Interval = TimeSpan.FromMilliseconds(250),
         };
-        _topmostTimer.Tick += (_, _) => EnsureNativeTopmost(moveToTarget: false);
+        _topmostTimer.Tick += (_, _) => EnsureNativeTopmost(moveToTarget: true);
         SourceInitialized += (_, _) => MakeClickThrough();
         Closing += (_, e) =>
         {
@@ -165,15 +166,20 @@ public partial class OverlayNotificationWindow : Window
         error = Marshal.GetLastPInvokeError();
         if (previousStyles == 0 && error != 0)
             Log.Write($"Could not make overlay click-through: Win32 error {error}.");
+
+        // Capture notifications must not appear in a subsequent instant screenshot.
+        if (!SetWindowDisplayAffinity(hwnd, WdaExcludeFromCapture))
+            Log.Write($"Could not exclude notification from capture: Win32 error {Marshal.GetLastWin32Error()}.");
     }
 
     private nint ResolveTargetMonitor()
     {
         nint foreground = GetForegroundWindow();
         nint hwnd = new WindowInteropHelper(this).Handle;
-        return MonitorFromWindow(
+        nint monitor = MonitorFromWindow(
             foreground != 0 ? foreground : hwnd,
             MonitorDefaultToNearest);
+        return monitor != 0 ? monitor : MonitorFromWindow(hwnd, MonitorDefaultToNearest);
     }
 
     private void EnsureNativeTopmost(bool moveToTarget)
@@ -185,9 +191,12 @@ public partial class OverlayNotificationWindow : Window
         int x = 0;
         int y = 0;
         uint flags = SwpNoSize | SwpNoActivate | SwpShowWindow;
-        if (!moveToTarget ||
-            _targetMonitor == 0 ||
-            !TryGetOverlayPosition(hwnd, _targetMonitor, out x, out y))
+        if (moveToTarget && !TryGetOverlayPosition(hwnd, _targetMonitor, out x, out y))
+        {
+            _targetMonitor = ResolveTargetMonitor();
+            moveToTarget = TryGetOverlayPosition(hwnd, _targetMonitor, out x, out y);
+        }
+        if (!moveToTarget)
         {
             flags |= SwpNoMove;
         }
@@ -273,6 +282,9 @@ public partial class OverlayNotificationWindow : Window
 
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowDisplayAffinity(nint hwnd, uint affinity);
 
     [DllImport("user32.dll")]
     private static extern nint MonitorFromWindow(nint hwnd, uint flags);

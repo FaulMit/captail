@@ -16,9 +16,9 @@ Before running the workflow:
 1. Review changes since the previous tag.
 2. Move completed entries from `[Unreleased]` into a dated version section in `CHANGELOG.md`.
 3. Follow [RELEASE_NOTES.md](RELEASE_NOTES.md) for categories, wording, and required upgrade notices.
-4. Capture the complete README baseline from the exact release-candidate build by following [SCREENSHOTS.md](SCREENSHOTS.md). Replace every required screenshot even when its screen did not visibly change.
-5. Verify the screenshot build can actually record and reopen the README showcase profile: hardware AV1, 4K, 240 FPS, system audio, and microphone.
-6. Add a real screenshot for each significant new user-facing workflow or screen. Do not use mockups, concepts, generated UI, or screenshots from an older build.
+4. Preserve the existing README showcase video. Do not replace it or add application screenshots to the README as part of a release.
+5. Validate capture, playback, and the changed user-facing workflows using the release candidate.
+6. Keep Store listing images separate from the README showcase. Update Store images only when requested.
 7. Preview the generated GitHub Release description locally:
 
 ```powershell
@@ -57,7 +57,7 @@ After publishing, verify:
 - release title, version, and prerelease status;
 - Installer, Portable ZIP, and `SHA256SUMS.txt` assets;
 - generated release notes and full-changelog link;
-- README screenshots match the published build, contain no private data, and render at a readable size;
+- the README showcase video remains unchanged and no application screenshots were added;
 - GitHub build-provenance attestations.
 
 ## Local package build

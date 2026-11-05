@@ -27,6 +27,7 @@ public static class Localization
         new("ja", "ja-JP", "日本語", "JA"),
         new("ko", "ko-KR", "한국어", "KO"),
         new("pl", "pl-PL", "Polski", "PL"),
+        new("bg", "bg-BG", "Български", "BG"),
     ];
 
     public static event Action? Changed;

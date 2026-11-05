@@ -17,6 +17,7 @@ namespace Captail;
 public sealed class MpvHost : HwndHost
 {
     private const string HostWindowClass = "CaptailMpvHostWindow";
+    private const string PreferredHardwareDecoders = "d3d11va,auto-safe";
     private const int ErrorClassAlreadyExists = 1410;
     private const uint WsChild = 0x40000000;
     private const uint WsVisible = 0x10000000;
@@ -37,6 +38,7 @@ public sealed class MpvHost : HwndHost
     private readonly object _stateLock = new();
     private nint _hostHandle;
     private nint _mpvHandle;
+    private SingleThreadTaskScheduler? _nativeLifetimeScheduler;
     private CancellationTokenSource? _eventCancellation;
     private Task? _eventTask;
     private TaskCompletionSource<bool>? _fileLoadedCompletion;
@@ -268,6 +270,8 @@ public sealed class MpvHost : HwndHost
         Pause();
         ResizeVideoWindow();
         await WaitForVideoOutputAsync(cancellationToken);
+        if (RetryAv1HardwareDecoding())
+            await WaitForVideoOutputAsync(cancellationToken);
     }
 
     public void Play()
@@ -406,15 +410,43 @@ public sealed class MpvHost : HwndHost
         }
         if (_mpvHandle != 0)
         {
-            MpvNative.TerminateDestroy(_mpvHandle);
+            nint handle = _mpvHandle;
+            Task.Factory.StartNew(
+                () => MpvNative.TerminateDestroy(handle),
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                _nativeLifetimeScheduler!).GetAwaiter().GetResult();
             _mpvHandle = 0;
         }
+        _nativeLifetimeScheduler?.Dispose();
+        _nativeLifetimeScheduler = null;
         cancellation?.Dispose();
         _eventCancellation = null;
         _eventTask = null;
     }
 
     private void InitializePlayer()
+    {
+        // Native audio/device initialization must not change WPF's STA COM
+        // lifetime. Keep creation and destruction on the same dedicated MTA.
+        _nativeLifetimeScheduler = new SingleThreadTaskScheduler("Captail mpv lifetime");
+        try
+        {
+            Task.Factory.StartNew(
+                InitializeNativePlayer,
+                CancellationToken.None,
+                TaskCreationOptions.None,
+                _nativeLifetimeScheduler).GetAwaiter().GetResult();
+        }
+        catch
+        {
+            _nativeLifetimeScheduler.Dispose();
+            _nativeLifetimeScheduler = null;
+            throw;
+        }
+    }
+
+    private void InitializeNativePlayer()
     {
         _mpvHandle = MpvNative.Create();
         if (_mpvHandle == 0)
@@ -440,7 +472,7 @@ public sealed class MpvHost : HwndHost
             SetOption("gpu-context", "d3d11");
             // Prefer direct D3D11 decode without a system-memory copy-back.
             // Safe auto fallback retains playback where interop is unavailable.
-            SetOption("hwdec", "d3d11va,auto-safe");
+            SetOption("hwdec", PreferredHardwareDecoders);
             SetOption("video-sync", "audio");
             // Instant replays can be 144/240 FPS while the display or a running
             // game leaves less presentation budget. Skipping already-late decode
@@ -593,6 +625,30 @@ public sealed class MpvHost : HwndHost
                    out value) >= 0;
     }
 
+    private bool RetryAv1HardwareDecoding()
+    {
+        if (!string.Equals(
+                MpvNative.GetPropertyStringValue(_mpvHandle, "video-format"),
+                "av1",
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                MpvNative.GetPropertyStringValue(_mpvHandle, "hwdec-current"),
+                "no",
+                StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // Replay buffers can start before the first AV1 sequence header. mpv
+        // falls back to software and keeps that decoder even after reaching a
+        // valid frame. Retry once per load, after that frame supplies the header.
+        // Changing hwdec to its existing value does not restart the decoder.
+        SetProperty("hwdec", "no");
+        SetProperty("hwdec", PreferredHardwareDecoders);
+        Log.Write("libmpv: retried AV1 hardware decoding after initial video output.");
+        return true;
+    }
+
     private async Task WaitForVideoOutputAsync(CancellationToken cancellationToken)
     {
         DateTime deadline = DateTime.UtcNow.AddSeconds(5);
@@ -600,7 +656,7 @@ public sealed class MpvHost : HwndHost
         {
             bool hasWidth = TryGetInt64("video-out-params/w", out long width) && width > 0;
             bool hasHeight = TryGetInt64("video-out-params/h", out long height) && height > 0;
-            if (hasWidth && hasHeight)
+            if (hasWidth && hasHeight && !IsBuffering)
                 return;
             await Task.Delay(50, cancellationToken);
         }

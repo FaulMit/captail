@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(CaptailObsBridge LANGUAGES CXX)
 
-add_library(CaptailObsBridge SHARED CaptailObsBridge.cpp)
+add_library(CaptailObsBridge SHARED CaptailObsBridge.cpp MonitorScreenshot.cpp DisplayColorState.cpp)
+set_source_files_properties(DisplayColorState.cpp PROPERTIES COMPILE_DEFINITIONS "NTDDI_VERSION=NTDDI_WIN11_GA")
 target_compile_features(CaptailObsBridge PRIVATE cxx_std_20)
 target_compile_definitions(CaptailObsBridge PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
-target_link_libraries(CaptailObsBridge PRIVATE dxgi)
+target_link_libraries(CaptailObsBridge PRIVATE dxgi d3d11 d2d1 dxguid ole32)

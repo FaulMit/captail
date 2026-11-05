@@ -14,6 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Captail\Captail.csproj" />
+    <Content Include="../../native/ObsBridge/build/Release/CaptailObsBridge.dll" Link="CaptailObsBridge.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../native/ProcessAudio/build/Release/captail-process-audio.dll" Link="obs-plugins/64bit/captail-process-audio.dll" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

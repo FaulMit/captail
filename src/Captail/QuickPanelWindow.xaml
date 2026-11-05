@@ -1,0 +1,368 @@
+<Window x:Class="Captail.QuickPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Captail Quick Panel"
+        Width="736" Height="810" MinWidth="600" MinHeight="460"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
+        Background="Transparent" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
+        FontFamily="{StaticResource FontUi}" Foreground="{StaticResource TextPrimaryBrush}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <Geometry x:Key="RecordingStopIcon">M6 6H18V18H6Z</Geometry>
+        <Style x:Key="PanelCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource BgSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderControlBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
+        </Style>
+        <Style x:Key="PanelCardButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PanelExpander" TargetType="Expander">
+            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Expander">
+                        <Border Background="{StaticResource BgSurfaceBrush}"
+                                BorderBrush="{StaticResource BorderControlBrush}"
+                                BorderThickness="1" CornerRadius="12" Padding="16">
+                            <StackPanel>
+                                <ToggleButton IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              Cursor="Hand" Background="Transparent" BorderThickness="0"
+                                              HorizontalContentAlignment="Stretch">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <ContentPresenter/>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <ContentPresenter ContentSource="Header"/>
+                                        <TextBlock x:Name="Chevron" Grid.Column="1" Text="⌄" FontSize="24"
+                                                   VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                    </Grid>
+                                </ToggleButton>
+                                <Border x:Name="ContentSite" Visibility="Collapsed" Margin="0,13,0,0"
+                                        Padding="0,13,0,0" BorderBrush="{StaticResource DividerBrush}"
+                                        BorderThickness="0,1,0,0">
+                                    <ContentPresenter ContentSource="Content"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ContentSite" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="Chevron" Property="Text" Value="⌃"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PanelFieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <Style x:Key="PanelTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        </Style>
+        <Style x:Key="PanelDetail" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+    </Window.Resources>
+    <Border x:Name="PanelFrame" Margin="12" Padding="20,16,20,8"
+            Background="{StaticResource BgWindowGradient}"
+            BorderBrush="{StaticResource WindowBorderBrush}" BorderThickness="1"
+            CornerRadius="18">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="28" ShadowDepth="5" Color="#CC000000" Opacity="0.65"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="56"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid Margin="4,0,4,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid Width="27" Height="27" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <Ellipse Stroke="{DynamicResource AccentBrush}" StrokeThickness="3"/>
+                    <Ellipse Width="6" Height="6" Fill="{DynamicResource AccentBrush}"/>
+                </Grid>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{DynamicResource L.Brand}" FontSize="20" FontWeight="Bold"/>
+                    <Border Width="1" Height="23" Margin="17,0" Background="{StaticResource DividerBrush}"/>
+                    <TextBlock Text="{DynamicResource L.QuickPanel.Title}" FontSize="14"
+                               VerticalAlignment="Center" Foreground="{StaticResource TextSecondaryBrush}"/>
+                </StackPanel>
+                <Button Grid.Column="2" Style="{StaticResource SubtleButton}" Margin="0,0,8,0"
+                        Content="{DynamicResource L.Settings}" Click="Settings_Click"/>
+                <Button Grid.Column="3" Style="{StaticResource SubtleButton}" Width="34"
+                        Content="✕" Focusable="False" Click="Close_Click"/>
+            </Grid>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid Margin="4,0,4,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <Border x:Name="CaptureCard" Style="{StaticResource PanelCard}">
+                            <StackPanel>
+                                <Border Style="{StaticResource SegmentStrip}" Height="42">
+                                    <UniformGrid Rows="1">
+                                        <RadioButton x:Name="ReplayModeButton" GroupName="QuickPanelCaptureMode"
+                                                     Tag="replay" Content="{DynamicResource L.Capture.Replay}"
+                                                     Style="{StaticResource SegmentButton}" Click="CaptureMode_Click"/>
+                                        <RadioButton x:Name="RecordingModeButton" GroupName="QuickPanelCaptureMode"
+                                                     Tag="recording" Content="{DynamicResource L.Capture.Recording}"
+                                                     Style="{StaticResource SegmentButton}" Click="CaptureMode_Click"/>
+                                    </UniformGrid>
+                                </Border>
+                                <Grid x:Name="ReplayCaptureRow" Margin="0,14,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="CaptureDetail" Style="{StaticResource PanelDetail}"
+                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ToggleButton x:Name="CaptureToggle" Grid.Column="1" Style="{StaticResource ToggleSwitch}"
+                                                  VerticalAlignment="Center" Click="CaptureToggle_Click"/>
+                                </Grid>
+                                <Button x:Name="RecordingActionButton" Style="{StaticResource AccentButton}"
+                                        AutomationProperties.AutomationId="QuickPanelRecordingAction"
+                                        AutomationProperties.Name="{Binding Text, ElementName=RecordingActionText}"
+                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
+                                        Margin="0,14,0,0" Padding="10,11" MinHeight="44"
+                                        Visibility="Collapsed" Click="RecordingAction_Click">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                                    HorizontalAlignment="Center" Margin="0,0,8,0">
+                                            <Path x:Name="RecordingActionIcon" Data="{StaticResource IconDownload}"
+                                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="2" Width="14" Height="14" Stretch="Uniform"
+                                                  VerticalAlignment="Center" Margin="0,0,7,0"/>
+                                            <TextBlock x:Name="RecordingActionText" FontSize="12" FontWeight="ExtraBold"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="#29000000" CornerRadius="5"
+                                                Padding="6,3" VerticalAlignment="Center">
+                                            <TextBlock x:Name="RecordingActionHotkey" FontFamily="{StaticResource FontMono}"
+                                                       FontSize="9"/>
+                                        </Border>
+                                    </Grid>
+                                </Button>
+                                <Button x:Name="SaveReplayButton" Style="{StaticResource AccentButton}"
+                                        Margin="0,14,0,0" Content="{DynamicResource L.Hotkey.SaveReplay}"
+                                        Click="SaveReplay_Click"/>
+                            </StackPanel>
+                        </Border>
+                        <Expander x:Name="SystemAudioSection" Style="{StaticResource PanelExpander}"
+                                  Expanded="Section_Expanded">
+                            <Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.Audio.SystemAudio}" Style="{StaticResource PanelTitle}"/>
+                                    <TextBlock x:Name="SystemAudioDetail" Style="{StaticResource PanelDetail}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel>
+                                <StackPanel x:Name="SystemAudioSelector">
+                                    <TextBlock Text="{DynamicResource L.Audio.SystemDeviceHeader}" Style="{StaticResource PanelFieldLabel}"/>
+                                    <ComboBox x:Name="SystemAudioBox" Style="{StaticResource DarkCombo}"
+                                              SelectionChanged="SystemAudioBox_SelectionChanged"
+                                              DropDownClosed="Selector_DropDownClosed"/>
+                                </StackPanel>
+                                <Button x:Name="SystemAudioConfigure" Style="{StaticResource SubtleButton}"
+                                        Content="{DynamicResource L.Audio.ConfigureRouting}" Click="SystemAudioConfigure_Click"
+                                        Visibility="Collapsed"/>
+                                <StackPanel x:Name="SystemMeterRow" Margin="0,14,0,0">
+                                    <Grid Margin="0,0,0,6">
+                                        <TextBlock Text="{DynamicResource L.Audio.Volume}" Style="{StaticResource PanelFieldLabel}" Margin="0"/>
+                                        <TextBlock x:Name="SystemMeterText" Text="— dBFS" HorizontalAlignment="Right"
+                                                   FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </Grid>
+                                    <ProgressBar x:Name="SystemMeterBar" Style="{StaticResource DiskProgress}"
+                                                 Maximum="100" Height="6"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+                        <Expander x:Name="MicrophoneSection" Style="{StaticResource PanelExpander}"
+                                  Expanded="Section_Expanded">
+                            <Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.Audio.Microphone}" Style="{StaticResource PanelTitle}"/>
+                                    <TextBlock x:Name="MicrophoneDetail" Style="{StaticResource PanelDetail}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource L.Audio.MicDeviceHeader}" Style="{StaticResource PanelFieldLabel}"/>
+                                <ComboBox x:Name="MicrophoneBox" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="MicrophoneBox_SelectionChanged"
+                                          DropDownClosed="Selector_DropDownClosed"/>
+                                <StackPanel x:Name="MicMeterRow" Margin="0,14,0,0">
+                                    <Grid Margin="0,0,0,6">
+                                        <TextBlock Text="{DynamicResource L.Audio.Volume}" Style="{StaticResource PanelFieldLabel}" Margin="0"/>
+                                        <TextBlock x:Name="MicMeterText" Text="— dBFS" HorizontalAlignment="Right"
+                                                   FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"/>
+                                    </Grid>
+                                    <ProgressBar x:Name="MicMeterBar" Style="{StaticResource DiskProgress}"
+                                                 Maximum="100" Height="6"/>
+                                </StackPanel>
+                                <StackPanel x:Name="MicBoostRow" Margin="0,14,0,0">
+                                    <Grid Margin="0,0,0,5">
+                                        <TextBlock Text="{DynamicResource L.Audio.Boost}" Style="{StaticResource PanelFieldLabel}" Margin="0"/>
+                                        <TextBlock HorizontalAlignment="Right" FontFamily="{StaticResource FontMono}"
+                                                   FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                                                   Text="{Binding ElementName=MicBoostSlider, Path=Value, StringFormat={}+{0:0} dB}"/>
+                                    </Grid>
+                                    <Slider x:Name="MicBoostSlider" Style="{StaticResource VolumeSlider}"
+                                            Maximum="20" TickFrequency="1" IsSnapToTickEnabled="True"
+                                            ToolTip="{DynamicResource L.Audio.BoostTip}"
+                                            ValueChanged="MicBoostSlider_ValueChanged"
+                                            PreviewMouseLeftButtonUp="MicBoostSlider_MouseLeftButtonUp"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Expander>
+                        <Border Style="{StaticResource PanelCard}">
+                            <Button x:Name="LastClipButton" Style="{StaticResource PanelCardButton}"
+                                    Click="LastClip_Click">
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock Text="{DynamicResource L.QuickPanel.LastClip}" Style="{StaticResource PanelTitle}" DockPanel.Dock="Left"/>
+                                        <TextBlock Text="›" FontSize="23" Foreground="{DynamicResource AccentBrush}"
+                                                   HorizontalAlignment="Right"/>
+                                    </DockPanel>
+                                    <Border Height="135" Margin="0,12,0,10" Background="{StaticResource BgControlBrush}" CornerRadius="7">
+                                        <Image x:Name="LastClipImage" Stretch="UniformToFill"/>
+                                    </Border>
+                                    <TextBlock x:Name="LastClipName" Style="{StaticResource PanelTitle}" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock x:Name="LastClipDetail" Style="{StaticResource PanelDetail}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </Border>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <Expander x:Name="RecordingParametersSection" Style="{StaticResource PanelExpander}"
+                                  Expanded="Section_Expanded">
+                            <Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.QuickPanel.RecordingParameters}" Style="{StaticResource PanelTitle}"/>
+                                    <TextBlock x:Name="RecordingParametersDetail" Style="{StaticResource PanelDetail}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource L.Video.FrameRate}" Style="{StaticResource PanelFieldLabel}"/>
+                                <ComboBox x:Name="FrameRateBox" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="FrameRateBox_SelectionChanged"
+                                          DropDownClosed="Selector_DropDownClosed">
+                                    <ComboBoxItem Content="30 FPS" Tag="30"/>
+                                    <ComboBoxItem Content="60 FPS" Tag="60"/>
+                                    <ComboBoxItem Content="120 FPS" Tag="120"/>
+                                    <ComboBoxItem Content="144 FPS" Tag="144"/>
+                                    <ComboBoxItem Content="240 FPS" Tag="240"/>
+                                </ComboBox>
+                                <TextBlock Text="{DynamicResource L.Video.Codec}" Style="{StaticResource PanelFieldLabel}" Margin="0,13,0,6"/>
+                                <ComboBox x:Name="CodecBox" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="CodecBox_SelectionChanged"
+                                          DropDownClosed="Selector_DropDownClosed">
+                                    <ComboBoxItem Content="H264" Tag="h264"/>
+                                    <ComboBoxItem Content="HEVC" Tag="hevc"/>
+                                    <ComboBoxItem Content="AV1" Tag="av1"/>
+                                </ComboBox>
+                                <TextBlock Text="{DynamicResource L.Video.Resolution}" Style="{StaticResource PanelFieldLabel}" Margin="0,13,0,6"/>
+                                <ComboBox x:Name="ResolutionBox" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="ResolutionBox_SelectionChanged"
+                                          DropDownClosed="Selector_DropDownClosed">
+                                    <ComboBoxItem Content="{DynamicResource L.Video.SourceResolution}" Tag="source"/>
+                                    <ComboBoxItem Content="720p" Tag="720p"/>
+                                    <ComboBoxItem Content="1080p" Tag="1080p"/>
+                                    <ComboBoxItem Content="1440p" Tag="1440p"/>
+                                    <ComboBoxItem Content="2160p" Tag="2160p"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Expander>
+                        <Expander x:Name="FolderSection" Style="{StaticResource PanelExpander}"
+                                  Expanded="Section_Expanded">
+                            <Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.Storage.ReplayFolder}" Style="{StaticResource PanelTitle}"/>
+                                    <TextBlock x:Name="FolderDetail" Style="{StaticResource PanelDetail}" Margin="0,5,0,0"/>
+                                    <TextBlock x:Name="DiskDetail" Style="{StaticResource PanelDetail}" Margin="0,3,0,0"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource SubtleButton}" Content="{DynamicResource L.Tray.OpenFolder}"
+                                        Click="OpenFolder_Click" Margin="0,0,8,0"/>
+                                <Button Style="{StaticResource SubtleButton}" Content="{DynamicResource L.Storage.Change}"
+                                        Click="ChangeFolder_Click"/>
+                            </StackPanel>
+                        </Expander>
+                        <Expander x:Name="MonitorSection" Style="{StaticResource PanelExpander}"
+                                  Expanded="Section_Expanded">
+                            <Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.Video.Monitor}" Style="{StaticResource PanelTitle}"/>
+                                    <TextBlock x:Name="MonitorDetail" Style="{StaticResource PanelDetail}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource L.Video.Monitor}" Style="{StaticResource PanelFieldLabel}"/>
+                                <ComboBox x:Name="MonitorBox" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="MonitorBox_SelectionChanged"
+                                          DropDownClosed="Selector_DropDownClosed"/>
+                            </StackPanel>
+                        </Expander>
+                        <Expander x:Name="SourceSection" Style="{StaticResource PanelExpander}"
+                                  Expanded="Section_Expanded">
+                            <Expander.Header>
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource L.Video.Source}" Style="{StaticResource PanelTitle}"/>
+                                    <TextBlock x:Name="SourceDetail" Style="{StaticResource PanelDetail}" Margin="0,5,0,0"/>
+                                </StackPanel>
+                            </Expander.Header>
+                            <StackPanel>
+                                <TextBlock Text="{DynamicResource L.Video.Source}" Style="{StaticResource PanelFieldLabel}"/>
+                                <ComboBox x:Name="SourceBox" Style="{StaticResource DarkCombo}"
+                                          SelectionChanged="SourceBox_SelectionChanged"
+                                          DropDownClosed="Selector_DropDownClosed">
+                                    <ComboBoxItem Content="{DynamicResource L.Video.Desktop}" Tag="desktop"/>
+                                    <ComboBoxItem Content="{DynamicResource L.Video.GameSource}" Tag="game"/>
+                                </ComboBox>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

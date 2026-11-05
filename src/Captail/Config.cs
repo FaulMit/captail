@@ -6,6 +6,8 @@ namespace Captail;
 
 public sealed class Config
 {
+    internal const int MinimumBufferSeconds = 1;
+    internal const int MaximumBufferSeconds = 86400;
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = true,
@@ -15,14 +17,24 @@ public sealed class Config
     public int BufferSeconds { get; set; } = 300;
     /// <summary>0 = duration-only limit.</summary>
     public int MaxReplaySizeMb { get; set; }
+    public bool DiskReplayBufferEnabled { get; set; }
     public int FrameRate { get; set; } = 60;
     /// <summary>0 = adaptive bitrate based on codec and load.</summary>
     public int BitrateMbps { get; set; }
+    public bool AdvancedSettingsEnabled { get; set; }
+    public EncoderTuningOptions EncoderTuning { get; set; } = new();
+    public List<RecordingPreset> RecordingPresets { get; set; } = [];
+    public string SelectedRecordingPresetId { get; set; } = "";
     public string Hotkey { get; set; } = "Ctrl+Shift+F10";
     public string ToggleReplayHotkey { get; set; } = "Ctrl+Shift+F9";
+    public string QuickPanelHotkey { get; set; } = "Ctrl+Shift+F11";
+    public bool InstantScreenshotsEnabled { get; set; }
+    public string ScreenshotHotkey { get; set; } = "Ctrl+Shift+F12";
+    /// <summary>"left" or "right".</summary>
+    public string QuickPanelSide { get; set; } = "right";
     /// <summary>"replay" or "recording".</summary>
     public string CaptureMode { get; set; } = "replay";
-    public bool ReplayEnabled { get; set; } = true;
+    public bool ReplayEnabled { get; set; } = false;
     public bool WarnWhenGameStartsWithReplayOff { get; set; } = true;
     public bool ShowRecordingIndicator { get; set; } = true;
     /// <summary>"top-left", "top-right", "bottom-left", or "bottom-right".</summary>
@@ -164,10 +176,20 @@ public sealed class Config
         Language = source.Language;
         BufferSeconds = source.BufferSeconds;
         MaxReplaySizeMb = source.MaxReplaySizeMb;
+        DiskReplayBufferEnabled = source.DiskReplayBufferEnabled;
         FrameRate = source.FrameRate;
         BitrateMbps = source.BitrateMbps;
+        AdvancedSettingsEnabled = source.AdvancedSettingsEnabled;
+        EncoderTuning = (source.EncoderTuning ?? new()) with { };
+        RecordingPresets = (source.RecordingPresets ?? [])
+            .Where(preset => preset is not null).Select(preset => preset.Clone()).ToList();
+        SelectedRecordingPresetId = source.SelectedRecordingPresetId;
         Hotkey = source.Hotkey;
         ToggleReplayHotkey = source.ToggleReplayHotkey;
+        QuickPanelHotkey = source.QuickPanelHotkey;
+        InstantScreenshotsEnabled = source.InstantScreenshotsEnabled;
+        ScreenshotHotkey = source.ScreenshotHotkey;
+        QuickPanelSide = source.QuickPanelSide;
         CaptureMode = source.CaptureMode;
         ReplayEnabled = source.ReplayEnabled;
         WarnWhenGameStartsWithReplayOff = source.WarnWhenGameStartsWithReplayOff;
@@ -209,9 +231,11 @@ public sealed class Config
         string.Equals(CaptureMode, other.CaptureMode, StringComparison.Ordinal) &&
         (string.Equals(CaptureMode, "recording", StringComparison.Ordinal) ||
          (BufferSeconds == other.BufferSeconds &&
-          MaxReplaySizeMb == other.MaxReplaySizeMb)) &&
+          MaxReplaySizeMb == other.MaxReplaySizeMb &&
+          DiskReplayBufferEnabled == other.DiskReplayBufferEnabled)) &&
         FrameRate == other.FrameRate &&
         BitrateMbps == other.BitrateMbps &&
+        EncoderTuning == other.EncoderTuning &&
         string.Equals(Codec, other.Codec, StringComparison.Ordinal) &&
         MonitorIndex == other.MonitorIndex &&
         string.Equals(RecordingResolution, other.RecordingResolution, StringComparison.Ordinal) &&
@@ -234,18 +258,52 @@ public sealed class Config
     {
         Language = NormalizeLanguage(Language);
         CaptureMode = AllowedText(CaptureMode, ["replay", "recording"], "replay");
-        BufferSeconds = AllowedValue(BufferSeconds, [15, 30, 60, 120, 300, 600, 900], 300);
+        BufferSeconds = Math.Clamp(BufferSeconds, MinimumBufferSeconds, MaximumBufferSeconds);
         MaxReplaySizeMb = AllowedValue(MaxReplaySizeMb, [0, 250, 500, 1000, 2000, 5000, 10000], 0);
         FrameRate = AllowedValue(FrameRate, [30, 60, 120, 144, 240], 60);
         BitrateMbps = AllowedValue(BitrateMbps, [0, 10, 20, 50, 80], 0);
+        EncoderTuning ??= new();
+        EncoderTuning.Normalize();
+        RecordingPresets = RecordingPreset.NormalizeLibrary(RecordingPresets);
+        SelectedRecordingPresetId = SelectedRecordingPresetId?.Trim() ?? "";
+        if (!RecordingPresets.Any(preset => preset.Id == SelectedRecordingPresetId))
+            SelectedRecordingPresetId = "";
         Hotkey = NormalizeHotkey(Hotkey, "Ctrl+Shift+F10");
         ToggleReplayHotkey = NormalizeHotkey(ToggleReplayHotkey, "Ctrl+Shift+F9");
+        QuickPanelHotkey = NormalizeHotkey(QuickPanelHotkey, "Ctrl+Shift+F11");
         if (!HotkeyManager.IsValid(Hotkey))
             Hotkey = "Ctrl+Shift+F10";
         if (!HotkeyManager.IsValid(ToggleReplayHotkey) ||
             !HotkeyManager.AreDistinct(Hotkey, ToggleReplayHotkey))
         {
             ToggleReplayHotkey = "Ctrl+Shift+F9";
+        }
+        if (!HotkeyManager.IsValid(QuickPanelHotkey) ||
+            !HotkeyManager.AreDistinct(Hotkey, QuickPanelHotkey) ||
+            !HotkeyManager.AreDistinct(ToggleReplayHotkey, QuickPanelHotkey))
+        {
+            QuickPanelHotkey = new[]
+            {
+                "Ctrl+Shift+F11", "Ctrl+Shift+F12",
+                "Ctrl+Alt+F11", "Ctrl+Alt+F12",
+            }.First(candidate =>
+                HotkeyManager.AreDistinct(Hotkey, candidate) &&
+                HotkeyManager.AreDistinct(ToggleReplayHotkey, candidate));
+        }
+        QuickPanelSide = AllowedText(QuickPanelSide, ["left", "right"], "right");
+        ScreenshotHotkey = NormalizeHotkey(ScreenshotHotkey, "Ctrl+Shift+F12");
+        if (!HotkeyManager.IsValid(ScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(Hotkey, ScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(ToggleReplayHotkey, ScreenshotHotkey) ||
+            !HotkeyManager.AreDistinct(QuickPanelHotkey, ScreenshotHotkey))
+        {
+            ScreenshotHotkey = new[]
+            {
+                "Ctrl+Shift+F12", "Ctrl+Alt+F12", "Ctrl+Alt+F11", "Ctrl+Alt+F10",
+            }.First(candidate =>
+                HotkeyManager.AreDistinct(Hotkey, candidate) &&
+                HotkeyManager.AreDistinct(ToggleReplayHotkey, candidate) &&
+                HotkeyManager.AreDistinct(QuickPanelHotkey, candidate));
         }
         Codec = AllowedText(Codec, ["h264", "hevc", "av1"], "h264");
         MonitorIndex = Math.Clamp(MonitorIndex, 0, 63);

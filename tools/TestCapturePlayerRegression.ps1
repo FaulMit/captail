@@ -74,8 +74,8 @@ Assert-Contains $engine 'obs_sceneitem_set_bounds_type\([\s\S]*?BoundsType\.Stre
 Assert-Contains $native 'obs_sceneitem_set_bounds\(' `
     "OBS interop must expose scene-item bounds for stretched Game Capture."
 Assert-Contains $engine `
-    'obs_data_set_bool\(settings,\s*"force_sdr",\s*true\)' `
-    "SDR recording must force HDR display capture through SDR conversion."
+    'obs_data_set_bool\(settings,\s*"force_sdr",\s*false\)' `
+    "Desktop capture must preserve HDR input for OBS tone mapping into the SDR canvas."
 Assert-Contains $engine `
     'obs_set_video_levels\(\s*ObsSdrWhiteLevel,\s*ObsHdrNominalPeakLevel\)' `
     "HDR Game Capture must initialize OBS tone-mapping levels."
@@ -94,7 +94,9 @@ Assert-Contains $engine 'id\s*==\s*_adapterIndex' `
 
 Assert-Contains $player 'public void SetVolumePercent\(' `
     "Embedded player needs runtime volume control."
-Assert-Contains $player 'SetOption\("hwdec", "d3d11va,auto-safe"\)' `
+Assert-Contains $player 'PreferredHardwareDecoders = "d3d11va,auto-safe"' `
+    "Hardware decoder preference must retain direct D3D11 followed by safe fallback."
+Assert-Contains $player 'SetOption\("hwdec", PreferredHardwareDecoders\)' `
     "Windows player must prefer direct D3D11 hardware decoding before safe fallback."
 Assert-Contains $player 'SetOption\("framedrop", "decoder"\)' `
     "High-frame-rate replay preview must drop late decoded frames under GPU pressure."

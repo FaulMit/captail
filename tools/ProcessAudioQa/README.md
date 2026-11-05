@@ -46,6 +46,21 @@ tone. This validates native audio separation independently of game hooking.
 All reports, recordings, and OBS configuration are written below
 `.qa/process-audio`, which is ignored by Git.
 
+`--separate-game executable.exe` exercises the same automatic mixer routing
+planner and identity-qualified reconciliation as Separate mode. Each probe is
+labelled `game-<PID>-N` or `system-<PID>-N`; ordinary output uses a
+`system-global-N` exclusion probe. Pass the native plugin with `--plugin`.
+Use independent known tones for the game and another application, both routed
+through Voicemeeter. Assert that the game tone remains on Game and the other
+tone remains on System without the game tone. This harness does not alter
+Windows device routing or Captail configuration.
+
+`ProcessAudioFoundationQa --separate-capture=<directory>` additionally exercises
+the production three-track recording graph, gains, encoders, muxer and teardown.
+It uses `Issue53AudioSignal.exe` as the detected game fixture, independently of
+game hook recognition. Check the resulting `capture.json` path with FFprobe and
+decode each track. Real-game recognition and NGENUITY still need separate QA.
+
 The Debug Captail build also accepts backend-only mux QA arguments. They do
 not add product UI or persisted test settings:
 

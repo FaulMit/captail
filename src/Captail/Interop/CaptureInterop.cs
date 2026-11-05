@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Captail.Interop;
 
@@ -27,6 +28,12 @@ internal static class CaptureInterop
 
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(nint window, StringBuilder text, int count);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(nint window, StringBuilder text, int count);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(
@@ -89,7 +96,12 @@ internal static class CaptureInterop
     public sealed record ForegroundAppInfo(
         string Executable,
         string FullPath,
-        bool IsFullscreen);
+        bool IsFullscreen)
+    {
+        public nint Window { get; init; }
+        public string Title { get; init; } = "";
+        public string WindowClass { get; init; } = "";
+    }
 
     public static List<MonitorInfo> EnumerateMonitors()
     {
@@ -159,10 +171,22 @@ internal static class CaptureInterop
                 // Process name still allows normal hook/foreground matching.
             }
 
+            var title = new StringBuilder(1025);
+            var windowClass = new StringBuilder(256);
+            int titleLength = GetWindowText(window, title, title.Capacity);
+            int classLength = GetClassName(window, windowClass, windowClass.Capacity);
+            // Focus can change while process metadata is being read.
+            if (GetForegroundWindow() != window)
+                return new ForegroundAppInfo("", "", false);
             return new ForegroundAppInfo(
                 executable,
                 fullPath,
-                CoversMonitor(window));
+                CoversMonitor(window))
+            {
+                Window = window,
+                Title = titleLength > 0 ? title.ToString() : "",
+                WindowClass = classLength > 0 ? windowClass.ToString() : "",
+            };
         }
         catch (Exception exception) when (
             exception is ArgumentException or InvalidOperationException or Win32Exception)

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Captail/Captail.csproj" />
+    <Content Include="../../native/ObsBridge/build/Release/CaptailObsBridge.dll" Link="CaptailObsBridge.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../native/ProcessAudio/build/Release/captail-process-audio.dll" Link="obs-plugins/64bit/captail-process-audio.dll" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../runtime/ffmpeg/*" Link="ffmpeg/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

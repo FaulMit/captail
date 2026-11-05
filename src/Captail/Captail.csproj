@@ -15,7 +15,7 @@
     <RootNamespace>Captail</RootNamespace>
     <ApplicationIcon>Assets\Captail.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>0.2.4</Version>
+    <Version>0.3.0</Version>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <DefineConstants Condition="'$(MicrosoftStoreBuild)' == 'true'">$(DefineConstants);MICROSOFT_STORE</DefineConstants>
   </PropertyGroup>
@@ -60,6 +60,8 @@
     <ObsPluginSdkRoot>$(MSBuildProjectDirectory)\..\..\runtime\obs-sdk</ObsPluginSdkRoot>
     <ProcessAudioSource>$(MSBuildProjectDirectory)\..\..\native\ProcessAudio</ProcessAudioSource>
     <ProcessAudioBuild>$(ProcessAudioSource)\build$(NativeBuildSuffix)</ProcessAudioBuild>
+    <ObsWinrtSource>$(MSBuildProjectDirectory)\..\..\native\ObsWinrt</ObsWinrtSource>
+    <ObsWinrtBuild>$(ObsWinrtSource)\build$(NativeBuildSuffix)</ObsWinrtBuild>
     <NativeCmakeGenerator Condition="'$(NativeCmakeGenerator)' == ''">Visual Studio 17 2022</NativeCmakeGenerator>
   </PropertyGroup>
 
@@ -127,6 +129,12 @@
     <Exec Command="cmake --build &quot;$(ObsBridgeBuild)&quot; --config Release --target CaptailObsBridge" />
   </Target>
 
+  <Target Name="BuildObsWinrt" BeforeTargets="PrepareForBuild" DependsOnTargets="AcquireObsPluginSdk">
+    <Exec Condition="!Exists('$(ObsWinrtBuild)\CaptailObsWinrt.sln')"
+          Command="cmake -S &quot;$(ObsWinrtSource)&quot; -B &quot;$(ObsWinrtBuild)&quot; -G &quot;$(NativeCmakeGenerator)&quot; -A x64 -DOBS_INCLUDE_DIR=&quot;$(ObsPluginSdkRoot)\include&quot;" />
+    <Exec Command="cmake --build &quot;$(ObsWinrtBuild)&quot; --config Release --target CaptailObsWinrt" />
+  </Target>
+
   <Target Name="CopyObsBridge" AfterTargets="Build" DependsOnTargets="BuildObsBridge">
     <Copy SourceFiles="$(ObsBridgeBuild)\Release\CaptailObsBridge.dll"
           DestinationFolder="$(OutDir)" />
@@ -174,8 +182,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
-    <Content Include="$(ObsRuntimeRoot)\bin\**\*">
+    <Content Include="$(ObsRuntimeRoot)\bin\**\*" Exclude="$(ObsRuntimeRoot)\bin\libobs-winrt.dll">
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(ObsWinrtBuild)\Release\libobs-winrt.dll" Link="libobs-winrt.dll">
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>

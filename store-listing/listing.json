@@ -1,6 +1,6 @@
 {
   "SchemaVersion": 1,
-  "ReleaseVersion": "0.2.4",
+  "ReleaseVersion": "0.3.0",
   "Screenshots": [
     {
       "Source": "images/captail-main.png",
@@ -53,7 +53,7 @@
         "Per-game replay folders",
         "Eleven interface languages"
       ],
-      "ReleaseNotes": "Captail 0.2.4 combines playback and trimming in one window, with the full timeline, audio tracks, and save actions always available. Export now offers format, resolution, video codec, bitrate, and audio codec settings. Clip browsing and active-clip highlighting are more responsive, accent colors carry through to window and shortcut icons, and updated media runtimes improve compatibility. Desktop capture preparation was also improved on supported Windows systems.",
+      "ReleaseNotes": "Captail 0.3.0 adds recording presets, advanced encoder settings, a quick sidebar, independent instant screenshots, an optional disk replay buffer, and Bulgarian translation. Audio-track labels follow the interface language. The player stays open after trimming. Display-change recovery, borderless capture fallback, and Voicemeeter Separate tracks routing are improved. Long disk-buffer saves on slow drives remain a known limitation. Repeated multi-track player sessions also close safely.",
       "Keywords": [
         "instant replay",
         "game recorder",
@@ -92,7 +92,7 @@
         "Раздельные папки для разных игр",
         "Одиннадцать языков интерфейса"
       ],
-      "ReleaseNotes": "Captail 0.2.4 объединяет воспроизведение и обрезку в одном окне: шкала времени, аудиодорожки и сохранение всегда доступны. При экспорте можно выбрать формат, разрешение, видеокодек, битрейт и аудиокодек. Быстрее работает список клипов, заметнее выделяется воспроизводимый клип, значки окон и ярлыков соответствуют цвету интерфейса. Обновлены медиакомпоненты и подготовка захвата рабочего стола на поддерживаемых версиях Windows.",
+      "ReleaseNotes": "Captail 0.3.0: пресеты записи, расширенные настройки кодировщика, быстрая боковая панель, мгновенные скриншоты независимо от записи, дисковый буфер повторов и болгарский язык. Названия аудиодорожек переведены. Плеер остаётся открытым после обрезки. Улучшены восстановление при смене монитора и dual-mode, выбор захвата без рамки и маршрутизация Voicemeeter в режиме отдельных дорожек. Долгое сохранение дискового буфера на медленных накопителях остаётся известным ограничением. Исправлен сбой при закрытии повторных сеансов плеера с несколькими дорожками.",
       "Keywords": [
         "мгновенный повтор",
         "запись игр",

@@ -30,15 +30,17 @@
 Captail is a focused alternative to NVIDIA ShadowPlay Instant Replay. It can keep the latest seconds or minutes in a rolling buffer or write a continuous recording until you stop it. No scenes, streaming setup, account, cloud upload, analytics, or telemetry.
 
 > [!WARNING]
-> Captail `v0.2.4` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
+> Captail `v0.3.0` is an early public preview. Recording works, but bugs and hardware-specific problems are expected. NVIDIA RTX 40 and RTX 50 series are tested; other GPUs need broader public testing.
 
-## What's new in Captail 0.2.4?
+## What's new in Captail 0.3.0?
 
-- Play and trim clips in one window, with the complete timeline, audio tracks, and save actions always available.
-- Export clips with a chosen format, resolution, video codec, bitrate, and audio codec.
-- Browse recent clips more smoothly and see which clip is currently playing.
-- Use window and shortcut icons that match your chosen accent color.
-- Benefit from updated media runtimes and improved desktop-capture preparation on supported systems.
+- Save recording presets and reveal advanced encoder settings when needed.
+- Open the quick sidebar with `Ctrl+Shift+F11` to control capture and switch presets.
+- Take instant screenshots independently of replay recording, or use an optional disk replay buffer.
+- Keep editing after a trim, with localized audio-track labels and a Bulgarian interface option.
+- Benefit from improved display-change recovery, borderless-capture fallback, and Voicemeeter Separate tracks routing.
+
+Long disk-buffer saves on slow drives remain a known limitation. See the [release notes](CHANGELOG.md#030---2026-11-05) for details.
 
 ## Is Captail for me?
 
@@ -97,7 +99,7 @@ Every Captail package includes .NET, libobs, FFmpeg, and the embedded preview pl
 ## How do I save my first replay?
 
 1. Launch Captail. It stays available from the system tray.
-2. Keep **Instant Replay** selected on the main dashboard.
+2. Select **Instant Replay** on the main dashboard and enable it when ready. Fresh installations start with replay disabled.
 3. Open Settings and choose **Desktop** or **Game Capture**.
 4. Choose buffer length, codec, resolution, FPS, and audio sources.
 5. Play normally.
@@ -116,7 +118,7 @@ The optional replay status indicator keeps recording state visible over games an
 
 Enable **Warn when a game starts** if you want one quiet reminder when Captail detects a game while Instant Replay is disabled. The reminder never enables recording automatically.
 
-On first launch, Captail follows your Windows language when it supports it; otherwise it starts in English. Use the compact language control in the title bar to switch between English, Russian, Ukrainian, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Japanese, Korean, and Polish.
+On first launch, Captail follows your Windows language when it supports it; otherwise it starts in English. Use the compact language control in the title bar to switch between English, Russian, Ukrainian, Simplified Chinese, Spanish, Brazilian Portuguese, German, French, Japanese, Korean, Polish, and Bulgarian.
 
 If similarly sized monitors are hard to distinguish, open Video settings and select **Identify displays** beside the monitor list. Captail briefly places a large number on each matching screen.
 
@@ -146,10 +148,10 @@ Recovery reduces lost footage; it cannot guarantee frames that Windows, a game, 
 
 ## Where is the rolling buffer stored?
 
-The live replay buffer stores compressed video and audio packets in **RAM**. Only saved replays are written to your selected folder.
+By default, the live replay buffer stores compressed video and audio packets in **RAM**. Enable the optional disk replay buffer to keep temporary segments under `.captail-buffer` in your replay folder. Captail excludes these segments from the library and cleans up its session files. Saving long disk-buffer clips to a slow drive can take substantial time.
 
 - **Buffer length** controls how much recent time Captail tries to keep.
-- **Buffer limit** caps compressed replay data in RAM. If it is reached first, available replay time becomes shorter.
+- **Buffer limit** caps compressed replay history. If it is reached first, available replay time becomes shorter; disk-buffer active segments and saves can temporarily exceed the limit.
 - **Bitrate, resolution, FPS, and codec** affect both memory use and saved file size.
 - The dashboard shows free space on the drive containing your replay folder.
 
@@ -295,7 +297,7 @@ dotnet build .\Captail.sln -c Debug --no-restore
 
 The first build acquires the pinned OBS and FFmpeg runtimes when they are missing.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Release maintainers should use [docs/RELEASING.md](docs/RELEASING.md) and the [README screenshot plan](docs/SCREENSHOTS.md); published binaries are built and verified by GitHub Actions.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Release maintainers should use [docs/RELEASING.md](docs/RELEASING.md) and preserve the README showcase video; published binaries are built and verified by GitHub Actions.
 
 ## License and attribution
 

@@ -1,7 +1,7 @@
 #include <Windows.h>
 #include <chrono>
 #include <d3d11.h>
-#include <dxgi.h>
+#include <dxgi1_4.h>
 #include <wrl/client.h>
 
 using Microsoft::WRL::ComPtr;
@@ -27,6 +27,9 @@ int WINAPI wWinMain(
     const int client_height = GetSystemMetrics(SM_CYSCREEN);
     const bool stretched_back_buffer =
         command_line && wcsstr(command_line, L"--stretched") != nullptr;
+    const bool exclusive = command_line && wcsstr(command_line, L"--exclusive") != nullptr;
+    const bool screenshot_qa = command_line && wcsstr(command_line, L"--screenshot-qa") != nullptr;
+    const bool hdr_buffer = command_line && wcsstr(command_line, L"--hdr-buffer") != nullptr;
     constexpr DWORD window_style = WS_POPUP;
 
     WNDCLASSW window_class{};
@@ -64,13 +67,13 @@ int WINAPI wWinMain(
         swap_desc.BufferDesc.Height = 1024;
         swap_desc.BufferDesc.Scaling = DXGI_MODE_SCALING_STRETCHED;
     }
-    swap_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    swap_desc.BufferDesc.Format = hdr_buffer ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM;
     swap_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swap_desc.OutputWindow = window;
     swap_desc.SampleDesc.Count = 1;
     swap_desc.Windowed = TRUE;
     swap_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    swap_desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
+    swap_desc.Flags = exclusive ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING;
 
     ComPtr<ID3D11Device> device;
     ComPtr<ID3D11DeviceContext> context;
@@ -91,6 +94,25 @@ int WINAPI wWinMain(
         &context);
     if (FAILED(result))
         return 3;
+    if (hdr_buffer) {
+        ComPtr<IDXGISwapChain3> swap3;
+        if (FAILED(swap_chain.As(&swap3)) ||
+            FAILED(swap3->SetColorSpace1(DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709)))
+            return 10;
+    }
+
+    ShowWindow(window, screenshot_qa ? SW_SHOW : show);
+    if (screenshot_qa)
+        SetForegroundWindow(window);
+    if (exclusive) {
+        if (FAILED(swap_chain->SetFullscreenState(TRUE, nullptr)))
+            return 7;
+        // Flip-model swap chains must resize after entering exclusive fullscreen.
+        if (FAILED(swap_chain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, swap_desc.Flags))) {
+            swap_chain->SetFullscreenState(FALSE, nullptr);
+            return 8;
+        }
+    }
 
     ComPtr<ID3D11Texture2D> back_buffer;
     ComPtr<ID3D11RenderTargetView> render_target;
@@ -107,7 +129,6 @@ int WINAPI wWinMain(
     if (FAILED(device->CreateTexture2D(&stress_desc, nullptr, &stress_texture)))
         return 5;
 
-    ShowWindow(window, show);
     uint32_t frame = 0;
     constexpr auto frame_interval = std::chrono::nanoseconds(1'000'000'000 / 240);
     auto next_frame = std::chrono::steady_clock::now();
@@ -133,7 +154,12 @@ int WINAPI wWinMain(
             context->CopyResource(stress_texture.Get(), back_buffer.Get());
             context->CopyResource(back_buffer.Get(), stress_texture.Get());
         }
-        swap_chain->Present(0, DXGI_PRESENT_ALLOW_TEARING);
+        result = swap_chain->Present(exclusive ? 1 : 0, exclusive ? 0 : DXGI_PRESENT_ALLOW_TEARING);
+        if (FAILED(result)) {
+            if (exclusive)
+                swap_chain->SetFullscreenState(FALSE, nullptr);
+            return 9;
+        }
         measurement_frames++;
         const auto measurement_now = std::chrono::steady_clock::now();
         const auto measurement_elapsed = measurement_now - measurement_start;
@@ -153,5 +179,7 @@ int WINAPI wWinMain(
         if (now - next_frame > frame_interval)
             next_frame = now;
     }
+    if (exclusive)
+        swap_chain->SetFullscreenState(FALSE, nullptr);
     return 0;
 }

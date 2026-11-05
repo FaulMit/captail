@@ -60,10 +60,19 @@ Require $engine 'RequiredObsVersion\s*=\s*"32\.2\.2"' `
 Require $mpvAcquisition '\$version\s*=\s*"v0\.41\.0-1023-g69e63f425"' `
     "mpv runtime must stay on the validated v0.41.0-1023 build."
 Require $mpvAcquisition `
+    '177897acc207c211245da44c33e16ff12958dff7b07ccf1f3ed31f0d134dd005' `
+    "Mirrored mpv runtime archive hash is not pinned."
+Require $mpvAcquisition `
     'fac135c68a35b7639e39d72c0c365104edbaebdea39a0dfdd8c36e8c8e80faef' `
     "mpv runtime archive hash is not pinned."
 Require $ffmpegAcquisition '\$version\s*=\s*"n9\.0\.1-84-g946fcce07b"' `
     "FFmpeg runtime must stay on the validated 9.0.1 build."
+Require $ffmpegAcquisition `
+    '675a7772d369f09928da8b23ef8b975114ba754f09136ccbe63ec1d7150e0cee' `
+    "Mirrored FFmpeg shared runtime archive hash is not pinned."
+Require $ffmpegAcquisition `
+    'caa82e5c5540bed005806a2ab8891e7a24aa2d3ca84f5d34ff18cf010e237536' `
+    "Mirrored FFmpeg static runtime archive hash is not pinned."
 Require $ffmpegAcquisition `
     'a2a50423b631cb51e91c2668c16a4807197c50d1f5fc56dd4516ca188a0d731f' `
     "FFmpeg shared runtime archive hash is not pinned."

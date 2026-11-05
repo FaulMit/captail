@@ -646,6 +646,12 @@
                                     Margin="0,14,0,0" Padding="12,8"
                                     HorizontalAlignment="Stretch"
                                     Click="ExportAs_Click"/>
+                            <Button Content="{DynamicResource L.Library.UploadToYouTube}"
+                                    Style="{StaticResource SubtleButton}"
+                                    Margin="0,8,0,0" Padding="12,8"
+                                    HorizontalAlignment="Stretch"
+                                    ToolTip="{DynamicResource L.Library.UploadToYouTubeHint}"
+                                    Click="UploadToYouTube_Click"/>
                         </StackPanel>
                     </Border>
                 </Popup>
