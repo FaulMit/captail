@@ -1269,7 +1269,7 @@ public partial class App : Application
                 amd.Preferred("h264")?.Family == "amf" &&
                 intel.Preferred("av1")?.Family == "qsv" &&
                 intel.Preferred("h264")?.Family == "qsv" &&
-                invalidConfig.BufferSeconds == 300 &&
+                invalidConfig.BufferSeconds == 1 &&
                 invalidConfig.FrameRate == 60 &&
                 invalidConfig.Codec == "h264" &&
                 invalidConfig.SystemAudioVolume == 100 &&
@@ -1290,6 +1290,7 @@ public partial class App : Application
                 $"oldNvidiaAv1={oldNvidia.Supports("av1")}, " +
                 $"amd={amd.Preferred("av1")?.Family}, " +
                 $"intel={intel.Preferred("av1")?.Family}, " +
+                $"normalizedBuffer={invalidConfig.BufferSeconds}, " +
                 $"legacyCapture={legacyWindowsCaptureMethod}, " +
                 $"win10Capture={windows10CaptureMethod}, " +
                 $"win11Capture={windows11CaptureMethod}, " +
